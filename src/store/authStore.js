@@ -2,15 +2,14 @@
 //  Zustand Auth Store
 //  Manages user authentication state globally.
 //  Mock login: user@visa.com
-//  Replace login() action with real API call when backend ready.
 // ============================================================
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
 
 // ── Axios Instance ───────────────────────────────────────────
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-const API_BASE_URL = isLocal ? "http://localhost:5000/api" : "/api";
+export const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+export const API_BASE_URL = `${SERVER_URL}/api`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
