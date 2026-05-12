@@ -1,44 +1,36 @@
-// ============================================================
-//  Application Form Page (Multi-Step)
-//  Step 1: Personal Information
-//  Step 2: Document Upload (drag-drop UI)
-//  Step 3: Payment Summary (Stripe placeholder)
-//
-//  Uses React Hook Form + Zustand uiStore for step tracking.
-//  URL param :countryId pre-selects the destination.
-// ============================================================
-import { useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { 
-  ArrowRight, ArrowLeft, CheckCircle, 
-  UploadCloud, Upload, User, Mail, Calendar, Plane, CreditCard, ShieldCheck, X, FileText, AlertCircle
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle,
+  CreditCard,
+  FileText,
+  Image as ImageIcon,
+  Minus,
+  Plane,
+  Plus,
+  X,
+  ShieldCheck,
+  Upload,
+  AlertCircle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/layout/Navbar";
-import StepIndicator from "../components/ui/StepIndicator";
 import Button from "../components/ui/Button";
-import Input, { Select } from "../components/ui/Input";
-import Card from "../components/ui/Card";
-import { useUIStore } from "../store/uiStore";
-import { useAuthStore, api } from "../store/authStore";
+import GoogleDriveLinkHint from "../components/application/GoogleDriveLinkHint";
 import { getCountryById, COUNTRIES } from "../data/countries";
-import { useUIStore as useUI } from "../store/uiStore";
-import { useDataStore } from "../store/dataStore";
+import { api, useAuthStore } from "../store/authStore";
+import { useUIStore } from "../store/uiStore";
+import { useCountries, useMergedCountry } from "../hooks/useCountries";
+import ContactVerificationModal from "../components/account/ContactVerificationModal";
+import {
+  needsPhoneContactGate,
+  needsEmailContactGate,
+} from "../utils/contactVerificationGate";
+import { clearTravelDraft, saveTravelDraft } from "../utils/travelDraftStorage";
 
-// Helper to load Razorpay script dynamically
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-
-// ── Step labels ────────────────────────────────────────────
-const STEPS = ["Personal Info", "Documents", "Payment"];
+const MAX_DOCUMENT_SIZE_BYTES = 500 * 1024;
+const FILE_SIZE_ERROR = "File must be below 500kb";
 
 const normalizeProcessingDays = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -47,748 +39,719 @@ const normalizeProcessingDays = (value) => {
   return Number(matches[matches.length - 1]);
 };
 
-// ── Nationality options ────────────────────────────────────
-const NATIONALITIES = [
-  { value: "us", label: "🇺🇸 United States" },
-  { value: "in", label: "🇮🇳 India" },
-  { value: "gb", label: "🇬🇧 United Kingdom" },
-  { value: "ca", label: "🇨🇦 Canada" },
-  { value: "au", label: "🇦🇺 Australia" },
-  { value: "ae", label: "🇦🇪 UAE" },
-  { value: "de", label: "🇩🇪 Germany" },
-  { value: "fr", label: "🇫🇷 France" },
-  { value: "jp", label: "🇯🇵 Japan" },
-  { value: "sg", label: "🇸🇬 Singapore" },
-  { value: "other", label: "🌍 Other" },
-];
+const DOCUMENT_META = {
+  passport: { label: "Passport Upload", Icon: FileText },
+  idCard: { label: "Aadhaar Card Upload", Icon: CreditCard },
+  dobCertificate: { label: "DOB Certificate Upload", Icon: FileText },
+  photo: { label: "Passport Photo Upload", Icon: ImageIcon },
+  bankStatement: { label: "Bank Statement Upload", Icon: FileText },
+  travelInsurance: { label: "Travel Insurance Upload", Icon: ShieldCheck },
+  flightTicket: { label: "Flight Ticket Upload", Icon: Plane },
+  hotelBooking: { label: "Hotel Booking Upload", Icon: Building2 },
+  coverLetter: { label: "Cover Letter Upload", Icon: FileText },
+  invitationLetter: { label: "Invitation Letter Upload", Icon: FileText },
+  employmentLetter: { label: "Employment Letter Upload", Icon: FileText },
+  taxReturn: { label: "ITR / Tax Return Upload", Icon: FileText },
+  marriageCertificate: { label: "Marriage Certificate Upload", Icon: FileText },
+};
 
-// ── Mock uploaded files ────────────────────────────────────
-// In production, these would be uploaded to Cloudinary
-const MOCK_DOCS = [
-  { key: "passport", label: "Passport Copy", required: true, accept: ".pdf,.jpg,.png", icon: "🛂" },
-  { key: "photo",    label: "Passport Photo", required: true, accept: ".jpg,.png",     icon: "📷" },
-  { key: "bank",     label: "Bank Statement", required: false, accept: ".pdf",          icon: "🏦" },
-  { key: "itinerary",label: "Travel Itinerary", required: false, accept: ".pdf",        icon: "✈️" },
-];
+const buildDocFields = (documentKeys = ["passport"]) => {
+  const keys = Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"];
+  const seen = new Set();
 
-// ─────────────────────────────────────────────────────────────
-//  COMPONENT
-// ─────────────────────────────────────────────────────────────
-const ApplicationForm = () => {
-  const { countryId } = useParams();
-  const navigate       = useNavigate();
-  const { user }       = useAuthStore();
-  const { showToast }  = useUI();
-  const { addBooking, applicationDraft, setApplicationDraft, clearApplicationDraft } = useDataStore();
-
-  // Zustand step state
-  const { currentStep, nextStep, prevStep, resetSteps } = useUIStore();
-
-  // Get country data (or default to first country if none specified)
-  const country = getCountryById(countryId) || COUNTRIES[0];
-  
-
-  // ── React Hook Form ────────────────────────────────────────
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    trigger,
-    getValues,
-  } = useForm({
-    defaultValues: applicationDraft || {
-      firstName:    user?.name?.split(" ")[0] || "",
-      lastName:     user?.name?.split(" ")[1] || "",
-      email:        user?.email || "",
-      nationality:  "",
-      passportNo:   "",
-      dob:          "",
-      travelDate:   "",
-      returnDate:   "",
-      purpose:      "tourism",
-    },
-  });
-
-  // ── Document upload state ──────────────────────────────────
-  const [uploadedFiles, setUploadedFiles] = useState({});
-  const [dragging, setDragging]           = useState(null); // key of doc being dragged over
-  const [submitted, setSubmitted]         = useState(false);
-  const [isSubmitting, setIsSubmitting]   = useState(false);
-
-  // ── Country selector (override via dropdown) ──────────────
-  const [selectedCountryId, setSelectedCountryId] = useState(country.id);
-  const selectedCountry = getCountryById(selectedCountryId) || country;
-
-  // ── Handle file drop / select ─────────────────────────────
-  const handleFileDrop = useCallback((key, file) => {
-    if (!file) return;
-    setUploadedFiles((prev) => ({ ...prev, [key]: file }));
+  const fields = keys.reduce((acc, key) => {
+    if (!key || seen.has(key)) return acc;
+    seen.add(key);
+    acc.push({
+      key,
+      label: DOCUMENT_META[key]?.label || `${key.replace(/([A-Z])/g, " $1")} Upload`,
+      Icon: DOCUMENT_META[key]?.Icon || FileText,
+    });
+    return acc;
   }, []);
 
-  const removeFile = (key) => {
-    setUploadedFiles((prev) => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
+  return fields.length
+    ? fields
+    : [{
+      key: "passport",
+      label: DOCUMENT_META.passport.label,
+      Icon: DOCUMENT_META.passport.Icon,
+    }];
+};
+
+const formatFileSize = (size = 0) => {
+  if (!size) return "0 KB";
+  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const createTraveler = () => ({
+  name: "",
+  documents: {},
+  otherDocuments: [],
+  gdriveLink: "",
+});
+
+const ApplicationForm = () => {
+  const { countryId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { showToast } = useUIStore();
+  const { user, isAuthenticated, sessionAuthMethod } = useAuthStore();
+  const { countries: allCountries } = useCountries();
+  const prefillApplied = useRef(false);
+  const travelerNameInputRefs = useRef({});
+
+  const listCountry = allCountries.find((c) => c.id === countryId);
+  const country =
+    useMergedCountry(countryId, listCountry) || getCountryById(countryId) || COUNTRIES[0];
+  const docFields = useMemo(
+    () => buildDocFields(country?.requiredDocuments),
+    [country?.requiredDocuments]
+  );
+  const [travelers, setTravelers] = useState([createTraveler()]);
+  const [draggingKey, setDraggingKey] = useState("");
+  const [docErrors, setDocErrors] = useState({});
+  const [uploadSettings, setUploadSettings] = useState({
+    enableGDriveUpload: true,
+    enableFileUpload: true,
+  });
+  const [checkoutStarting, setCheckoutStarting] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactModalMode, setContactModalMode] = useState("phone");
+  const continueAfterContactRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !localStorage.getItem("token")) return;
+    const method = sessionAuthMethod ?? useAuthStore.getState().sessionAuthMethod;
+    if (needsPhoneContactGate(method, user)) {
+      setContactModalMode("phone");
+      setContactModalOpen(true);
+    } else if (needsEmailContactGate(method, user)) {
+      setContactModalMode("email");
+      setContactModalOpen(true);
+    }
+  }, [isAuthenticated, user, sessionAuthMethod]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await api.get("/config/upload-settings");
+        if (alive && data?.success && data.config) setUploadSettings(data.config);
+      } catch {
+        /* keep defaults */
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (prefillApplied.current) return;
+    const st = location.state;
+    if (!st?.travelerNames || !Array.isArray(st.travelerNames)) return;
+    prefillApplied.current = true;
+    const n = Math.max(1, Number(st.travellerCount) || st.travelerNames.length);
+    setTravelers(
+      Array.from({ length: n }, (_, i) => ({
+        name: String(st.travelerNames[i] || "").trim(),
+        documents: {},
+        otherDocuments: [],
+        gdriveLink: "",
+      }))
+    );
+  }, [location.state]);
+
+  const flowDateFrom = location.state?.travelDateFrom;
+  const flowDateTo = location.state?.travelDateTo;
+  const flowVisaOption = location.state?.visaOption;
+
+  useEffect(() => {
+    const cid = country?.id || countryId;
+    if (!cid) return;
+    const timer = window.setTimeout(() => {
+      saveTravelDraft(cid, {
+        travelDateFrom: flowDateFrom ?? "",
+        travelDateTo: flowDateTo ?? "",
+        visaOption: flowVisaOption ?? country?.visaType ?? "e-Visa",
+        travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        showTravelDetails: true,
+      });
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [
+    travelers,
+    country?.id,
+    countryId,
+    country?.visaType,
+    flowDateFrom,
+    flowDateTo,
+    flowVisaOption,
+  ]);
+
+  useEffect(() => {
+    const raw = (location.hash || "").replace(/^#/, "");
+    if (raw !== "document-upload-section") return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("document-upload-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, location.pathname, countryId, travelers.length]);
+
+  useEffect(() => {
+    const handleGlobalTypingForTravelerName = (event) => {
+      const activeElement = document.activeElement;
+      const tagName = activeElement?.tagName?.toLowerCase();
+      const isTypingInFormField = (
+        activeElement?.isContentEditable ||
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select"
+      );
+      if (isTypingInFormField) return;
+
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.length !== 1 && event.key !== "Backspace") return;
+
+      const firstEmptyIndex = travelers.findIndex((traveler) => !String(traveler?.name || "").trim());
+      const targetIndex = firstEmptyIndex >= 0 ? firstEmptyIndex : 0;
+      const targetInput = travelerNameInputRefs.current[targetIndex];
+      if (!targetInput) return;
+
+      event.preventDefault();
+      targetInput.focus();
+
+      setTravelers((prev) =>
+        prev.map((traveler, i) => {
+          if (i !== targetIndex) return traveler;
+          const currentName = String(traveler?.name || "");
+          if (event.key === "Backspace") {
+            return { ...traveler, name: currentName.slice(0, -1) };
+          }
+          return { ...traveler, name: `${currentName}${event.key}` };
+        })
+      );
+    };
+
+    window.addEventListener("keydown", handleGlobalTypingForTravelerName);
+    return () => window.removeEventListener("keydown", handleGlobalTypingForTravelerName);
+  }, [travelers]);
+
+  const addTraveler = () => setTravelers((prev) => [...prev, createTraveler()]);
+  const removeTraveler = () => setTravelers((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+
+  const updateTravelerName = (index, value) => {
+    setTravelers((prev) => prev.map((t, i) => (i === index ? { ...t, name: value } : t)));
   };
 
-  // ── Next step with validation trigger ─────────────────────
-  const handleNext = async () => {
-    // Step 1: validate personal info fields
-    if (currentStep === 0) {
-      const valid = await trigger(["firstName", "lastName", "email", "nationality", "passportNo", "dob", "travelDate"]);
-      if (!valid) return;
+  const updateTravelerGdrive = (index, value) => {
+    setTravelers((prev) => prev.map((t, i) => (i === index ? { ...t, gdriveLink: value } : t)));
+  };
+
+  const updateTravelerDoc = (index, key, file) => {
+    const inputKey = `${index}-${key}`;
+    if (file && file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      showToast(FILE_SIZE_ERROR, "error");
+      setDocErrors((prev) => ({ ...prev, [inputKey]: FILE_SIZE_ERROR }));
+      return;
     }
-    // Step 2: check required docs
-    if (currentStep === 1) {
-      const missingRequired = MOCK_DOCS.filter((d) => d.required && !uploadedFiles[d.key]);
-      if (missingRequired.length > 0) {
-        showToast(`Please upload: ${missingRequired.map((d) => d.label).join(", ")}`, "error");
+    setDocErrors((prev) => ({ ...prev, [inputKey]: null }));
+    setTravelers((prev) =>
+      prev.map((t, i) =>
+        i === index
+          ? { ...t, documents: { ...t.documents, [key]: file || null } }
+          : t
+      )
+    );
+  };
+
+  const updateTravelerOtherDocs = (index, files) => {
+    const incoming = Array.from(files || []);
+    const invalid = incoming.find((file) => file && file.size > MAX_DOCUMENT_SIZE_BYTES);
+    if (invalid) {
+      showToast(FILE_SIZE_ERROR, "error");
+      return;
+    }
+    const fileSig = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+    setTravelers((prev) =>
+      prev.map((t, i) => {
+        if (i !== index) return t;
+        const existing = Array.isArray(t.otherDocuments) ? [...t.otherDocuments] : [];
+        const merged = [...existing];
+        for (const f of incoming) {
+          if (!merged.some((x) => fileSig(x) === fileSig(f))) merged.push(f);
+        }
+        const capped = merged.slice(0, 10);
+        return { ...t, otherDocuments: capped };
+      })
+    );
+  };
+
+  const removeTravelerOtherDoc = (index, docIndex) => {
+    setTravelers((prev) =>
+      prev.map((t, i) => {
+        if (i !== index) return t;
+        const docs = Array.isArray(t.otherDocuments) ? [...t.otherDocuments] : [];
+        docs.splice(docIndex, 1);
+        return { ...t, otherDocuments: docs };
+      })
+    );
+  };
+
+  const handleDrop = (event, travelerIndex, fieldKey) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggingKey("");
+    const file = event.dataTransfer?.files?.[0] || null;
+    updateTravelerDoc(travelerIndex, fieldKey, file);
+  };
+
+  const travelerComplete = useCallback(
+    (traveler) => {
+      if (!String(traveler.name || "").trim()) return false;
+      const { enableFileUpload: fileOn, enableGDriveUpload: gdOn } = uploadSettings;
+      if (gdOn && String(traveler.gdriveLink || "").trim()) return true;
+      if (fileOn && docFields.every((f) => traveler.documents[f.key] instanceof File)) {
+        return true;
+      }
+      return false;
+    },
+    [docFields, uploadSettings]
+  );
+
+  const allComplete = useMemo(
+    () => travelers.length > 0 && travelers.every((t) => travelerComplete(t)),
+    [travelerComplete, travelers]
+  );
+
+  const persistTravelerUploads = async (appId) => {
+    for (let index = 0; index < travelers.length; index += 1) {
+      const traveler = travelers[index];
+      const travelerNo = index + 1;
+      const travelerName = String(traveler.name || "").trim() || `Traveler ${travelerNo}`;
+      const gdriveLink = String(traveler.gdriveLink || "").trim();
+
+      const requiredFiles = docFields
+        .map((field) => ({ field, file: traveler.documents?.[field.key] }))
+        .filter((entry) => entry.file instanceof File);
+      const otherFiles = Array.isArray(traveler.otherDocuments)
+        ? traveler.otherDocuments.filter((file) => file instanceof File)
+        : [];
+
+      if (requiredFiles.length > 0 || otherFiles.length > 0) {
+        const formData = new FormData();
+        const documentsMeta = [];
+
+        requiredFiles.forEach(({ field, file }) => {
+          formData.append("documents", file);
+          documentsMeta.push({ docType: field.key, kind: "required" });
+        });
+        otherFiles.forEach((file) => {
+          formData.append("documents", file);
+          documentsMeta.push({ docType: "otherDocument", kind: "other" });
+        });
+
+        formData.append("travelerNo", String(travelerNo));
+        formData.append("travelerName", travelerName);
+        formData.append("gdriveLink", gdriveLink);
+        formData.append("documentsMeta", JSON.stringify(documentsMeta));
+
+        await api.post(`/users/applications/${appId}/documents`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        await api.put(`/users/applications/${appId}`, {
+          travelerUpdate: {
+            travelerNo: String(travelerNo),
+            travelerName,
+            gdriveLink,
+          },
+        });
+      }
+    }
+  };
+
+  const handleContinueSubmit = async () => {
+    const travelerNames = travelers.map((t, i) => String(t.name || "").trim() || `Traveler ${i + 1}`);
+    const travelerGdriveLinks = travelers.map((t) => String(t.gdriveLink || "").trim());
+    const flow = location.state;
+    const visaForSummary = flow?.visaOption || country.visaType || "e-Visa";
+    const travelDateFrom = flow?.travelDateFrom ?? null;
+    const travelDateTo = flow?.travelDateTo ?? null;
+
+    setCheckoutStarting(true);
+    try {
+      const { data } = await api.post("/users/application/checkout-draft", {
+        countryId: country.id,
+        countryName: country.name,
+        flagEmoji: country.flagEmoji || "🛂",
+        visaType: visaForSummary,
+        travelDateFrom,
+        travelDateTo,
+        travellerCount: travelers.length,
+        travelerNames,
+        processingDays: normalizeProcessingDays(country.processingDays),
+      });
+
+      if (!data?.success || !data.application?._id) {
+        showToast(data?.message || "Could not start application. Please try again.", "error");
+        return;
+      }
+
+      const appId = data.application._id;
+      await persistTravelerUploads(appId);
+      clearTravelDraft(country.id);
+      showToast("Opening payment summary.", "success");
+      const applyFlowState = {
+        travelerNames,
+        travellerCount: travelers.length,
+        travelDateFrom,
+        travelDateTo,
+        visaOption: visaForSummary,
+      };
+      navigate(`/dashboard/application/${appId}/summary`, {
+        state: {
+          summaryData: {
+            applicationId: appId,
+            countryId: country.id,
+            countryName: country.name,
+            flagEmoji: country.flagEmoji || "🛂",
+            visaType: visaForSummary,
+            travellerCount: travelers.length,
+            travelerNames,
+            travelerGdriveLinks,
+            travelDateFrom,
+            travelDateTo,
+            docsUploaded: true,
+          },
+          applicationPrev: {
+            path: `/apply/${country.id}`,
+            state: applyFlowState,
+          },
+        },
+      });
+    } catch (err) {
+      const serverMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        (typeof err?.response?.data === "string" ? err.response.data : "");
+      showToast(serverMessage || err?.message || "Could not save traveler documents. Please try again.", "error");
+    } finally {
+      setCheckoutStarting(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!allComplete) {
+      showToast("Enter each traveler's name and either upload all required documents or add a Google Drive link.", "error");
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (token && user) {
+      const method = sessionAuthMethod ?? useAuthStore.getState().sessionAuthMethod;
+      if (needsPhoneContactGate(method, user)) {
+        continueAfterContactRef.current = handleContinueSubmit;
+        setContactModalMode("phone");
+        setContactModalOpen(true);
+        return;
+      }
+      if (needsEmailContactGate(method, user)) {
+        continueAfterContactRef.current = handleContinueSubmit;
+        setContactModalMode("email");
+        setContactModalOpen(true);
         return;
       }
     }
-
-    // Save current form values to draft before moving next
-    setApplicationDraft(getValues());
-
-    nextStep();
+    await handleContinueSubmit();
   };
-
-  const handlePayment = async ({ token, applicationId, applicantName, applicantEmail }) => {
-    // A. Load Razorpay SDK
-    const isLoaded = await loadRazorpayScript();
-    if (!isLoaded) {
-      showToast("Razorpay SDK load nahi hua.", "error");
-      return { success: false };
-    }
-
-    // Fetch public Razorpay key configured by Admin
-    let razorpayKeyId = "";
-    try {
-      const configRes = await api.get("/config/razorpay");
-      if (configRes.data.success) {
-        razorpayKeyId = configRes.data.keyId;
-      }
-    } catch (error) {
-      showToast("Razorpay not configured. Please contact admin.", "error");
-      return { success: false };
-    }
-
-    if (!razorpayKeyId) {
-      showToast("Razorpay key missing in admin settings.", "error");
-      return { success: false };
-    }
-
-    // B. Backend se Order ID mangwayein
-    const orderRes = await api.post(
-      "/users/payments/create-order",
-      {
-        amount: selectedCountry.basePrice + 3000,
-        applicationId,
-      }
-    );
-
-    if (!orderRes.data?.success || !orderRes.data?.order) {
-      showToast("Payment order create nahi hua.", "error");
-      return { success: false };
-    }
-
-    const order = orderRes.data.order;
-    const amount = selectedCountry.basePrice + 3000;
-
-    // C. Razorpay Popup Window
-    return new Promise((resolve) => {
-      const options = {
-        key: razorpayKeyId,
-        amount: order.amount,
-        currency: order.currency || "INR",
-        name: "Visa & Voyage",
-        description: "Visa Fee Payment",
-        order_id: order.id,
-        handler: async function (response) {
-          try {
-            const verifyRes = await api.post(
-              "/users/payments/verify",
-              {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                applicationId,
-                amount,
-              }
-            );
-
-            if (verifyRes.data?.success) {
-              alert("Payment Verified! Application Submitted Successfully.");
-              addBooking(verifyRes.data.application || { _id: applicationId });
-              window.location.href = "/dashboard/profile";
-              return resolve({ success: true });
-            }
-
-            showToast("Payment verification failed.", "error");
-            return resolve({ success: false });
-          } catch (error) {
-            console.error("Verification Error:", error);
-            alert("Payment ho gayi par verify nahi hui. Support se contact karein.");
-            return resolve({ success: false });
-          }
-        },
-        prefill: {
-          name: applicantName,
-          email: applicantEmail,
-        },
-        theme: { color: "#00d4ff" },
-        modal: {
-          ondismiss: async function () {
-            console.log("Razorpay modal closed by user");
-            try {
-              await api.post(
-                "/users/payments/cancel",
-                {
-                  applicationId,
-                  reason: "User closed the payment window",
-                }
-              );
-              showToast("Payment cancelled. You can complete it later from your dashboard.", "info");
-              // Redirect to dashboard so they can see the cancelled status
-              window.location.href = "/dashboard/profile";
-            } catch (err) {
-              console.error("Error recording cancellation:", err);
-            }
-            resolve({ success: false });
-          },
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", function () {
-        showToast("Payment failed to start.", "error");
-        resolve({ success: false });
-      });
-      rzp.open();
-    });
-  };
-
-  // ── Final submit ──────────────────────────────────────────
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
-    
-    try {
-      const token = localStorage.getItem("token"); // Fallback if authStore doesn't expose it
-      
-      const formData = new FormData();
-      // Append text fields
-      formData.append("firstName", data.firstName);
-      formData.append("lastName", data.lastName);
-      formData.append("email", data.email);
-      formData.append("nationality", data.nationality);
-      formData.append("passportNo", data.passportNo);
-      formData.append("dob", data.dob);
-      formData.append("travelDate", data.travelDate);
-      if (data.returnDate) formData.append("returnDate", data.returnDate);
-      
-      formData.append("countryId", selectedCountry.id);
-      formData.append("countryName", selectedCountry.name);
-      formData.append("flagEmoji", selectedCountry.flagEmoji);
-      formData.append("visaType", selectedCountry.visaType);
-      formData.append("fee", selectedCountry.basePrice + 3000);
-      formData.append("processingDays", normalizeProcessingDays(selectedCountry.processingDays));
-      
-      formData.append("paymentStatus", "pending_payment");
-
-      // Append files
-      Object.keys(uploadedFiles).forEach((key) => {
-        // uploadedFiles[key] contains the actual File object
-        formData.append("documents", uploadedFiles[key]);
-      });
-
-      // Submit to backend
-      const response = await api.post(
-        "/users/application",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
-        }
-      );
-
-      if (response.data.success) {
-        const applicationId = response.data.application._id;
-        const paymentResult = await handlePayment({
-          token,
-          applicationId,
-          applicantName: `${data.firstName} ${data.lastName}`,
-          applicantEmail: data.email,
-        });
-
-        if (paymentResult.success) {
-          setSubmitted(true);
-          resetSteps();
-          clearApplicationDraft();
-          showToast("Payment successful! Application submitted.", "success");
-        }
-      }
-      setIsSubmitting(false);
-    } catch (error) {
-      console.error("Submission failed:", error);
-      setIsSubmitting(false);
-      showToast(error.response?.data?.message || "Application submission failed", "error");
-    }
-  };
-
-  // ── Success screen ────────────────────────────────────────
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center max-w-md"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-6"
-            >
-              <CheckCircle size={48} className="text-emerald-400" />
-            </motion.div>
-            <h2 className="text-3xl font-bold text-text-primary mb-3">Application Submitted!</h2>
-            <p className="text-text-secondary mb-8">
-              Your {selectedCountry.name} visa application has been submitted.
-              We'll notify you via email with updates.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button variant="primary" onClick={() => navigate("/dashboard")} id="go-to-dashboard-btn">
-                View Dashboard
-              </Button>
-              <Button variant="secondary" onClick={() => { setSubmitted(false); resetSteps(); }} id="new-app-after-submit-btn">
-                New Application
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col pb-20">
       <Navbar />
-
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-        {/* ── Page header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <button
+          type="button"
+          onClick={() => {
+            const cid = country?.id || countryId;
+            if (!cid) {
+              navigate("/destinations");
+              return;
+            }
+            const flow = location.state || {};
+            saveTravelDraft(cid, {
+              travelDateFrom: flow.travelDateFrom ?? "",
+              travelDateTo: flow.travelDateTo ?? "",
+              visaOption: flow.visaOption ?? country?.visaType ?? "e-Visa",
+              travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+              showTravelDetails: true,
+            });
+            // Replace so history is not […, destination, apply, destination]; Back on country won't return to apply.
+            navigate(`/destination/${cid}`, { replace: true });
+          }}
+          className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary"
         >
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors mb-4"
-            id="back-btn"
-          >
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-1">
-            {selectedCountry.flagEmoji} {selectedCountry.name} Visa Application
-          </h1>
-          <p className="text-text-secondary text-sm">
-            {selectedCountry.visaType} · Processing: {selectedCountry.processingDays} days
+          <ArrowLeft size={16} /> Back
+        </button>
+
+        <div>
+          <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-1">
+            {country.flagEmoji} {country.name}
           </p>
-        </motion.div>
-
-        {/* ── Step indicator ── */}
-        <div className="mb-8">
-          <StepIndicator steps={STEPS} currentStep={currentStep} />
+          <h1 className="text-2xl font-bold text-text-primary">Traveler Document Upload</h1>
+          <p className="text-sm text-text-secondary mt-1">
+            {uploadSettings.enableFileUpload && uploadSettings.enableGDriveUpload
+              ? "Add each traveler. Upload every required file or share one Google Drive link per traveler."
+              : uploadSettings.enableFileUpload
+                ? "Add each traveler and upload every required document."
+                : uploadSettings.enableGDriveUpload
+                  ? "Add each traveler and share a Google Drive folder link with their documents."
+                  : "Document uploads are temporarily unavailable."}
+          </p>
         </div>
 
-        {/* ── Step panels ── */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={{ duration: 0.25 }}
-          >
-
-            {/* ══════════════════════════════════════
-                STEP 1: PERSONAL INFORMATION
-                ══════════════════════════════════════ */}
-            {currentStep === 0 && (
-              <Card>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-cyan/10 flex items-center justify-center">
-                    <User size={20} className="text-cyan" />
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-text-primary">Personal Information</h2>
-                    <p className="text-xs text-text-muted">Exactly as shown on your passport</p>
-                  </div>
-                </div>
-
-                <form className="space-y-5">
-                  {/* Name row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input
-                      label="First Name"
-                      placeholder="John"
-                      leftIcon={<User size={15} />}
-                      error={errors.firstName?.message}
-                      id="form-first-name"
-                      {...register("firstName", { required: "First name is required" })}
-                    />
-                    <Input
-                      label="Last Name"
-                      placeholder="Doe"
-                      error={errors.lastName?.message}
-                      id="form-last-name"
-                      {...register("lastName", { required: "Last name is required" })}
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <Input
-                    label="Email Address"
-                    type="email"
-                    placeholder="john@example.com"
-                    leftIcon={<Mail size={15} />}
-                    error={errors.email?.message}
-                    id="form-email"
-                    {...register("email", {
-                      required: "Email is required",
-                      pattern: { value: /^[^@]+@[^@]+\.[^@]+$/, message: "Invalid email" },
-                    })}
-                  />
-
-                  {/* Nationality + DOB */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Select
-                      label="Nationality"
-                      options={NATIONALITIES}
-                      placeholder="Select nationality..."
-                      error={errors.nationality?.message}
-                      id="form-nationality"
-                      {...register("nationality", { required: "Nationality is required" })}
-                    />
-                    <Input
-                      label="Date of Birth"
-                      type="date"
-                      leftIcon={<Calendar size={15} />}
-                      error={errors.dob?.message}
-                      id="form-dob"
-                      className="[color-scheme:dark]"
-                      {...register("dob", { required: "Date of birth is required" })}
-                    />
-                  </div>
-
-                  {/* Passport number */}
-                  <Input
-                    label="Passport Number"
-                    placeholder="e.g. A12345678"
-                    error={errors.passportNo?.message}
-                    id="form-passport"
-                    helper="Enter the number exactly as shown on your passport"
-                    {...register("passportNo", {
-                      required: "Passport number is required",
-                      minLength: { value: 6, message: "Invalid passport number" },
-                    })}
-                  />
-
-                  {/* Travel dates */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input
-                      label="Intended Arrival Date"
-                      type="date"
-                      leftIcon={<Plane size={15} />}
-                      error={errors.travelDate?.message}
-                      id="form-travel-date"
-                      className="[color-scheme:dark]"
-                      {...register("travelDate", { required: "Travel date is required" })}
-                    />
-                    <Input
-                      label="Intended Return Date"
-                      type="date"
-                      id="form-return-date"
-                      className="[color-scheme:dark]"
-                      {...register("returnDate")}
-                    />
-                  </div>
-
-                  {/* Destination override */}
-                  <div>
-                    <label className="text-sm font-medium text-text-secondary mb-1.5 block">
-                      Destination Country
-                    </label>
-                    <select
-                      id="form-country"
-                      value={selectedCountryId}
-                      onChange={(e) => setSelectedCountryId(e.target.value)}
-                      className="w-full bg-surface-2 text-text-primary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan/20 focus:border-cyan [color-scheme:dark]"
-                    >
-                      {COUNTRIES.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.flagEmoji} {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </form>
-              </Card>
-            )}
-
-            {/* ══════════════════════════════════════
-                STEP 2: DOCUMENT UPLOAD
-                ══════════════════════════════════════ */}
-            {currentStep === 1 && (
-              <div className="space-y-5">
-                <Card>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
-                      <FileText size={20} className="text-gold" />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-text-primary">Upload Documents</h2>
-                      <p className="text-xs text-text-muted">Accepted: PDF, JPG, PNG. Max 10MB each.</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Required documents checklist */}
-                <Card>
-                  <h3 className="text-sm font-semibold text-text-primary mb-3">
-                    {selectedCountry.name} Requirements
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedCountry.requirements.map((req) => (
-                      <li key={req} className="flex items-center gap-2 text-sm text-text-secondary">
-                        <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />
-                        {req}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-
-                {/* Upload zones */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {MOCK_DOCS.map((doc) => {
-                    const file = uploadedFiles[doc.key];
-                    return (
-                      <div key={doc.key}>
-                        {/* Drop zone */}
-                        <div
-                          id={`upload-${doc.key}`}
-                          onDragOver={(e) => { e.preventDefault(); setDragging(doc.key); }}
-                          onDragLeave={() => setDragging(null)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setDragging(null);
-                            const f = e.dataTransfer.files[0];
-                            if (f) handleFileDrop(doc.key, f);
-                          }}
-                          className={`
-                            relative rounded-xl border-2 border-dashed p-5 text-center transition-all duration-200 cursor-pointer
-                            ${dragging === doc.key
-                              ? "border-cyan bg-cyan/10"
-                              : file
-                              ? "border-emerald-500/40 bg-emerald-500/5"
-                              : "border-border hover:border-cyan/30 hover:bg-surface-3"
-                            }
-                          `}
-                        >
-                          {file ? (
-                            /* Uploaded state */
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                <CheckCircle size={18} className="text-emerald-400" />
-                              </div>
-                              <div className="flex-1 text-left min-w-0">
-                                <p className="text-sm font-medium text-text-primary truncate">{file.name}</p>
-                                <p className="text-xs text-text-muted">
-                                  {(file.size / 1024).toFixed(0)} KB
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => removeFile(doc.key)}
-                                className="p-1 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-red-400 transition-colors"
-                                aria-label={`Remove ${doc.label}`}
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            /* Empty upload state */
-                            <>
-                              <div className="text-3xl mb-2">{doc.icon}</div>
-                              <p className="text-sm font-medium text-text-primary">
-                                {doc.label}
-                                {doc.required && <span className="text-red-400 ml-1">*</span>}
-                              </p>
-                              <p className="text-xs text-text-muted mt-1 mb-3">
-                                Drag & drop or click to browse
-                              </p>
-                              <label
-                                htmlFor={`file-input-${doc.key}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-3 text-xs text-text-secondary hover:text-text-primary cursor-pointer transition-colors"
-                              >
-                                <Upload size={12} /> Browse
-                              </label>
-                              <input
-                                id={`file-input-${doc.key}`}
-                                type="file"
-                                accept={doc.accept}
-                                className="hidden"
-                                onChange={(e) => handleFileDrop(doc.key, e.target.files[0])}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Security note */}
-                <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-cyan/5 border border-cyan/15">
-                  <ShieldCheck size={16} className="text-cyan flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-text-secondary">
-                    All documents are encrypted with 256-bit SSL. We never share your data without consent.
-                    Files are automatically deleted after visa decision.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* ══════════════════════════════════════
-                STEP 3: PAYMENT SUMMARY
-                ══════════════════════════════════════ */}
-            {currentStep === 2 && (
-              <div className="space-y-5">
-                {/* Order summary */}
-                <Card>
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                      <CheckCircle size={20} className="text-emerald-400" />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-text-primary">Payment Summary</h2>
-                      <p className="text-xs text-text-muted">Review your order before payment</p>
-                    </div>
-                  </div>
-
-                  {/* Fee breakdown */}
-                  <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">{selectedCountry.name} {selectedCountry.visaType}</span>
-                      <span className="text-text-primary font-medium">₹{selectedCountry.basePrice}.00</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">Processing Fee</span>
-                      <span className="text-text-primary font-medium">₹2000.00</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">Service Fee</span>
-                      <span className="text-text-primary font-medium">₹1000.00</span>
-                    </div>
-                    <div className="border-t border-border pt-3 flex justify-between">
-                      <span className="font-semibold text-text-primary">Total Due</span>
-                      <span className="font-bold text-xl text-cyan">
-                        ₹{selectedCountry.basePrice + 3000}.00
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Processing time */}
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-2 border border-border">
-                    <AlertCircle size={16} className="text-amber-400 flex-shrink-0" />
-                    <p className="text-xs text-text-secondary">
-                      Expected processing time: <strong className="text-text-primary">{selectedCountry.processingDays} business days</strong>.
-                      You'll receive email updates at every stage.
-                    </p>
-                  </div>
-                </Card>
-
-                {/* Razorpay CTA Card */}
-                <Card>
-                  <div className="flex items-center gap-3 mb-5">
-                    <CreditCard size={20} className="text-cyan" />
-                    <h3 className="font-semibold text-text-primary">Secure Payment via Razorpay</h3>
-                  </div>
-
-                  <p className="text-sm text-text-secondary mb-6 leading-relaxed">
-                    Clicking <strong className="text-text-primary">"Pay &amp; Submit Application"</strong> below will open a
-                    secure Razorpay checkout. You can pay using Credit/Debit Card, UPI, Net Banking, or Wallets.
-                  </p>
-
-                  {/* Security badges */}
-                  <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-border">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-emerald-400" />
-                      <span className="text-xs text-text-muted">256-bit SSL Encrypted</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-cyan" />
-                      <span className="text-xs text-text-muted">PCI DSS Compliant</span>
-                    </div>
-                    <div className="ml-auto flex gap-2">
-                      {["UPI", "Cards", "Net Banking"].map((m) => (
-                        <span key={m} className="text-xs px-2 py-0.5 rounded bg-surface-3 text-text-muted">{m}</span>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
-
-          </motion.div>
-        </AnimatePresence>
-
-        {/* ── Navigation buttons ── */}
-        <div className="flex items-center justify-between mt-8">
-          <Button
-            variant="ghost"
-            leftIcon={<ArrowLeft size={16} />}
-            onClick={() => {
-              if (currentStep === 0) {
-                navigate(-1);
-              } else {
-                setApplicationDraft(getValues());
-                prevStep();
-              }
-            }}
-            id="form-prev-btn"
-          >
-            {currentStep === 0 ? "Cancel" : "Back"}
-          </Button>
-
-          {currentStep < STEPS.length - 1 ? (
-            <Button
-              variant="primary"
-              rightIcon={<ArrowRight size={16} />}
-              onClick={handleNext}
-              id="form-next-btn"
+        <div className="rounded-2xl border border-border bg-surface p-4 flex items-center justify-between">
+          <p className="text-sm font-medium text-text-primary">No. of Travelers</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={removeTraveler}
+              className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center disabled:opacity-40"
+              disabled={travelers.length <= 1}
             >
-              Continue
-            </Button>
+              <Minus size={14} />
+            </button>
+            <span className="w-6 text-center font-semibold text-text-primary">{travelers.length}</span>
+            <button
+              type="button"
+              onClick={addTraveler}
+              className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+
+        <section id="document-upload-section" className="space-y-4 scroll-mt-28">
+          {!uploadSettings.enableFileUpload && !uploadSettings.enableGDriveUpload ? (
+            <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted text-center">
+              Document uploads are disabled. Please contact support or try again later.
+            </div>
           ) : (
-            <Button
-              variant="primary"
-              leftIcon={<ShieldCheck size={16} />}
-              loading={isSubmitting}
-              onClick={handleSubmit(onSubmit)}
-              id="form-submit-btn"
-            >
-              Pay & Submit Application
-            </Button>
+            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            {travelers.map((traveler, index) => (
+            <div key={`traveler-${index}`} className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-text-primary">Traveler {index + 1}</p>
+                {travelerComplete(traveler) ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-semibold">
+                    <CheckCircle size={14} /> Completed
+                  </span>
+                ) : (
+                  <span className="text-xs text-amber-400">Pending</span>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs text-text-muted block mb-1.5">Traveler Name</label>
+                <input
+                  ref={(el) => {
+                    travelerNameInputRefs.current[index] = el;
+                  }}
+                  type="text"
+                  autoComplete="off"
+                  value={traveler.name}
+                  onChange={(e) => updateTravelerName(index, e.target.value)}
+                  placeholder="Enter full name"
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
+                />
+              </div>
+
+              {uploadSettings.enableGDriveUpload && (
+                <div>
+                  <label className="text-xs text-text-muted block mb-1.5">
+                    Google Drive link
+                    {uploadSettings.enableFileUpload
+                      ? " (optional if you upload every file below)"
+                      : " (required)"}
+                  </label>
+                  <input
+                    type="url"
+                    autoComplete="off"
+                    value={traveler.gdriveLink}
+                    onChange={(e) => updateTravelerGdrive(index, e.target.value)}
+                    placeholder="https://drive.google.com/..."
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted"
+                  />
+                </div>
+              )}
+
+              {uploadSettings.enableFileUpload && (
+              <div className="flex w-full flex-col gap-2">
+                {docFields.map((field) => {
+                  const file = traveler.documents[field.key];
+                  const zoneKey = `${index}-${field.key}`;
+                  const isDragging = draggingKey === zoneKey;
+                  const Icon = field.Icon;
+                  return (
+                    <div key={`${index}-${field.key}`} className="w-full space-y-1">
+                      <div
+                        role="presentation"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDraggingKey(zoneKey);
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setDraggingKey(zoneKey);
+                        }}
+                        onDragLeave={() => {
+                          setDraggingKey((prev) => (prev === zoneKey ? "" : prev));
+                        }}
+                        onDrop={(e) => handleDrop(e, index, field.key)}
+                        className={`flex w-full min-w-0 items-center gap-2 rounded-xl border bg-background px-2.5 py-2 transition-colors ${
+                          docErrors[zoneKey]
+                            ? "border-red-500/45"
+                            : isDragging
+                              ? "border-cyan bg-cyan/5 ring-1 ring-cyan/30"
+                              : "border-border"
+                        }`}
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan/10 text-cyan">
+                          <Icon size={14} strokeWidth={2} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-text-primary">{field.label}</p>
+                          <p className="truncate text-[10px] text-text-muted">
+                            {file
+                              ? `${file.name} · ${formatFileSize(file.size)}`
+                              : "PDF, JPG, PNG · max 500 KB"}
+                          </p>
+                        </div>
+                        <label
+                          htmlFor={`traveler-${index}-${field.key}`}
+                          className="shrink-0 cursor-pointer rounded-md bg-cyan/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan hover:bg-cyan/25"
+                        >
+                          {file ? "Replace" : "Upload"}
+                        </label>
+                        <input
+                          id={`traveler-${index}-${field.key}`}
+                          type="file"
+                          accept=".pdf,image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          onChange={(e) => {
+                            updateTravelerDoc(index, field.key, e.target.files?.[0] || null);
+                            e.target.value = "";
+                          }}
+                        />
+                      </div>
+                      {docErrors[zoneKey] && (
+                        <p className="flex items-center gap-1 px-0.5 text-xs font-medium text-red-500">
+                          <AlertCircle size={12} /> {docErrors[zoneKey]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              )}
+
+              {uploadSettings.enableFileUpload && (
+                <div className="w-full space-y-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-2.5 py-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan/10 text-cyan">
+                      <FileText size={14} strokeWidth={2} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-text-primary">Other documents</p>
+                      <p className="text-[10px] text-text-muted">
+                        {traveler.otherDocuments?.length || 0}{" "}
+                        {(traveler.otherDocuments?.length || 0) === 1 ? "file" : "files"} selected · max 500 KB each
+                      </p>
+                    </div>
+                    <label
+                      htmlFor={`traveler-${index}-other-docs`}
+                      className="shrink-0 cursor-pointer rounded-md bg-cyan/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan hover:bg-cyan/25"
+                    >
+                      Upload
+                    </label>
+                    <input
+                      id={`traveler-${index}-other-docs`}
+                      type="file"
+                      multiple
+                      accept=".pdf,image/jpeg,image/png,image/webp"
+                      onChange={(e) => {
+                        updateTravelerOtherDocs(index, e.target.files || []);
+                        e.target.value = "";
+                      }}
+                      className="sr-only"
+                    />
+                  </div>
+                  {Array.isArray(traveler.otherDocuments) && traveler.otherDocuments.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      {traveler.otherDocuments.map((file, docIdx) => (
+                        <div
+                          key={`traveler-${index}-other-doc-${docIdx}`}
+                          className="relative rounded-lg border border-border bg-surface px-3 py-2"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => removeTravelerOtherDoc(index, docIdx)}
+                            className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+                            aria-label={`Remove ${file?.name || `file ${docIdx + 1}`}`}
+                          >
+                            <X size={12} />
+                          </button>
+                          <p className="text-xs text-text-primary truncate pr-3" title={file?.name || ""}>
+                            {file?.name || `File ${docIdx + 1}`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+            </div>
+            {uploadSettings.enableGDriveUpload && (
+              <div className="rounded-2xl border border-border bg-surface-2 p-4 mt-4">
+                <GoogleDriveLinkHint variant="shared" />
+              </div>
+            )}
+            </>
           )}
-        </div>
-      </div>
+        </section>
+
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={checkoutStarting}
+          disabled={
+            checkoutStarting ||
+            (!uploadSettings.enableFileUpload && !uploadSettings.enableGDriveUpload)
+          }
+          onClick={handleContinue}
+        >
+          Continue
+        </Button>
+      </main>
+
+      <ContactVerificationModal
+        isOpen={contactModalOpen}
+        mode={contactModalMode}
+        onClose={() => {
+          continueAfterContactRef.current = null;
+          setContactModalOpen(false);
+        }}
+        onCompleted={() => {
+          const fn = continueAfterContactRef.current;
+          continueAfterContactRef.current = null;
+          setContactModalOpen(false);
+          if (fn) void fn();
+        }}
+      />
     </div>
   );
 };

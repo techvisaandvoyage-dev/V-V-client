@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
  * @param {function} onClose     — Called when backdrop/X is clicked
  * @param {string}   title       — Modal header title
  * @param {"sm"|"md"|"lg"|"xl"} size
+ * @param {boolean} closeOnBackdropClick — when false, clicking the backdrop does not call onClose
  */
 const Modal = ({
   isOpen,
@@ -20,6 +21,7 @@ const Modal = ({
   children,
   size = "md",
   hideCloseButton = false,
+  closeOnBackdropClick = true,
   footer,
 }) => {
   // ── Lock body scroll when modal is open ──────────────────
@@ -32,12 +34,15 @@ const Modal = ({
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  // ── Close on Escape key ──────────────────────────────────
+  // ── Close on Escape key (only when backdrop close is allowed) ──
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    if (!isOpen || !closeOnBackdropClick) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [isOpen, onClose, closeOnBackdropClick]);
 
   // ── Width sizes ───────────────────────────────────────────
   const sizes = {
@@ -59,7 +64,7 @@ const Modal = ({
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-          onClick={onClose}
+          onClick={closeOnBackdropClick ? onClose : undefined}
           aria-modal="true"
           role="dialog"
           aria-label={title}

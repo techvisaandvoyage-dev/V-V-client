@@ -1,8 +1,11 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import ProtectedRoute from "./ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { getAdminAppUrl } from "../utils/adminAppUrl";
+
+const routeMotionEase = [0.16, 1, 0.3, 1];
 
 // ── Lazy loaded Pages ───────────────────────────────────────────
 const LandingPage         = lazy(() => import("../pages/LandingPage"));
@@ -11,9 +14,11 @@ const RegisterPage        = lazy(() => import("../pages/RegisterPage"));
 const UserDashboard       = lazy(() => import("../pages/UserDashboard"));
 const ProfilePage         = lazy(() => import("../pages/ProfilePage"));
 const ApplicationDetails  = lazy(() => import("../pages/ApplicationDetails"));
+const ApplicationSummaryPage = lazy(() => import("../pages/ApplicationSummaryPage"));
 const ApplicationForm     = lazy(() => import("../pages/ApplicationForm"));
 const CountryDetails      = lazy(() => import("../pages/CountryDetails"));
 const AllDestinationsPage = lazy(() => import("../pages/AllDestinationsPage"));
+const StaticPage          = lazy(() => import("../pages/StaticPage"));
 
 // ── Fallback Loader ────────────────────────────────────────
 const PageLoader = () => (
@@ -54,13 +59,30 @@ const NotFound = () => (
 
 // ── Routes Map ──────────────────────────────────────────────
 const AppRoutes = () => {
+  const location = useLocation();
+  const reduceMotion = useReducedMotion();
+
   return (
     <Suspense fallback={<PageLoader />}>
-      <Routes>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={location.pathname}
+          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { duration: 0.28, ease: routeMotionEase }
+          }
+          className="w-full"
+        >
+          <Routes location={location}>
         {/* ── Public routes ── */}
         <Route path="/" element={<LandingPage />} />
       <Route path="/destinations" element={<AllDestinationsPage />} />
       <Route path="/destination/:countryId" element={<CountryDetails />} />
+      <Route path="/page/:slug" element={<StaticPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -86,6 +108,22 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRole="user">
             <ApplicationDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/application/:id/summary"
+        element={
+          <ProtectedRoute requiredRole="user">
+            <ApplicationSummaryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/application/summary"
+        element={
+          <ProtectedRoute requiredRole="user">
+            <ApplicationSummaryPage />
           </ProtectedRoute>
         }
       />
@@ -123,10 +161,11 @@ const AppRoutes = () => {
       <Route path="/admin/*" element={<AdminAppRedirect />} />
 
       <Route path="*" element={<NotFound />} />
-      </Routes>
+          </Routes>
+        </motion.div>
+      </AnimatePresence>
     </Suspense>
   );
 };
 
 export default AppRoutes;
-

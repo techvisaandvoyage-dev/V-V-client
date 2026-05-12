@@ -1,0 +1,782 @@
+[
+  {
+    "country": "Afghanistan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Albania",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Algeria",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Andorra",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Angola",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Antigua and Barbuda",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Argentina",
+    "located_in": "South America"
+  },
+  {
+    "country": "Armenia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Australia",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Austria",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Azerbaijan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Bahamas",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Bahrain",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Bangladesh",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Barbados",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Belarus",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Belgium",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Belize",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Benin",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Bhutan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Bolivia",
+    "located_in": "South America"
+  },
+  {
+    "country": "Bosnia and Herzegovina",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Botswana",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Brazil",
+    "located_in": "South America"
+  },
+  {
+    "country": "Brunei",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Bulgaria",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Burkina Faso",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Burundi",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Cabo Verde",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Cambodia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Cameroon",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Canada",
+    "located_in": "North America"
+  },
+  {
+    "country": "Central African Republic",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Chad",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Chile",
+    "located_in": "South America"
+  },
+  {
+    "country": "China",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Colombia",
+    "located_in": "South America"
+  },
+  {
+    "country": "Comoros",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Congo",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Costa Rica",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Cote d'Ivoire",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Croatia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Cuba",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Cyprus",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Czechia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Democratic Republic of the Congo",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Denmark",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Djibouti",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Dominica",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Dominican Republic",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Ecuador",
+    "located_in": "South America"
+  },
+  {
+    "country": "Egypt",
+    "located_in": "Africa"
+  },
+  {
+    "country": "El Salvador",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Equatorial Guinea",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Eritrea",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Estonia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Eswatini",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Ethiopia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Fiji",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Finland",
+    "located_in": "Europe"
+  },
+  {
+    "country": "France",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Gabon",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Gambia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Georgia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Germany",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Ghana",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Greece",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Grenada",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Guatemala",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Guinea",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Guinea-Bissau",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Guyana",
+    "located_in": "South America"
+  },
+  {
+    "country": "Haiti",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Honduras",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Hungary",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Iceland",
+    "located_in": "Europe"
+  },
+  {
+    "country": "India",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Indonesia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Iran",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Iraq",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Ireland",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Israel",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Italy",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Jamaica",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Japan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Jordan",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Kazakhstan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Kenya",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Kiribati",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Kuwait",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Kyrgyzstan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Laos",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Latvia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Lebanon",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Lesotho",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Liberia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Libya",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Liechtenstein",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Lithuania",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Luxembourg",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Madagascar",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Malawi",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Malaysia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Maldives",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Mali",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Malta",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Marshall Islands",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Mauritania",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Mauritius",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Mexico",
+    "located_in": "North America"
+  },
+  {
+    "country": "Micronesia",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Moldova",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Monaco",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Mongolia",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Montenegro",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Morocco",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Mozambique",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Myanmar",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Namibia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Nauru",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Nepal",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Netherlands",
+    "located_in": "Europe"
+  },
+  {
+    "country": "New Zealand",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Nicaragua",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Niger",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Nigeria",
+    "located_in": "Africa"
+  },
+  {
+    "country": "North Korea",
+    "located_in": "Asia"
+  },
+  {
+    "country": "North Macedonia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Norway",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Oman",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Pakistan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Palau",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Palestine",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Panama",
+    "located_in": "Central America"
+  },
+  {
+    "country": "Papua New Guinea",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Paraguay",
+    "located_in": "South America"
+  },
+  {
+    "country": "Peru",
+    "located_in": "South America"
+  },
+  {
+    "country": "Philippines",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Poland",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Portugal",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Qatar",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Romania",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Russia",
+    "located_in": "Europe & Asia"
+  },
+  {
+    "country": "Rwanda",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Saint Kitts and Nevis",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Saint Lucia",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Saint Vincent and the Grenadines",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Samoa",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "San Marino",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Sao Tome and Principe",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Saudi Arabia",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Senegal",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Serbia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Seychelles",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Sierra Leone",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Singapore",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Slovakia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Slovenia",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Solomon Islands",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Somalia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "South Africa",
+    "located_in": "Africa"
+  },
+  {
+    "country": "South Korea",
+    "located_in": "Asia"
+  },
+  {
+    "country": "South Sudan",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Spain",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Sri Lanka",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Sudan",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Suriname",
+    "located_in": "South America"
+  },
+  {
+    "country": "Sweden",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Switzerland",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Syria",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Tajikistan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Tanzania",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Thailand",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Timor-Leste",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Togo",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Tonga",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Trinidad and Tobago",
+    "located_in": "Caribbean"
+  },
+  {
+    "country": "Tunisia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Turkey",
+    "located_in": "Europe & Asia"
+  },
+  {
+    "country": "Turkmenistan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Tuvalu",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Uganda",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Ukraine",
+    "located_in": "Europe"
+  },
+  {
+    "country": "United Arab Emirates",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "United Kingdom",
+    "located_in": "Europe"
+  },
+  {
+    "country": "United States",
+    "located_in": "North America"
+  },
+  {
+    "country": "Uruguay",
+    "located_in": "South America"
+  },
+  {
+    "country": "Uzbekistan",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Vanuatu",
+    "located_in": "Oceania"
+  },
+  {
+    "country": "Vatican City",
+    "located_in": "Europe"
+  },
+  {
+    "country": "Venezuela",
+    "located_in": "South America"
+  },
+  {
+    "country": "Vietnam",
+    "located_in": "Asia"
+  },
+  {
+    "country": "Yemen",
+    "located_in": "Middle East"
+  },
+  {
+    "country": "Zambia",
+    "located_in": "Africa"
+  },
+  {
+    "country": "Zimbabwe",
+    "located_in": "Africa"
+  }
+]

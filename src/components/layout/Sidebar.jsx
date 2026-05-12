@@ -6,9 +6,9 @@
 // ============================================================
 import { NavLink, useNavigate, Link } from "react-router-dom";
 import {
-  LayoutDashboard, FileText, PlusCircle, Globe, Settings,
-  LogOut, ChevronLeft, ChevronRight, Shield, BarChart2,
-  Users, MapPin, Plane,
+  LayoutDashboard, FileText,
+  LogOut, ChevronLeft, ChevronRight, Shield,
+  Plane,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
@@ -18,16 +18,13 @@ import { useUIStore } from "../../store/uiStore";
 const USER_NAV = [
   { label: "Overview",         icon: LayoutDashboard,  to: "/dashboard",         id: "nav-overview" },
   { label: "My Applications",  icon: FileText,          to: "/dashboard/apps",    id: "nav-my-apps" },
-  { label: "New Application",  icon: PlusCircle,        to: "/apply",             id: "nav-new-app" },
-  { label: "Destinations",     icon: Globe,             to: "/dashboard/countries", id: "nav-countries" },
-  { label: "Settings",         icon: Settings,          to: "/dashboard/settings", id: "nav-settings" },
 ];
 
 
 
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
-  const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
+  const { sidebarOpen, toggleSidebar } = useUIStore();
   const navigate = useNavigate();
 
   // Choose nav items based on user role
@@ -38,9 +35,6 @@ const Sidebar = () => {
     logout();
     navigate("/");
   };
-
-  // ── Sidebar width based on open/closed state ──────────────
-  const sidebarWidth = sidebarOpen ? "w-60" : "w-16";
 
   return (
     <>
@@ -69,7 +63,7 @@ const Sidebar = () => {
                   transition={{ duration: 0.2 }}
                   className="font-bold text-lg tracking-tight overflow-hidden whitespace-nowrap"
                 >
-                  Visa & <span className="text-gradient-cyan">Voyage</span>
+                  <span className="text-gradient-cyan">VISAANDVOYAGE</span>
                 </motion.span>
               )}
             </AnimatePresence>

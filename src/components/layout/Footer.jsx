@@ -1,66 +1,68 @@
 // ============================================================
 //  Footer Component
-//  Landing page footer: links, social icons, trust badges.
+//  Landing page footer: CMS links, social icons, trust badges.
 // ============================================================
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Plane, Mail, MessageCircle, Link as LinkIcon, Shield, Lock, Globe } from "lucide-react";
+import { api } from "../../store/authStore";
+
+const FOOTER_SECTIONS = [
+  { key: "company", title: "Company" },
+  { key: "services", title: "Services" },
+  { key: "support", title: "Support" },
+  { key: "legal", title: "Legal" },
+];
 
 const Footer = () => {
+  const location = useLocation();
   const currentYear = new Date().getFullYear();
+  const [pages, setPages] = useState([]);
 
-  // ── Footer navigation columns ─────────────────────────────
-  const columns = [
-    {
-      title: "Company",
-      links: [
-        { label: "About Us",     href: "#" },
-        { label: "Careers",      href: "#" },
-        { label: "Press",        href: "#" },
-        { label: "Blog",         href: "#" },
-      ],
-    },
-    {
-      title: "Services",
-      links: [
-        { label: "Tourist Visas",   href: "#" },
-        { label: "Business Visas",  href: "#" },
-        { label: "Student Visas",   href: "#" },
-        { label: "Work Permits",    href: "#" },
-      ],
-    },
-    {
-      title: "Support",
-      links: [
-        { label: "Help Center",       href: "#" },
-        { label: "Track Application", href: "#" },
-        { label: "Contact Us",        href: "#" },
-        { label: "FAQ",               href: "#" },
-      ],
-    },
-    {
-      title: "Legal",
-      links: [
-        { label: "Privacy Policy",   href: "#" },
-        { label: "Terms of Service", href: "#" },
-        { label: "Cookie Policy",    href: "#" },
-        { label: "Refund Policy",    href: "#" },
-      ],
-    },
-  ];
+  useEffect(() => {
+    let active = true;
 
-  // ── Trust badges ──────────────────────────────────────────
+    const loadFooterPages = async () => {
+      try {
+        const { data } = await api.get("/pages");
+        if (active && data.success) {
+          setPages(Array.isArray(data.items) ? data.items : []);
+        }
+      } catch {
+        if (active) setPages([]);
+      }
+    };
+
+    loadFooterPages();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const columns = useMemo(
+    () =>
+      FOOTER_SECTIONS.map((section) => ({
+        ...section,
+        links: pages
+          .filter((page) => (page.footerSection || "company") === section.key)
+          .map((page) => ({
+            label: page.title,
+            to: `/page/${page.slug}`,
+          })),
+      })),
+    [pages]
+  );
+
   const trustBadges = [
     { icon: Shield, label: "SSL Secured" },
-    { icon: Lock,   label: "Data Protected" },
-    { icon: Globe,  label: "150+ Countries" },
+    { icon: Lock, label: "Data Protected" },
+    { icon: Globe, label: "150+ Countries" },
   ];
 
   return (
     <footer className="bg-surface border-t border-border" id="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        {/* ── Top: Brand + columns ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
-          {/* Brand */}
           <div className="lg:col-span-1">
             <Link to="/" className="flex items-center gap-2.5 mb-4">
               <div className="w-8 h-8 rounded-lg bg-cyan flex items-center justify-center">
@@ -75,12 +77,11 @@ const Footer = () => {
               Fast, secure, and professionally managed.
             </p>
 
-            {/* Social links */}
             <div className="flex items-center gap-3">
               {[
-                { icon: Mail,  href: "#", label: "Email" },
+                { icon: Mail, href: "#", label: "Email" },
                 { icon: LinkIcon, href: "#", label: "Website" },
-                { icon: MessageCircle,   href: "#", label: "Chat" },
+                { icon: MessageCircle, href: "#", label: "Chat" },
               ].map(({ icon: Icon, href, label }) => (
                 <a
                   key={label}
@@ -94,35 +95,37 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Nav columns */}
           {columns.map((col) => (
-            <div key={col.title}>
+            <div key={col.key}>
               <h3 className="text-sm font-semibold text-text-primary mb-4">{col.title}</h3>
               <ul className="space-y-3">
                 {col.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
+                  <li key={link.to}>
+                    <Link
+                      to={link.to}
+                      state={{
+                        from: `${location.pathname}${location.search}${location.hash}`,
+                      }}
                       className="text-sm text-text-secondary hover:text-cyan transition-colors duration-200"
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
+                {col.links.length === 0 && (
+                  <li className="text-sm text-text-muted">No pages yet</li>
+                )}
               </ul>
             </div>
           ))}
         </div>
 
-        {/* ── Divider ── */}
         <div className="border-t border-border pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            {/* Copyright */}
             <p className="text-sm text-text-muted">
-              © {currentYear} {atob("VmlzYSAmIFZveWFnZSBieSBZYXNoIFJhaiBTaW5naC4=")} {atob("QWxsIHJpZ2h0cyByZXNlcnZlZC4gTGljZW5zZWQgZm9yIHBlcnNvbmFsIHVzZSBvbmx5OyByZXNhbGUgb3IgdW5hdXRob3JpemVkIHJlZGlzdHJpYnV0aW9uIGlzIHN0cmljdGx5IHByb2hpYml0ZWQu")}
+              &copy; {currentYear} Visa & Voyage. All rights reserved.
             </p>
 
-            {/* Trust badges */}
             <div className="flex items-center gap-6">
               {trustBadges.map(({ icon: Icon, label }) => (
                 <div key={label} className="flex items-center gap-2 text-xs text-text-muted">

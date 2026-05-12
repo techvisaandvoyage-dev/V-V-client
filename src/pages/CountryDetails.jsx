@@ -1,41 +1,262 @@
-import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowLeft, Clock, ShieldCheck, CheckCircle, Search, AlertCircle, Minus, Plus, Calendar, Home, Globe } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  CircleCheck,
+  ShieldCheck,
+  HelpCircle,
+  BadgeCheck,
+  CalendarDays,
+  Users,
+  Minus,
+  Plus,
+  X,
+} from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import Button from "../components/ui/Button";
+import ImageWithShimmer from "../components/ui/ImageWithShimmer";
 import { useDataStore } from "../store/dataStore";
+import { useAuthStore, api } from "../store/authStore";
+import { useUIStore } from "../store/uiStore";
+import { useCountries, useMergedCountry } from "../hooks/useCountries";
+import {
+  openRazorpayForApplication,
+  validateRazorpayCheckoutReadiness,
+} from "../utils/razorpayCheckout";
+import ContactVerificationModal from "../components/account/ContactVerificationModal";
+import {
+  needsPhoneContactGate,
+  needsEmailContactGate,
+} from "../utils/contactVerificationGate";
+import { loadTravelDraft, saveTravelDraft } from "../utils/travelDraftStorage";
+import { getLocalDateYmd, maxYmd } from "../utils/dateInput";
 
 const ease = [0.16, 1, 0.3, 1];
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease } }
+  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
 };
 
-// Date Helpers
-const getFutureDate = (daysInFuture) => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysInFuture);
-  return d;
+const normalizeProcessingDays = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const matches = String(value || "").match(/\d+/g);
+  if (!matches?.length) return 0;
+  return Number(matches[matches.length - 1]);
 };
-const formatDate = (date) => {
-  const day = date.getDate();
-  const suffix = ["th", "st", "nd", "rd"][(day % 10 > 3 ? 0 : (day % 100 - day % 10 != 10) * day % 10)];
-  return `${day}${suffix} ${date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })}`;
+
+const DOCUMENT_LABELS = {
+  passport: "Passport Upload",
+  idCard: "Aadhaar Card Upload",
+  dobCertificate: "DOB Certificate Upload",
+  photo: "Passport Photo Upload",
+  bankStatement: "Bank Statement Upload",
+  travelInsurance: "Travel Insurance Upload",
+  flightTicket: "Flight Ticket Upload",
+  hotelBooking: "Hotel Booking Upload",
+  coverLetter: "Cover Letter Upload",
+  invitationLetter: "Invitation Letter Upload",
+  employmentLetter: "Employment Letter Upload",
+  taxReturn: "ITR / Tax Return Upload",
+  marriageCertificate: "Marriage Certificate Upload",
 };
+
+const createTravelerState = () => ({
+  name: "",
+});
 
 const CountryDetails = () => {
   const { countryId } = useParams();
   const navigate = useNavigate();
-  const { getCountryById } = useDataStore();
-  const country = getCountryById(countryId);
+  const location = useLocation();
+  const { fetchUserApplications, bookings } = useDataStore();
+  const { isAuthenticated, user, sessionAuthMethod } = useAuthStore();
+  const { showToast } = useUIStore();
+  const { countries: allCountries } = useCountries();
+  const listCountry = allCountries.find((c) => c.id === countryId);
+  const country = useMergedCountry(countryId, listCountry);
 
-  // State for checkout card
-  const [travellers, setTravellers] = useState(1);
-  const [paidGovtFee, setPaidGovtFee] = useState("no");
-  const [activeTab, setActiveTab] = useState("info"); // dummy sub-nav state
+  // ── All hooks must be called before any conditional return (Rules of Hooks) ──
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [showTravelDetails, setShowTravelDetails] = useState(false);
+  const [visaOption, setVisaOption] = useState("e-Visa");
+  const [travelDateFrom, setTravelDateFrom] = useState("");
+  const [travelDateTo, setTravelDateTo] = useState("");
+  const [travelers, setTravelers] = useState([createTravelerState()]);
+  const [paymentSummaryOpen, setPaymentSummaryOpen] = useState(false);
+  const [visaTermsAccepted, setVisaTermsAccepted] = useState(false);
+  const [razorpayReady, setRazorpayReady] = useState(false);
+  const [razorpayCheckLoading, setRazorpayCheckLoading] = useState(false);
+  const [razorpayReadyMessage, setRazorpayReadyMessage] = useState("");
+  const [currentApplicationId, setCurrentApplicationId] = useState("");
+  const [draftCreating, setDraftCreating] = useState(false);
+  const [travelValidationAttempted, setTravelValidationAttempted] = useState(false);
+  const travelerNameInputRefs = useRef({});
+  const [destinationPageContent, setDestinationPageContent] = useState(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactModalMode, setContactModalMode] = useState("phone");
+  const pendingContactAction = useRef(null);
 
+  const SERVICE_FEE_PER_TRAVELLER = 1500;
+  const GST_RATE = 0.18;
+  const travellerCount = travelers.length;
+
+  const { serviceAmount, gstAmount, payableToUs } = useMemo(() => {
+    const service = SERVICE_FEE_PER_TRAVELLER * travellerCount;
+    const gst = Math.round(service * GST_RATE);
+    return { serviceAmount: service, gstAmount: gst, payableToUs: service + gst };
+  }, [travellerCount]);
+
+  const whyBookNow = useMemo(() => {
+    const defaults = [
+      "Fast document pre-check by visa specialists",
+      "Transparent pricing and status updates",
+      "Dedicated support throughout your application",
+    ];
+    return Array.isArray(country?.whyBookNow) && country.whyBookNow.length ? country.whyBookNow : defaults;
+  }, [country]);
+
+  const includedItems = useMemo(() => {
+    const g = destinationPageContent?.included;
+    if (Array.isArray(g) && g.length) return g;
+    const defaults = [
+      "Application form guidance",
+      "Document checklist and validation",
+      "End-to-end support till submission",
+    ];
+    return Array.isArray(country?.included) && country.included.length ? country.included : defaults;
+  }, [destinationPageContent, country]);
+
+  const faqs = useMemo(() => {
+    const g = destinationPageContent?.faqs;
+    if (Array.isArray(g) && g.length) return g;
+    if (Array.isArray(country?.faqs) && country.faqs.length) return country.faqs;
+    const defaults = [
+      { question: "How long does processing take?", answer: `Typical processing is ${country?.processingDays ?? ""} based on current embassy timelines.` },
+      { question: "Can I track my application?", answer: "Yes, you can track status updates from your user dashboard after applying." },
+      { question: "Is this fee refundable?", answer: "Government and service fees depend on visa policy and review stage." },
+    ];
+    return defaults;
+  }, [destinationPageContent, country]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await api.get("/config/destination-content");
+        if (alive && data?.success && data.config) setDestinationPageContent(data.config);
+      } catch {
+        /* keep fallbacks below */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!paymentSummaryOpen) return;
+    let active = true;
+    const checkReadiness = async () => {
+      setRazorpayCheckLoading(true);
+      const result = await validateRazorpayCheckoutReadiness();
+      if (!active) return;
+      setRazorpayReady(!!result.ok);
+      setRazorpayReadyMessage(result.ok ? "" : result.message || "");
+      setRazorpayCheckLoading(false);
+    };
+    checkReadiness();
+    return () => { active = false; };
+  }, [paymentSummaryOpen]);
+
+  useEffect(() => {
+    const handleGlobalTypingForTravelerName = (event) => {
+      if (!showTravelDetails) return;
+
+      const activeElement = document.activeElement;
+      const tagName = activeElement?.tagName?.toLowerCase();
+      const isTypingInFormField = (
+        activeElement?.isContentEditable ||
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select"
+      );
+      if (isTypingInFormField) return;
+
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.length !== 1 && event.key !== "Backspace") return;
+
+      const firstEmptyIndex = travelers.findIndex((traveler) => !String(traveler?.name || "").trim());
+      const targetIndex = firstEmptyIndex >= 0 ? firstEmptyIndex : 0;
+      const targetInput = travelerNameInputRefs.current[targetIndex];
+      if (!targetInput) return;
+
+      event.preventDefault();
+      targetInput.focus();
+
+      setTravelers((prev) =>
+        prev.map((traveler, i) => {
+          if (i !== targetIndex) return traveler;
+          const currentName = String(traveler?.name || "");
+          if (event.key === "Backspace") {
+            return { ...traveler, name: currentName.slice(0, -1) };
+          }
+          return { ...traveler, name: `${currentName}${event.key}` };
+        })
+      );
+    };
+
+    window.addEventListener("keydown", handleGlobalTypingForTravelerName);
+    return () => window.removeEventListener("keydown", handleGlobalTypingForTravelerName);
+  }, [showTravelDetails, travelers]);
+
+  /** Return date must stay on/after departure; both must be today or later. */
+  useEffect(() => {
+    if (!travelDateFrom || !travelDateTo) return;
+    if (travelDateTo < travelDateFrom) {
+      setTravelDateTo(travelDateFrom);
+    }
+  }, [travelDateFrom, travelDateTo]);
+
+  useEffect(() => {
+    if (!countryId) return;
+    const draft = loadTravelDraft(countryId);
+    if (!draft) return;
+    const today = getLocalDateYmd();
+    let from = draft.travelDateFrom != null && String(draft.travelDateFrom).length
+      ? String(draft.travelDateFrom).trim()
+      : "";
+    let to = draft.travelDateTo != null && String(draft.travelDateTo).length
+      ? String(draft.travelDateTo).trim()
+      : "";
+    if (from && from < today) from = "";
+    if (to && to < today) to = "";
+    if (!from) to = "";
+    if (from && to && to < from) to = from;
+    if (draft.travelDateFrom != null && String(draft.travelDateFrom).length) {
+      setTravelDateFrom(from);
+    }
+    if (draft.travelDateTo != null && String(draft.travelDateTo).length) {
+      setTravelDateTo(to);
+    }
+    if (draft.visaOption) setVisaOption(String(draft.visaOption));
+    if (Array.isArray(draft.travelers) && draft.travelers.length > 0) {
+      setTravelers(draft.travelers.map((t) => ({ name: String(t?.name || "") })));
+    }
+    if (draft.showTravelDetails) {
+      setShowTravelDetails(true);
+      window.setTimeout(() => {
+        const node = document.getElementById("travel-details");
+        if (!node) return;
+        const stickyOffset = 150;
+        const targetTop = window.scrollY + node.getBoundingClientRect().top - stickyOffset;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      }, 180);
+    }
+  }, [countryId]);
+
+  // ── Safe to early-return after all hooks ──
   if (!country) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
@@ -45,52 +266,377 @@ const CountryDetails = () => {
     );
   }
 
-  // Parse processing days string (e.g. "3-5" or "5") into a number
-  const parsedProcessingDays = parseInt(String(country.processingDays).split("-").pop() || "5", 10);
+  const minDepartureYmd = getLocalDateYmd();
+  const minReturnYmd = maxYmd(minDepartureYmd, travelDateFrom);
 
-  // Calculated Dates
-  const fastDateObj = getFutureDate(parsedProcessingDays);
-  const govtDateObj = getFutureDate(parsedProcessingDays * 4); // Fake govt lag
-  const todayFormatted = "Today";
-  const fastFormatted = formatDate(fastDateObj);
-  const govtFormatted  = formatDate(govtDateObj);
+  const requiredDocumentKeys = Array.isArray(country.requiredDocuments) && country.requiredDocuments.length
+    ? country.requiredDocuments
+    : ["passport"];
+  const requiredDocumentFields = requiredDocumentKeys.map((key) => ({
+    key,
+    label: DOCUMENT_LABELS[key] || `${key.replace(/([A-Z])/g, " $1")} Upload`,
+  }));
 
-  // Calculated Prices
-  const serviceFeePerPerson = 3000;
-  const govtFeePerPerson   = Number(country.basePrice) || 0;
-  
-  const totalGovt = govtFeePerPerson * travellers;
-  const totalService = serviceFeePerPerson * travellers;
-  // If they clicked YES to already paid, zero out govt fee from total
-  const finalPayNow = paidGovtFee === "yes" ? totalService : totalGovt + totalService;
+  const handleBack = () => {
+    if (showTravelDetails) {
+      setShowTravelDetails(false);
+      saveTravelDraft(country.id, {
+        travelDateFrom,
+        travelDateTo,
+        visaOption,
+        travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        showTravelDetails: false,
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    navigate("/", { replace: false });
+  };
 
-  const SUB_NAV = [
-    { id: "info", label: "Visa Info" },
-    { id: "why", label: "Why book now?" },
-    { id: "included", label: "What's Included" },
-    { id: "reviews", label: "Reviews" },
-    { id: "faq", label: "FAQs" }
+  const addTraveler = () => {
+    setTravelers((prev) => [...prev, createTravelerState()]);
+  };
+
+  const removeLastTraveler = () => {
+    setTravelers((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  };
+
+  const updateTravelerName = (index, name) => {
+    setTravelers((prev) =>
+      prev.map((t, i) => (i === index ? { ...t, name } : t))
+    );
+  };
+
+  const formatTravelRange = () => {
+    if (!travelDateFrom && !travelDateTo) return "—";
+    const opts = { day: "numeric", month: "short", year: "numeric" };
+    try {
+      const from = travelDateFrom
+        ? new Date(`${travelDateFrom}T12:00:00`).toLocaleDateString("en-IN", opts)
+        : "—";
+      const to = travelDateTo
+        ? new Date(`${travelDateTo}T12:00:00`).toLocaleDateString("en-IN", opts)
+        : "—";
+      if (travelDateFrom && travelDateTo) return `${from} – ${to}`;
+      return travelDateFrom ? `${from}` : to;
+    } catch {
+      return "—";
+    }
+  };
+
+  const getVisaCardTypeLabel = (visaTypeValue) => {
+    const value = String(visaTypeValue || "").toLowerCase();
+    if (value.includes("free")) return "Visa Free";
+    if (value.includes("e-visa") || value.includes("evisa")) return "e-Visa Only";
+    return "All Visa Types";
+  };
+
+  const SUB_NAV = showTravelDetails
+    ? [{ id: "travel-details", label: "Travel Details" }]
+    : [
+    { id: "document-requirements", label: "Document Requirements" },
+    { id: "why-book-now", label: "Why book now?" },
+    { id: "whats-included", label: "What's Included" },
+    { id: "faqs", label: "FAQs" },
   ];
+
+  const scrollToSection = (sectionId) => {
+    const node = document.getElementById(sectionId);
+    if (!node) return;
+    const stickyOffset = 150;
+    const targetTop = window.scrollY + node.getBoundingClientRect().top - stickyOffset;
+    window.scrollTo({ top: targetTop, behavior: "smooth" });
+  };
+
+  const clearContactGate = () => {
+    pendingContactAction.current = null;
+    setContactModalOpen(false);
+  };
+
+  const openContactGate = (mode, after) => {
+    pendingContactAction.current = after;
+    setContactModalMode(mode);
+    setContactModalOpen(true);
+  };
+
+  const completeContactGate = () => {
+    const fn = pendingContactAction.current;
+    pendingContactAction.current = null;
+    setContactModalOpen(false);
+    fn?.();
+  };
+
+  /** If a gate opens, runs `after` only after the user saves phone/email in the modal. */
+  const gateContactOrRun = (after) => {
+    const token = localStorage.getItem("token");
+    if (!isAuthenticated || !token || !user) {
+      after();
+      return;
+    }
+    const method = sessionAuthMethod ?? useAuthStore.getState().sessionAuthMethod;
+    if (needsPhoneContactGate(method, user)) {
+      openContactGate("phone", after);
+      return;
+    }
+    if (needsEmailContactGate(method, user)) {
+      openContactGate("email", after);
+      return;
+    }
+    after();
+  };
+
+  const openTravelDetails = () => {
+    setShowTravelDetails(true);
+    setTimeout(() => scrollToSection("travel-details"), 100);
+  };
+
+  const handleStartApplication = () => {
+    gateContactOrRun(() => openTravelDetails());
+  };
+
+  const handleUploadDocsNow = () => {
+    if (!validateTravelDetails("Upload documents now")) return;
+    const token = localStorage.getItem("token");
+    if (!isAuthenticated && !token) {
+      const next = `${location.pathname}${location.search || ""}`;
+      navigate(`/login?redirect=${encodeURIComponent(next)}`);
+      showToast("Please log in to upload traveler documents.", "info");
+      return;
+    }
+    gateContactOrRun(() => {
+      saveTravelDraft(country.id, {
+        travelDateFrom,
+        travelDateTo,
+        visaOption,
+        travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        showTravelDetails: true,
+      });
+      navigate(`/apply/${country.id}`, {
+        state: {
+          travelerNames: getTravelerNames(),
+          travellerCount,
+          travelDateFrom,
+          travelDateTo,
+          visaOption,
+        },
+      });
+    });
+  };
+
+  const handleUploadDocsLater = async () => {
+    if (!validateTravelDetails("Upload documents later")) return;
+    const travelerNames = getTravelerNames();
+
+    const token = localStorage.getItem("token");
+    if (!isAuthenticated && !token) {
+      const next = `${location.pathname}${location.search || ""}`;
+      navigate(`/login?redirect=${encodeURIComponent(next)}`);
+      showToast("Please log in to upload traveler documents.", "info");
+      return;
+    }
+
+    gateContactOrRun(async () => {
+      const appId = await createCheckoutDraftAndSetId();
+      if (!appId) {
+        showToast("Could not create your application draft.", "error");
+        return;
+      }
+      saveTravelDraft(country.id, {
+        travelDateFrom,
+        travelDateTo,
+        visaOption,
+        travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        showTravelDetails: true,
+      });
+      navigate(`/dashboard/application/${appId}/summary`, {
+        state: {
+          docsSkipped: true,
+          summaryData: {
+            applicationId: appId,
+            countryId: country.id,
+            countryName: country.name,
+            flagEmoji: country.flagEmoji || "🛂",
+            visaType: visaOption || country.visaType || "e-Visa",
+            travellerCount,
+            travelerNames,
+            docsUploaded: false,
+            travelDateFrom: travelDateFrom || null,
+            travelDateTo: travelDateTo || null,
+          },
+          applicationPrev: {
+            path: `/destination/${country.id}`,
+            state: {},
+          },
+        },
+      });
+    });
+  };
+
+  const closePaymentSummaryModal = () => {
+    setPaymentSummaryOpen(false);
+    setVisaTermsAccepted(false);
+  };
+
+  const getTravelerNames = () => travelers.map((t) => String(t.name || "").trim());
+
+  const validateTravelDetails = (actionLabel) => {
+    setTravelValidationAttempted(true);
+
+    if (!travelDateFrom || !travelDateTo) {
+      showToast(`Please select both travel dates before choosing ${actionLabel}.`, "error");
+      return false;
+    }
+
+    const missingName = travelers.findIndex((t) => !String(t.name || "").trim());
+    if (missingName >= 0) {
+      showToast(`Please enter traveler ${missingName + 1} name before choosing ${actionLabel}.`, "error");
+      return false;
+    }
+    return true;
+  };
+
+  const dateWarning = travelValidationAttempted && (!travelDateFrom || !travelDateTo);
+
+
+  const createCheckoutDraftAndSetId = async () => {
+    const token = localStorage.getItem("token");
+    if (!isAuthenticated && !token) {
+      const next = `${location.pathname}${location.search || ""}`;
+      navigate(`/login?redirect=${encodeURIComponent(next)}`);
+      showToast("Please log in to upload traveler documents.", "info");
+      return null;
+    }
+
+    const travelerNames = travelers.map((t, i) => String(t.name || "").trim() || `Traveler ${i + 1}`);
+
+    setDraftCreating(true);
+    try {
+      const { data } = await api.post("/users/application/checkout-draft", {
+        countryId: country.id,
+        countryName: country.name,
+        flagEmoji: country.flagEmoji || "🛂",
+        visaType: visaOption,
+        travelDateFrom: travelDateFrom || null,
+        travelDateTo: travelDateTo || null,
+        travellerCount,
+        travelerNames,
+        processingDays: normalizeProcessingDays(country.processingDays),
+      });
+
+      if (!data?.success || !data.application?._id) {
+        showToast(data?.message || "Could not start application.", "error");
+        return null;
+      }
+
+      setCurrentApplicationId(data.application._id);
+      return data.application._id;
+    } catch (err) {
+      // Frontend fallback: if draft API fails, reuse latest application for same country
+      let candidateBookings = Array.isArray(bookings) ? bookings : [];
+      try {
+        const listRes = await api.get("/users/applications");
+        if (listRes?.data?.success && Array.isArray(listRes.data.applications)) {
+          candidateBookings = listRes.data.applications;
+        }
+      } catch {
+        // Keep existing local bookings fallback
+      }
+
+      const fallback = candidateBookings
+        .filter((b) => (b?.countryId && b.countryId === country.id) || b?.countryName === country.name)
+        .sort((a, b) => {
+          const ta = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+          const tb = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+          return tb - ta;
+        })[0];
+
+      if (fallback?._id || fallback?.id) {
+        const reuseId = fallback._id || fallback.id;
+        setCurrentApplicationId(reuseId);
+        showToast("Using your latest application draft.", "info");
+        return reuseId;
+      }
+
+      if (err?.response?.status === 401) {
+        localStorage.removeItem("token");
+        const next = `${location.pathname}${location.search || ""}`;
+        navigate(`/login?redirect=${encodeURIComponent(next)}`);
+        showToast("Session expired. Please log in again.", "info");
+        return null;
+      }
+
+      console.error("Draft creation failed:", err);
+      showToast(err.response?.data?.message || err.message || "Could not create application draft.", "error");
+      return null;
+    } finally {
+      setDraftCreating(false);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (!visaTermsAccepted || paymentSubmitting) return;
+    if (!razorpayReady) {
+      showToast(
+        razorpayReadyMessage || "Razorpay is not ready yet. Please try again.",
+        "error"
+      );
+      return;
+    }
+
+    if (!currentApplicationId) {
+      showToast("Application draft is missing. Reopen and try again.", "error");
+      return;
+    }
+
+    setPaymentSubmitting(true);
+    try {
+      const fee = payableToUs;
+
+      const result = await openRazorpayForApplication({
+        applicationId: currentApplicationId,
+        amountRupees: fee,
+        description: `${country.name} visa — service fee`,
+        applicantName: user.name || "Applicant",
+        applicantEmail: user.email || "",
+        onSuccess: async () => {
+          await fetchUserApplications();
+          closePaymentSummaryModal();
+          showToast("Payment successful! Complete your application on the dashboard.", "success");
+          navigate(`/dashboard/application/${encodeURIComponent(currentApplicationId)}`);
+        },
+        onDismiss: () => {
+          showToast("Payment was not completed. Your application draft is waiting in the dashboard.", "info");
+          navigate(`/dashboard?payment=cancelled&applicationId=${encodeURIComponent(currentApplicationId)}`);
+        },
+        onFailure: (message) => {
+          showToast(message || "Payment could not be started. Check Razorpay keys in admin settings.", "error");
+          navigate(`/dashboard?payment=failed&applicationId=${encodeURIComponent(currentApplicationId)}`);
+        },
+      });
+
+      if (!result.success && !result.dismissed) {
+        /* toasts handled in callbacks */
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.message || err.message || "Something went wrong.", "error");
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
       <Navbar />
-      
-      {/* ── Sub Navigation Bar ── */}
+
       <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border/50 shadow-sm hidden sm:block">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <ul className="flex items-center gap-8 overflow-x-auto no-scrollbar">
             {SUB_NAV.map((tab) => (
               <li key={tab.id}>
                 <button
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
-                    ${activeTab === tab.id 
-                      ? "border-cyan text-cyan" 
-                      : "border-transparent text-text-secondary hover:text-text-primary"
-                    }
-                  `}
+                  onClick={() => scrollToSection(tab.id)}
+                  className="py-4 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-text-secondary hover:text-text-primary hover:border-cyan/40 transition-colors"
                 >
                   {tab.label}
                 </button>
@@ -101,266 +647,506 @@ const CountryDetails = () => {
       </div>
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full">
-        
         <button
-          onClick={() => navigate("/")}
+          type="button"
+          onClick={handleBack}
           className="group flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted hover:text-cyan transition-colors mb-10 w-fit"
         >
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           Back
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
-          
-          {/* ══════════════════════════════════════
-              LEFT CONTENT (7 cols)
-              ══════════════════════════════════════ */}
-          <div className="lg:col-span-7 space-y-12">
-            
-            {/* ── Massive Typography Header ── */}
-            <motion.div initial="initial" animate="animate" variants={fadeUp}>
-              <h1 className="text-4xl sm:text-5xl font-bold text-text-primary leading-tight tracking-tight">
-                Secure your {country.name} Visa before{" "}
-                <span className="text-cyan block sm:inline mt-2">{fastFormatted}</span>
-                <span className="text-cyan/70 font-light"> in {country.processingDays} days</span>
-              </h1>
-            </motion.div>
-
-            {/* ── Timeline Track ── */}
-            <motion.div 
-              className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.6, ease } }}
-            >
-              {/* Header inside track */}
-              <div className="bg-surface-2 py-3 px-4 flex items-center justify-center gap-2 text-sm font-medium text-cyan border-b border-border">
-                <Globe size={16} /> Fastest processing in {country.continent}
-              </div>
-              
-              {/* Actual timeline graph */}
-              <div className="p-8 pb-12 relative overflow-hidden">
-                <div className="relative h-20 w-full flex items-center justify-between before:content-[''] before:absolute before:left-4 before:right-4 before:h-0.5 before:bg-border before:z-0">
-                  
-                  {/* Point 1: Today */}
-                  <div className="relative z-10 flex flex-col items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-text-muted ring-4 ring-background"></div>
-                    <span className="absolute top-6 text-xs text-text-secondary whitespace-nowrap">Today</span>
-                  </div>
-
-                  {/* Point 2: Visa & Voyage */}
-                  <div className="relative z-10 flex flex-col items-center gap-3 w-1/3">
-                    <div className="absolute -top-10 px-3 py-1 rounded-full bg-cyan text-background text-xs font-bold shadow-md">
-                      Visa & Voyage
+        <div
+          className={
+            showTravelDetails
+              ? "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12"
+              : "flex flex-col gap-8 lg:grid lg:grid-cols-12 lg:gap-12"
+          }
+        >
+          <div
+            className={
+              showTravelDetails
+                ? "lg:col-span-8 space-y-8"
+                : "order-1 w-full space-y-8 lg:col-span-8 lg:col-start-1 lg:row-start-1"
+            }
+          >
+            {!showTravelDetails && (
+              <motion.div initial="initial" animate="animate" variants={fadeUp}>
+                <div className="relative overflow-hidden rounded-3xl border border-border">
+                  <ImageWithShimmer
+                    src={country.imageUrl}
+                    alt={country.name}
+                    className="h-64 sm:h-72"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                    <div className="absolute bottom-0 left-0 p-6 sm:p-8">
+                      <p className="text-white/80 text-sm">{country.flagEmoji} {country.locatedIn ?? country.regionLabel ?? country.continent}</p>
+                      <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight">{country.name} Visa</h1>
                     </div>
-                    <div className="w-4 h-4 rounded-full bg-cyan ring-4 ring-cyan/20"></div>
-                    <span className="absolute top-6 text-xs font-semibold text-cyan whitespace-nowrap">{fastFormatted}</span>
-                  </div>
-
-                  {/* Point 3: Dummy middle */}
-                  <div className="relative z-10 flex flex-col items-center gap-3 hidden sm:flex">
-                    <div className="w-3 h-3 rounded-full bg-surface-3 ring-4 ring-background"></div>
-                  </div>
-
-                  {/* Point 4: Govt standard */}
-                  <div className="relative z-10 flex flex-col items-center gap-3 w-1/4">
-                    <div className="absolute -top-10 px-3 py-1 rounded-full bg-surface-3 text-text-secondary text-xs font-bold border border-border">
-                      Govt Standard
-                    </div>
-                    <div className="w-4 h-4 rounded-full bg-surface-3 ring-4 ring-background"></div>
-                    <span className="absolute top-6 text-xs text-text-secondary whitespace-nowrap">{govtFormatted}</span>
-                  </div>
-
+                  </ImageWithShimmer>
                 </div>
-              </div>
-              
-              {/* Timeline Features */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 pt-0">
+              </motion.div>
+            )}
+
+            {showTravelDetails ? (
+              <motion.section
+                id="travel-details"
+                initial="initial"
+                animate="animate"
+                variants={fadeUp}
+                className="bg-surface border border-border rounded-2xl p-6 space-y-6"
+              >
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Search size={18} className="text-text-primary" />
-                    <h4 className="font-semibold text-text-primary text-sm">24/7 Application Monitoring</h4>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Our real-time tracker monitors your application status and embassy slots round the clock.
+                  <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-2">Travel Details</p>
+                  <h2 className="text-2xl font-bold text-text-primary">Start your application</h2>
+                  <p className="text-sm text-text-secondary mt-1">
+                    Fill travel details below to continue with your {country.name} visa process.
                   </p>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock size={18} className="text-text-primary" />
-                    <h4 className="font-semibold text-text-primary text-sm">Instant Processing</h4>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Our system auto-secures an appointment or processes e-Visa requests the moment they open.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
 
-            {/* ── Extra Content blocks (Requirements, etc.) ── */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.6, ease } }}
-              className="space-y-6"
-            >
-              <h2 className="text-2xl font-bold text-text-primary tracking-tight">
-                Mandatory Requirements
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {country.requirements?.map((req, i) => (
-                  <div key={i} className="flex gap-3 p-4 rounded-xl border border-border/50 bg-surface/30">
-                    <CheckCircle size={18} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-text-secondary text-sm leading-relaxed">{req}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-          </div>
-
-          {/* ══════════════════════════════════════
-              RIGHT SIDEBAR (5 cols) - Checkout Card
-              ══════════════════════════════════════ */}
-          <div className="lg:col-span-5 relative">
-            <motion.div
-              className="sticky top-24"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1, transition: { delay: 0.15, duration: 0.6, ease } }}
-            >
-              <div className="bg-surface border border-border rounded-3xl shadow-xl overflow-hidden flex flex-col">
-                
-                {/* Header Banner */}
-                <div className="bg-surface-2/80 px-4 py-3 border-b border-border flex items-center gap-2 text-sm font-medium text-cyan">
-                  <ShieldCheck size={18} />
-                  Visa Guaranteed by {fastFormatted}
+                <div className="rounded-2xl border border-border bg-surface-2 p-4">
+                  <label className="text-xs text-text-muted block mb-2">Type of Visa</label>
+                  <select
+                    value={visaOption}
+                    onChange={(e) => setVisaOption(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
+                  >
+                    <option value="e-Visa">e-Visa</option>
+                    <option value="Sticker Visa">Sticker Visa</option>
+                  </select>
                 </div>
 
-                {/* Form Elements */}
-                <div className="p-6 sm:p-8 space-y-6">
-                  
-                  {/* Selectors */}
-                  <div className="flex items-center gap-4 border-b border-border pb-6">
-                    <div className="flex-1">
-                      <label className="text-[10px] uppercase font-bold tracking-wider text-text-muted mb-1 block">Embassy</label>
-                      <select className="w-full bg-surface-2 border border-border rounded-lg px-2 py-1.5 text-sm font-semibold text-text-primary outline-none cursor-pointer [color-scheme:dark] focus:border-cyan/50 transition-colors">
-                        <option value="global">Global Online</option>
-                        <option value="local">Local Consulate</option>
-                      </select>
+                <div className="rounded-2xl border border-border bg-surface-2 p-4">
+                  <p className="text-xs text-text-muted mb-2">Select Travel Date</p>
+                  <div className="w-full rounded-xl border border-border bg-background px-3 py-3">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-medium text-text-primary">
+                      <CalendarDays size={16} className="text-cyan" />
+                      Select Travel Date
                     </div>
-                    <div className="w-[1px] h-10 bg-border self-end mb-1"></div>
-                    <div className="flex-1 pl-4">
-                      <label className="text-[10px] uppercase font-bold tracking-wider text-text-muted mb-1 block">Visa Type</label>
-                      <select className="w-full bg-surface-2 border border-border rounded-lg px-2 py-1.5 text-sm font-semibold text-text-primary outline-none cursor-pointer [color-scheme:dark] focus:border-cyan/50 transition-colors">
-                        <option>{country.visaType}</option>
-                        <option>Business</option>
-                      </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="date"
+                        autoComplete="off"
+                        min={minDepartureYmd}
+                        value={travelDateFrom}
+                        onChange={(e) => setTravelDateFrom(e.target.value)}
+                        className={`w-full bg-surface border rounded-lg px-3 py-2 text-sm text-text-primary outline-none transition-colors ${
+                          dateWarning && !travelDateFrom
+                            ? "border-red-500 focus:border-red-400"
+                            : "border-border focus:border-cyan/50"
+                        }`}
+                      />
+                      <input
+                        type="date"
+                        autoComplete="off"
+                        min={minReturnYmd}
+                        value={travelDateTo}
+                        onChange={(e) => setTravelDateTo(e.target.value)}
+                        className={`w-full bg-surface border rounded-lg px-3 py-2 text-sm text-text-primary outline-none transition-colors ${
+                          dateWarning && !travelDateTo
+                            ? "border-red-500 focus:border-red-400"
+                            : "border-border focus:border-cyan/50"
+                        }`}
+                      />
                     </div>
+                    {dateWarning && (
+                      <p className="text-xs text-red-400 mt-2">Select both travel dates to continue.</p>
+                    )}
                   </div>
+                </div>
 
-                  {/* Travellers Counter */}
-                  <div className="flex items-center justify-between border-b border-border pb-6">
-                    <div className="flex items-center gap-2 text-text-primary font-semibold text-sm">
-                      <Home size={18} /> Travellers
+                <div className="rounded-2xl border border-border bg-surface-2 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <Users size={16} className="text-cyan" />
+                      No. of Traveler
                     </div>
-                    <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => setTravellers(Math.max(1, travellers - 1))}
-                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-text-muted hover:bg-surface-2 transition-colors disabled:opacity-50"
-                        disabled={travellers <= 1}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={removeLastTraveler}
+                        className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center hover:border-cyan/40 disabled:opacity-40"
+                        disabled={travelers.length <= 1}
+                        aria-label="Remove traveler"
                       >
                         <Minus size={14} />
                       </button>
-                      <span className="w-4 text-center font-bold text-text-primary">{travellers}</span>
-                      <button 
-                        onClick={() => setTravellers(travellers + 1)}
-                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-text-muted hover:bg-surface-2 transition-colors"
+                      <span className="w-6 text-center font-semibold text-text-primary">{travelers.length}</span>
+                      <button
+                        type="button"
+                        onClick={addTraveler}
+                        className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center hover:border-cyan/40"
+                        aria-label="Add traveler"
                       >
                         <Plus size={14} />
                       </button>
                     </div>
                   </div>
-
-                  {/* Giant Price */}
-                  <div className="text-center py-4">
-                    <h2 className="text-5xl font-extrabold text-text-primary mb-1 tracking-tight">
-                      ₹{finalPayNow}
-                    </h2>
-                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                      To be paid now
-                    </p>
-                  </div>
-
-                  {/* Fee Toggle */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-surface-2 border border-border">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
-                      <AlertCircle size={14} className="text-text-muted" />
-                      Have you paid Govt fees yet?
-                    </div>
-                    <div className="flex bg-background rounded-lg p-1">
-                      <button
-                        onClick={() => setPaidGovtFee("yes")}
-                        className={`px-4 py-1 text-xs rounded-md font-semibold transition-all ${paidGovtFee === "yes" ? "bg-cyan text-background shadow-sm" : "text-text-muted hover:text-text-primary"}`}
-                      >
-                        Yes
-                      </button>
-                      <button
-                        onClick={() => setPaidGovtFee("no")}
-                        className={`px-4 py-1 text-xs rounded-md font-semibold transition-all ${paidGovtFee === "no" ? "bg-cyan text-background shadow-sm" : "text-text-muted hover:text-text-primary"}`}
-                      >
-                        No
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Receipt Breakdown */}
-                  <div className="bg-surface/50 rounded-xl p-5 border border-border/50 text-sm space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold text-text-primary flex items-center gap-2">
-                          <Calendar size={14} /> Pay Now
-                        </p>
-                        <p className="text-xs text-text-muted mt-0.5 underline decoration-dashed underline-offset-4 cursor-help">
-                          {paidGovtFee === "no" ? "Government Fees + Service" : "Processing Fee Only"}
-                        </p>
-                      </div>
-                      <p className="font-bold text-text-primary">₹{finalPayNow}</p>
-                    </div>
-                    
-                    {paidGovtFee === "yes" && (
-                      <div className="flex items-start justify-between opacity-50">
-                        <div>
-                          <p className="font-semibold text-text-primary flex items-center gap-2">
-                            <CheckCircle size={14} /> Already Paid
-                          </p>
-                          <p className="text-xs text-text-muted mt-0.5">Government Fees</p>
-                        </div>
-                        <p className="font-medium text-text-primary line-through">₹{totalGovt}</p>
-                      </div>
-                    )}
-                    
-                    <div className="border-t border-border pt-4 flex items-center justify-between">
-                      <p className="font-bold text-text-primary">Total Secure Amount</p>
-                      <p className="font-extrabold text-lg text-text-primary">₹{finalPayNow}</p>
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  <Button 
-                    variant="primary" 
-                    fullWidth 
-                    size="lg"
-                    className="h-14 font-semibold text-sm rounded-xl tracking-wide shadow-cyan-glow"
-                    onClick={() => navigate(`/apply/${country.id}`)}
-                  >
-                    Reserve Appointment Now
-                  </Button>
-
                 </div>
+
+                <div className="space-y-4">
+                  {travelers.map((traveler, index) => (
+                    <div
+                      key={`traveler-${index}`}
+                      className="rounded-2xl border border-border bg-surface-2 p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-text-primary">
+                          Traveler {index + 1}
+                        </p>
+                        <span className="text-xs text-text-muted">Name only</span>
+                      </div>
+                      <div>
+                        <label htmlFor={`traveler-name-${index}`} className="text-xs text-text-muted block mb-1.5">
+                          Full name (as on passport)
+                        </label>
+                        <input
+                          id={`traveler-name-${index}`}
+                          ref={(el) => {
+                            travelerNameInputRefs.current[index] = el;
+                          }}
+                          type="text"
+                          autoComplete="off"
+                          value={traveler.name}
+                          onChange={(e) => updateTravelerName(index, e.target.value)}
+                          placeholder="Enter name"
+                          className={`w-full bg-background border rounded-xl px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-muted transition-colors ${
+                            travelValidationAttempted && !String(traveler.name || "").trim()
+                              ? "border-red-500 focus:border-red-400"
+                              : "border-border focus:border-cyan/50"
+                          }`}
+                        />
+                        {travelValidationAttempted && !String(traveler.name || "").trim() && (
+                          <p className="text-xs text-red-400 mt-1.5">Traveler name is required.</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
+                    className="sm:flex-1"
+                    onClick={handleUploadDocsNow}
+                  >
+                    Upload documents now
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    className="sm:flex-1"
+                    onClick={handleUploadDocsLater}
+                    loading={draftCreating}
+                    disabled={draftCreating}
+                  >
+                    Upload documents later
+                  </Button>
+                </div>
+                <p className="text-xs text-text-muted">
+                  Required documents are uploaded on the next page after these traveler details are saved.
+                </p>
+              </motion.section>
+            ) : (
+              <>
+            <motion.section id="document-requirements" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-text-primary mb-4">Document Requirements</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {requiredDocumentFields.length ? requiredDocumentFields.map((doc) => (
+                  <div key={doc.key} className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-text-secondary flex items-start gap-2">
+                    <CircleCheck size={16} className="text-emerald-500 mt-0.5" />
+                    <span>{doc.label}</span>
+                  </div>
+                )) : (
+                  <p className="text-sm text-text-muted">No requirements configured yet.</p>
+                )}
               </div>
+            </motion.section>
+
+            <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BadgeCheck size={18} className="text-cyan" />
+                <h2 className="text-xl font-bold text-text-primary">Why book now?</h2>
+              </div>
+              <div className="space-y-3">
+                {whyBookNow.map((item, idx) => (
+                  <div key={`${item}-${idx}`} className="flex items-start gap-3">
+                    <CircleCheck size={16} className="text-emerald-500 mt-0.5" />
+                    <p className="text-sm text-text-secondary">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.section>
+
+            <motion.section id="whats-included" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShieldCheck size={18} className="text-cyan" />
+                <h2 className="text-xl font-bold text-text-primary">What's Included</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {includedItems.map((item, idx) => (
+                  <div key={`${item}-${idx}`} className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-text-secondary">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </motion.section>
+
+              </>
+            )}
+
+          </div>
+
+          <div
+            className={
+              showTravelDetails
+                ? "lg:col-span-4"
+                : "order-2 w-full lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:row-span-2"
+            }
+          >
+            <motion.div
+              className="sticky top-24 bg-surface border border-border rounded-2xl p-6"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, ease } }}
+            >
+              <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-2">Start Your Visa Process</p>
+              <h3 className="text-2xl font-bold text-text-primary mb-5">Apply for {country.name}</h3>
+
+              {showTravelDetails ? (
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-start justify-between gap-3 text-sm">
+                    <span className="text-text-muted shrink-0">Visa</span>
+                    <span className="font-semibold text-text-primary text-right">{country.name} Visa</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 text-sm">
+                    <span className="text-text-muted shrink-0">Visa type</span>
+                    <span className="font-semibold text-text-primary text-right">{visaOption}</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 text-sm">
+                    <span className="text-text-muted shrink-0">Travel date</span>
+                    <span className="font-semibold text-text-primary text-right">{formatTravelRange()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-text-muted">Travellers</span>
+                    <span className="font-semibold text-text-primary">{travellerCount}</span>
+                  </div>
+                  <div className="border-t border-border pt-3 mt-2 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-text-muted">Service</span>
+                      <span className="font-medium text-text-primary">₹{serviceAmount.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-text-muted">GST (18%)</span>
+                      <span className="font-medium text-text-primary">₹{gstAmount.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                      <span className="font-semibold text-text-primary">Payable to us</span>
+                      <span className="font-bold text-cyan">₹{payableToUs.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                  <p className="text-2xs text-text-muted pt-1">
+                    Government / embassy fees (if any) are shown separately at payment.
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-6 space-y-4">
+                  <p className="text-sm text-text-secondary">
+                    Start your application to enter travel details. Your selections will appear here.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="rounded-xl bg-surface-2 p-3">
+                      <p className="text-xs text-text-muted mb-1">VISA TYPE</p>
+                      <p className="text-sm font-semibold text-text-primary">
+                        {getVisaCardTypeLabel(country.visaType)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-surface-2 p-3">
+                      <p className="text-xs text-text-muted mb-1">FEE</p>
+                      <p className="text-sm font-semibold text-text-primary">
+                        ₹{country.basePrice}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-surface-2 p-3">
+                      <p className="text-xs text-text-muted mb-1">SUCCESS RATE</p>
+                      <p className="text-sm font-semibold text-text-primary">
+                        {country.successRate || 0}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!showTravelDetails && (
+                <Button
+                  variant="primary"
+                  fullWidth
+                  size="lg"
+                  onClick={handleStartApplication}
+                  id="country-details-start-application-btn"
+                >
+                  Start Application
+                </Button>
+              )}
             </motion.div>
           </div>
 
+          {!showTravelDetails && (
+            <div className="order-3 w-full lg:col-span-8 lg:col-start-1 lg:row-start-2">
+              <motion.section
+                id="faqs"
+                initial="initial"
+                animate="animate"
+                variants={fadeUp}
+                className="bg-surface border border-border rounded-2xl p-6"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <HelpCircle size={18} className="text-cyan" />
+                  <h2 className="text-xl font-bold text-text-primary">FAQs</h2>
+                </div>
+                <div className="space-y-3">
+                  {faqs.map((faq, idx) => (
+                    <div key={`${faq.question}-${idx}`} className="rounded-xl border border-border bg-surface-2 p-4">
+                      <p className="font-semibold text-text-primary text-sm">{faq.question}</p>
+                      <p className="text-sm text-text-secondary mt-1">{faq.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.section>
+            </div>
+          )}
         </div>
       </main>
+
+      {paymentSummaryOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="visa-payment-summary-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            aria-label="Close"
+            onClick={closePaymentSummaryModal}
+          />
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-surface shadow-modal p-6 sm:p-8">
+            <button
+              type="button"
+              onClick={closePaymentSummaryModal}
+              className="absolute top-4 right-4 p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+              aria-label="Close dialog"
+            >
+              <X size={20} />
+            </button>
+
+            <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-1">
+              Start Your Visa Process
+            </p>
+            <h2 id="visa-payment-summary-title" className="text-2xl font-bold text-text-primary mb-6 pr-8">
+              Payment Summary
+            </h2>
+
+            <div className="space-y-3 mb-6 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-text-muted shrink-0">Visa</span>
+                <span className="font-semibold text-text-primary text-right">{country.name} Visa</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-text-muted shrink-0">Visa type</span>
+                <span className="font-semibold text-text-primary text-right">{visaOption}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-text-muted shrink-0">Travel date</span>
+                <span className="font-semibold text-text-primary text-right">{formatTravelRange()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted">Travellers</span>
+                <span className="font-semibold text-text-primary">{travellerCount}</span>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 p-3">
+                <p className="text-xs text-text-muted mb-2">Traveler names</p>
+                <div className="space-y-1">
+                  {travelers.map((t, idx) => (
+                    <div key={`pay-name-${idx}`} className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">Traveler {idx + 1}</span>
+                      <span className="text-text-primary font-medium">
+                        {t.name?.trim() || "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-border pt-3 mt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">Service ({travellerCount} x ₹{SERVICE_FEE_PER_TRAVELLER})</span>
+                  <span className="font-medium text-text-primary">
+                    ₹{serviceAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">GST (18%)</span>
+                  <span className="font-medium text-text-primary">
+                    ₹{gstAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                  <span className="font-semibold text-text-primary">Payable to us</span>
+                  <span className="font-bold text-cyan">₹{payableToUs.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+              <p className="text-xs text-text-muted pt-1">
+                Government / embassy fees (if any) are shown separately at payment.
+              </p>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer group mb-6">
+              <input
+                type="checkbox"
+                checked={visaTermsAccepted}
+                onChange={(e) => setVisaTermsAccepted(e.target.checked)}
+                className="mt-1 rounded border-border text-cyan focus:ring-cyan/30"
+              />
+              <span className="text-sm text-text-secondary leading-snug">
+                I agree to the{" "}
+                <a href="/terms" className="text-cyan hover:underline font-medium" onClick={(e) => e.stopPropagation()}>
+                  terms and conditions
+                </a>{" "}
+                and understand the fees above are service charges only.
+              </span>
+            </label>
+
+            {!razorpayReady && (
+              <p className="text-xs text-amber-400 mb-3">
+                {razorpayCheckLoading
+                  ? "Checking Razorpay setup..."
+                  : razorpayReadyMessage || "Razorpay is not ready."}
+              </p>
+            )}
+
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!visaTermsAccepted || !razorpayReady || razorpayCheckLoading}
+              loading={paymentSubmitting}
+              onClick={handleProceedToPayment}
+            >
+              Proceed to payment
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <ContactVerificationModal
+        isOpen={contactModalOpen}
+        mode={contactModalMode}
+        onClose={clearContactGate}
+        onCompleted={completeContactGate}
+      />
 
       <Footer />
     </div>

@@ -19,7 +19,6 @@ const StepIndicator = ({ steps, currentStep }) => {
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
           const isActive    = index === currentStep;
-          const isUpcoming  = index > currentStep;
 
           return (
             <div key={step} className="flex items-center flex-1 last:flex-none">

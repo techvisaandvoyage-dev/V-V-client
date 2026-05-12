@@ -8,8 +8,19 @@ import { persist } from "zustand/middleware";
 import axios from "axios";
 
 // ── Axios Instance ───────────────────────────────────────────
-export const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-export const API_BASE_URL = `${SERVER_URL}/api`;
+/** Backend origin only (no /api). Strips trailing /api so VITE_API_URL=http://host:5000/api does not become .../api/api. */
+const normalizeServerUrl = (url) => {
+  let s = String(url ?? "http://localhost:5000").trim();
+  if (!s) s = "http://localhost:5000";
+  s = s.replace(/\/+$/, "");
+  while (/\/api$/i.test(s)) {
+    s = s.replace(/\/api$/i, "").replace(/\/+$/, "");
+  }
+  return s;
+};
+
+export const SERVER_URL = normalizeServerUrl(import.meta.env.VITE_API_URL);
+export const API_BASE_URL = SERVER_URL ? `${SERVER_URL}/api` : "/api";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,6 +34,51 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+const isEmailIdentifier = (value) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim().toLowerCase());
+
+/** Normalize phone entered at OTP login for display when API omits user.phone */
+const displayPhoneFromLoginInput = (raw) => {
+  const trimmed = String(raw || "").trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    return last10.length === 10 ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}` : `+${digits}`;
+  }
+  return trimmed || null;
+};
+
+/** Map GET /users/profile document to persisted auth user shape */
+const mapProfileUserToAuthState = (u) => ({
+  role: "user",
+  id: u._id?.toString?.() ? u._id.toString() : String(u._id || u.id || ""),
+  name: u.name,
+  email: u.email,
+  phone: u.phone,
+  isVerified: u.isVerified,
+  profileImage: u.profileImage,
+  age: u.age,
+  gender: u.gender,
+  passportNumber: u.passportNumber,
+});
+
+/** When /users/profile fails, use login/verify API user payload */
+const mapApiUserToAuthState = (raw) => {
+  if (!raw) return null;
+  return {
+    role: "user",
+    id: raw.id?.toString?.() ? raw.id.toString() : String(raw.id || raw._id || ""),
+    name: raw.name,
+    email: raw.email,
+    phone: raw.phone,
+    isVerified: raw.isVerified,
+    profileImage: raw.profileImage,
+    age: raw.age,
+    gender: raw.gender,
+    passportNumber: raw.passportNumber,
+  };
+};
+
 // ── Auth Store Definition ──────────────────────────────────
 export const useAuthStore = create(
   // persist middleware: saves auth state to localStorage
@@ -31,10 +87,31 @@ export const useAuthStore = create(
       // ── State ──────────────────────────────────────────
       user: null,             // Current user object or null
       isAuthenticated: false, // Whether user is logged in
+      /** Last successful log-in: "password" | "otp" | null (shown on dashboard) */
+      sessionAuthMethod: null,
       isLoading: false,       // Loading state for login action
       error: null,            // Error message from login failure
 
       // ── Actions ────────────────────────────────────────
+
+      /**
+       * refreshUserFromServer() — Sync user from DB after token is set
+       */
+      refreshUserFromServer: async (opts = {}) => {
+        try {
+          const { data } = await api.get("/users/profile");
+          if (!data.success || !data.user) return null;
+          const userObj = mapProfileUserToAuthState(data.user);
+          set(() => ({
+            user: userObj,
+            isAuthenticated: true,
+            ...(opts.sessionAuthMethod != null ? { sessionAuthMethod: opts.sessionAuthMethod } : {}),
+          }));
+          return userObj;
+        } catch {
+          return null;
+        }
+      },
       
       /**
        * login() — Authenticate a user
@@ -45,12 +122,19 @@ export const useAuthStore = create(
           const { data } = await api.post("/users/login", { identifier, email: identifier, password });
           
           if (data.success) {
-            const rawUser = data.user || data.admin;
-            const userObj = { role: "user", ...rawUser };
             localStorage.setItem("token", data.token);
-            set({ user: userObj, isAuthenticated: true, isLoading: false });
-            return { success: true, role: userObj.role };
+            const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "password" });
+            if (!refreshed) {
+              const fallback = mapApiUserToAuthState(data.user || data.admin);
+              if (fallback) {
+                set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "password" });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true, role: "user" };
           }
+          set({ isLoading: false });
+          return { success: false, role: null };
         } catch (error) {
           const message = error.response?.data?.message || "Login failed";
           set({ error: message, isLoading: false });
@@ -66,11 +150,19 @@ export const useAuthStore = create(
         try {
           const { data } = await api.post("/users/verify-otp", { identifier, otp });
           if (data.success) {
-            const userObj = { role: "user", ...data.user };
             localStorage.setItem("token", data.token);
-            set({ user: userObj, isAuthenticated: true, isLoading: false });
-            return { success: true, role: userObj.role };
+            const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
+            if (!refreshed) {
+              const fallback = mapApiUserToAuthState(data.user);
+              if (fallback) {
+                set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "otp" });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true, role: "user" };
           }
+          set({ isLoading: false });
+          return { success: false };
         } catch (error) {
           const message = error.response?.data?.message || "OTP verification failed";
           set({ error: message, isLoading: false });
@@ -80,19 +172,25 @@ export const useAuthStore = create(
 
       /**
        * sendLoginOtp() — Send OTP to existing user for passwordless login
+       * @param {string} identifier — email or phone
+       * @param {{ otpLength?: 4 | 6 }} [opts] — default 6; use 4 for short apply/login flows
        */
-      sendLoginOtp: async (identifier) => {
+      sendLoginOtp: async (identifier, opts = {}) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/send-login-otp", { identifier });
+          const otpLength = opts.otpLength === 4 ? 4 : 6;
+          const { data } = await api.post("/users/send-login-otp", { identifier, otpLength });
           if (data.success) {
             set({ isLoading: false });
-            return { success: true };
+            return { success: true, devOtp: data.devOtp };
           }
+          const failMsg = data.message || "Failed to send OTP";
+          set({ error: failMsg, isLoading: false });
+          return { success: false, message: failMsg };
         } catch (error) {
           const message = error.response?.data?.message || "Failed to send OTP";
           set({ error: message, isLoading: false });
-          return { success: false };
+          return { success: false, message };
         }
       },
 
@@ -104,11 +202,32 @@ export const useAuthStore = create(
         try {
           const { data } = await api.post("/users/verify-login-otp", { identifier, otp });
           if (data.success) {
-            const userObj = { role: "user", ...data.user };
             localStorage.setItem("token", data.token);
-            set({ user: userObj, isAuthenticated: true, isLoading: false });
-            return { success: true, role: userObj.role };
+            let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
+            if (!userFromProfile) {
+              const fallback = mapApiUserToAuthState(data.user);
+              if (fallback) {
+                set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "otp" });
+                userFromProfile = fallback;
+              }
+            }
+            const id = String(identifier || "").trim();
+            if (
+              userFromProfile &&
+              !userFromProfile.phone &&
+              !isEmailIdentifier(id) &&
+              id.replace(/\D/g, "").length >= 10
+            ) {
+              const shown = displayPhoneFromLoginInput(id);
+              if (shown) {
+                set({ user: { ...get().user, phone: shown } });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true, role: "user" };
           }
+          set({ isLoading: false });
+          return { success: false };
         } catch (error) {
           const message = error.response?.data?.message || "OTP verification failed";
           set({ error: message, isLoading: false });
@@ -119,12 +238,89 @@ export const useAuthStore = create(
       /**
        * forgotPasswordRequestOtp() — Send reset OTP to email
        */
-      forgotPasswordRequestOtp: async (email) => {
+      /**
+       * Exchange Firebase ID token for app JWT (Google, Email/Password, etc.).
+       * @param {"google"|"facebook"|"firebase"} sessionAuthMethod
+       */
+      loginWithFirebaseIdToken: async (idToken, sessionAuthMethod = "firebase") => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/forgot-password/request-otp", { email });
+          const { data } = await api.post("/users/firebase-auth", { idToken });
+          if (data.success) {
+            localStorage.setItem("token", data.token);
+            const refreshed = await get().refreshUserFromServer({ sessionAuthMethod });
+            if (!refreshed) {
+              const fallback = mapApiUserToAuthState(data.user);
+              if (fallback) {
+                set({
+                  user: fallback,
+                  isAuthenticated: true,
+                  sessionAuthMethod,
+                });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true, role: "user" };
+          }
           set({ isLoading: false });
-          return { success: !!data.success, message: data.message };
+          return { success: false, role: null };
+        } catch (error) {
+          const status = error.response?.status;
+          const serverMsg = error.response?.data?.message;
+          const message =
+            status === 404
+              ? serverMsg ||
+                "API returned 404. Set VITE_API_URL in client/.env to your backend origin (e.g. http://localhost:5000) so /api/users/firebase-auth is reachable."
+              : serverMsg || error.message || "Firebase log-in failed";
+          set({ error: message, isLoading: false });
+          return { success: false, role: null, message };
+        }
+      },
+
+      loginWithFirebaseGoogle: async (idToken) => {
+        return get().loginWithFirebaseIdToken(idToken, "google");
+      },
+
+      loginWithFirebaseFacebook: async (idToken) => {
+        return get().loginWithFirebaseIdToken(idToken, "facebook");
+      },
+
+      loginWithFirebaseEmailPassword: async (email, password) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { signInWithFirebaseEmail } = await import("../utils/firebaseAuth");
+          const token = await signInWithFirebaseEmail(email, password);
+          return await get().loginWithFirebaseIdToken(token, "firebase");
+        } catch (error) {
+          const message = error?.message || "Firebase log-in failed";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      registerWithFirebaseEmail: async (name, email, password) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { signUpWithFirebaseEmail } = await import("../utils/firebaseAuth");
+          const token = await signUpWithFirebaseEmail(email, password, name);
+          return await get().loginWithFirebaseIdToken(token, "firebase");
+        } catch (error) {
+          const message = error?.message || "Firebase sign-up failed";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      forgotPasswordRequestOtp: async (identifier) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/forgot-password/request-otp", { identifier });
+          set({ isLoading: false });
+          return {
+            success: !!data.success,
+            message: data.message,
+            devOtp: data.devOtp != null ? String(data.devOtp) : undefined,
+          };
         } catch (error) {
           const message = error.response?.data?.message || "Failed to send reset OTP";
           set({ isLoading: false, error: message });
@@ -135,10 +331,14 @@ export const useAuthStore = create(
       /**
        * forgotPasswordReset() — Verify OTP and reset password
        */
-      forgotPasswordReset: async (email, otp, newPassword) => {
+      forgotPasswordReset: async (identifier, otp, newPassword) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/forgot-password/reset", { email, otp, newPassword });
+          const { data } = await api.post("/users/forgot-password/reset", {
+            identifier,
+            otp,
+            newPassword,
+          });
           set({ isLoading: false });
           return { success: !!data.success, message: data.message };
         } catch (error) {
@@ -151,14 +351,20 @@ export const useAuthStore = create(
       /**
        * register() - Create a new account
        */
-      register: async (name, email, password) => {
+      register: async (name, identifier, password) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/signup", { name, identifier: email, password });
+          const { data } = await api.post("/users/signup", { name, identifier, password });
           if (data.success) {
             set({ isLoading: false });
-            return { success: true };
+            return {
+              success: true,
+              devOtp: data.devOtp != null ? String(data.devOtp) : undefined,
+            };
           }
+          const message = data.message || "Registration failed";
+          set({ error: message, isLoading: false });
+          return { success: false };
         } catch (error) {
           const message = error.response?.data?.message || "Registration failed";
           set({ error: message, isLoading: false });
@@ -171,7 +377,7 @@ export const useAuthStore = create(
        */
       logout: () => {
         localStorage.removeItem("token");
-        set({ user: null, isAuthenticated: false, error: null });
+        set({ user: null, isAuthenticated: false, error: null, sessionAuthMethod: null });
       },
 
       /**
@@ -186,8 +392,9 @@ export const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { data } = await api.put("/users/profile/update", updates);
-          if (data.success) {
-            set({ user: { ...get().user, ...data.user }, isLoading: false });
+          if (data.success && data.user) {
+            const mapped = mapProfileUserToAuthState(data.user);
+            set({ user: { ...get().user, ...mapped }, isLoading: false });
             return { success: true };
           }
         } catch (error) {
@@ -195,6 +402,8 @@ export const useAuthStore = create(
           set({ isLoading: false, error: message });
           return { success: false, message };
         }
+        set({ isLoading: false });
+        return { success: false, message: "Update failed" };
       },
 
       /**
@@ -244,7 +453,7 @@ export const useAuthStore = create(
             set({ user: { ...get().user, profileImage: data.profileImage }, isLoading: false });
             return { success: true, url: data.profileImage };
           }
-        } catch (error) {
+        } catch {
           set({ isLoading: false, error: "Upload failed" });
           return { success: false };
         }
@@ -252,9 +461,10 @@ export const useAuthStore = create(
     }),
     {
       name: "visa-voyage-auth",          // localStorage key
-      partialize: (state) => ({   // Only persist user + auth status
+      partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        sessionAuthMethod: state.sessionAuthMethod,
       }),
       // Auto-heal corrupted state: if token says "logged in" but user object
       // is missing, reset to logged-out so ProtectedRoute sends to /login

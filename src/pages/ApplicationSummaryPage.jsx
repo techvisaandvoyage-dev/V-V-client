@@ -1,0 +1,422 @@
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle, CreditCard, FileText, Loader2, ShieldCheck, Info } from "lucide-react";
+import Navbar from "../components/layout/Navbar";
+import Button from "../components/ui/Button";
+import { api, useAuthStore } from "../store/authStore";
+import { useUIStore } from "../store/uiStore";
+import { openRazorpayForApplication, validateRazorpayCheckoutReadiness } from "../utils/razorpayCheckout";
+
+const normalizeProcessingDays = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const matches = String(value || "").match(/\d+/g);
+  if (!matches?.length) return 0;
+  return Number(matches[matches.length - 1]);
+};
+
+const SERVICE_FEE_PER_TRAVELLER = 1500;
+const GST_RATE = 0.18;
+
+const ApplicationSummaryPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuthStore();
+  const { showToast } = useUIStore();
+
+  const [application, setApplication] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [razorpayReady, setRazorpayReady] = useState(false);
+  const [razorpayMessage, setRazorpayMessage] = useState("");
+
+  const docsSkipped = Boolean(location.state?.docsSkipped);
+  const summaryData = location.state?.summaryData || null;
+
+  useEffect(() => {
+    if (!id) {
+      if (summaryData) {
+        setApplication({
+          _id: null,
+          countryName: summaryData.countryName || "Visa",
+          flagEmoji: summaryData.flagEmoji || "🛂",
+          visaType: summaryData.visaType || "e-Visa",
+          travellerCount: summaryData.travellerCount || 1,
+          travelerNames: summaryData.travelerNames || [],
+          fee: Number(summaryData.fee || 0),
+          travellerDocuments: summaryData.docsUploaded ? [{}] : [],
+        });
+      }
+      setLoading(false);
+      return;
+    }
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get(`/users/applications/${id}`);
+        if (data?.success) setApplication(data.application);
+        else showToast(data?.message || "Could not load application.", "error");
+      } catch (err) {
+        showToast(err.response?.data?.message || "Could not load application summary.", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id, summaryData]);
+
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      const result = await validateRazorpayCheckoutReadiness();
+      if (!mounted) return;
+      setRazorpayReady(!!result.ok);
+      setRazorpayMessage(result.ok ? "" : result.message || "Razorpay unavailable.");
+    };
+    check();
+    return () => { mounted = false; };
+  }, []);
+
+  const travelerCount = Math.max(1, Number(application?.travellerCount || 1));
+
+  const travelerNames = useMemo(() => {
+    const names = Array.isArray(application?.travelerNames) ? application.travelerNames : [];
+    return Array.from({ length: travelerCount }).map((_, i) => names[i] || `Traveler ${i + 1}`);
+  }, [application?.travelerNames, travelerCount]);
+
+  const { serviceFee, taxes, totalAmount } = useMemo(() => {
+    const service = SERVICE_FEE_PER_TRAVELLER * travelerCount;
+    const gst = Math.round(service * GST_RATE);
+    return {
+      serviceFee: service,
+      taxes: gst,
+      totalAmount: Number(application?.fee) || service + gst,
+    };
+  }, [application?.fee, travelerCount]);
+
+  const docsUploaded =
+    (summaryData && summaryData.docsUploaded === true) ||
+    Array.isArray(application?.travellerDocuments) &&
+    application.travellerDocuments.length >= travelerCount;
+  const UPLOAD_SECTION_HASH = "#document-upload-section";
+
+  const openDocumentUploadSection = () => {
+    if (!summaryData?.countryId && !id) {
+      navigate("/dashboard");
+      return;
+    }
+    if (id) {
+      navigate(`/dashboard/application/${id}${UPLOAD_SECTION_HASH}`);
+      return;
+    }
+    navigate(`/apply/${summaryData.countryId}${UPLOAD_SECTION_HASH}`, {
+      state: {
+        travelerNames: summaryData.travelerNames,
+        travellerCount: summaryData.travellerCount,
+        visaOption: summaryData.visaType,
+        travelDateFrom: summaryData.travelDateFrom ?? null,
+        travelDateTo: summaryData.travelDateTo ?? null,
+      },
+    });
+  };
+
+  const handleBack = () => {
+    const prev = location.state?.applicationPrev;
+    if (prev?.path) {
+      navigate(prev.path, { state: prev.state ?? {} });
+      return;
+    }
+    /* "Upload documents later" → summary; Back should reopen travel details on country page */
+    if (docsSkipped && summaryData?.countryId) {
+      navigate(`/destination/${encodeURIComponent(summaryData.countryId)}`);
+      return;
+    }
+    /* Upload docs completed then summary; Back → document upload page */
+    if (
+      summaryData?.countryId &&
+      summaryData.docsUploaded === true &&
+      id
+    ) {
+      navigate(`/apply/${encodeURIComponent(summaryData.countryId)}`, {
+        state: {
+          travelerNames: summaryData.travelerNames,
+          travellerCount: summaryData.travellerCount,
+          travelDateFrom: summaryData.travelDateFrom ?? null,
+          travelDateTo: summaryData.travelDateTo ?? null,
+          visaOption: summaryData.visaType,
+        },
+      });
+      return;
+    }
+    if (id) {
+      navigate(`/dashboard/application/${encodeURIComponent(id)}`);
+      return;
+    }
+    const cid = summaryData?.countryId;
+    if (cid) {
+      navigate(`/destination/${encodeURIComponent(cid)}`);
+      return;
+    }
+    navigate("/dashboard");
+  };
+
+  const resolvePayAmountRupees = (appDoc) => {
+    const count = Math.max(1, Number(appDoc?.travellerCount || 1));
+    const service = SERVICE_FEE_PER_TRAVELLER * count;
+    const gst = Math.round(service * GST_RATE);
+    const fromServer = Number(appDoc?.fee);
+    return Number.isFinite(fromServer) && fromServer > 0 ? fromServer : service + gst;
+  };
+
+  const handlePay = async () => {
+    if (!termsAccepted) {
+      showToast("Please accept the terms and conditions.", "error");
+      return;
+    }
+    if (!razorpayReady) {
+      showToast(razorpayMessage || "Payment is not available right now.", "error");
+      return;
+    }
+
+    let app = application;
+    let appId = app?._id;
+
+    setPaying(true);
+    try {
+      if (!appId && summaryData?.countryId) {
+        const { data } = await api.post("/users/application/checkout-draft", {
+          countryId: summaryData.countryId,
+          countryName: summaryData.countryName,
+          flagEmoji: summaryData.flagEmoji || "🛂",
+          visaType: summaryData.visaType || "e-Visa",
+          travelDateFrom: summaryData.travelDateFrom ?? null,
+          travelDateTo: summaryData.travelDateTo ?? null,
+          travellerCount: summaryData.travellerCount || 1,
+          travelerNames: Array.isArray(summaryData.travelerNames) ? summaryData.travelerNames : [],
+          processingDays: normalizeProcessingDays(summaryData.processingDays),
+        });
+        if (!data?.success || !data.application?._id) {
+          showToast(data?.message || "Could not start application for payment.", "error");
+          return;
+        }
+        app = data.application;
+        appId = data.application._id;
+        setApplication(data.application);
+      }
+
+      if (!appId) {
+        showToast("Application not found. Go back and continue from the document step.", "error");
+        return;
+      }
+
+      const amountRupees = resolvePayAmountRupees(app);
+
+      await openRazorpayForApplication({
+        applicationId: appId,
+        amountRupees,
+        description: `${app.countryName || "Visa"} — service fee`,
+        applicantName: user?.name || "Applicant",
+        applicantEmail: user?.email || "",
+        onSuccess: () => {
+          showToast("Payment successful!", "success");
+          navigate(`/dashboard/application/${encodeURIComponent(appId)}`);
+        },
+        onDismiss: () => {
+          showToast("Payment was not completed. Your application is saved in the dashboard.", "info");
+          navigate(`/dashboard?payment=cancelled&applicationId=${encodeURIComponent(appId)}`);
+        },
+        onFailure: (m) => {
+          showToast(m || "Payment could not be started.", "error");
+          navigate(`/dashboard?payment=failed&applicationId=${encodeURIComponent(appId)}`);
+        },
+      });
+    } catch (err) {
+      showToast(err.response?.data?.message || "Could not start payment.", "error");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-cyan animate-spin" />
+      </div>
+    );
+  }
+
+  if (!application) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="text-text-primary font-semibold">Application not found.</p>
+          <Button variant="secondary" onClick={handleBack}>
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col pb-20">
+      <Navbar />
+      <main className="flex-1 max-w-lg w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+        {/* Back */}
+        <button
+          onClick={handleBack}
+          className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
+
+        {/* Header */}
+        <div>
+          <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-1">
+            {application.flagEmoji} {application.countryName}
+          </p>
+          <h1 className="text-2xl font-bold text-text-primary">Payment Summary</h1>
+          <p className="text-sm text-text-secondary mt-1">{application.visaType}</p>
+        </div>
+
+        {/* Progress steps */}
+        <div className="grid grid-cols-3 gap-2 text-[11px] font-medium">
+          <div className="rounded-lg bg-cyan/10 border border-cyan/30 p-2 text-cyan text-center">Application</div>
+          <div className={`rounded-lg p-2 text-center border text-[11px] font-medium ${
+            docsUploaded
+              ? "bg-cyan/10 border-cyan/30 text-cyan"
+              : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+          }`}>
+            Documents
+          </div>
+          <div className="rounded-lg bg-cyan/10 border border-cyan/30 p-2 text-cyan text-center">Payment</div>
+        </div>
+
+        {/* Travelers */}
+        <div className="rounded-2xl border border-border bg-surface p-5 space-y-2">
+          <h3 className="text-sm font-semibold text-text-primary mb-3">Traveler Details</h3>
+          {travelerNames.map((name, idx) => (
+            <div key={idx} className="flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Traveler {idx + 1}</span>
+              <span className="font-medium text-text-primary">{name}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Document status */}
+        <div className={`rounded-2xl border p-4 flex items-center justify-between gap-3 ${
+          docsUploaded
+            ? "border-emerald-500/30 bg-emerald-500/5"
+            : "border-amber-500/30 bg-amber-500/5"
+        }`}>
+          <div>
+            <p className="text-xs text-text-muted">Document Status</p>
+            <p className={`text-sm font-semibold mt-0.5 ${docsUploaded ? "text-emerald-400" : "text-amber-400"}`}>
+              {docsUploaded ? "All documents uploaded" : "Pending Upload"}
+            </p>
+          </div>
+          {docsUploaded ? (
+            <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<FileText size={14} />}
+              onClick={openDocumentUploadSection}
+            >
+              Upload now
+            </Button>
+          )}
+        </div>
+
+        {docsSkipped && (
+          <div className="rounded-2xl border border-cyan/30 bg-cyan/5 p-4">
+            <div className="flex items-start gap-3">
+              <Info size={18} className="text-cyan mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-text-primary">
+                  Documents can be uploaded after payment
+                </p>
+                <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                  You selected <span className="font-medium text-text-primary">Upload Documents Later</span>.
+                  Complete payment now, then upload required traveler documents from your
+                  dashboard application section.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Billing */}
+        <div className="rounded-2xl border border-border bg-surface p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-text-primary mb-1">Billing</h3>
+
+          <div className="flex justify-between text-sm">
+            <span className="text-text-secondary">Service Fee ({travelerCount} × ₹{SERVICE_FEE_PER_TRAVELLER.toLocaleString("en-IN")})</span>
+            <span className="text-text-primary">₹{serviceFee.toLocaleString("en-IN")}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-text-secondary">GST (18%)</span>
+            <span className="text-text-primary">₹{taxes.toLocaleString("en-IN")}</span>
+          </div>
+          <div className="border-t border-border pt-3 flex justify-between text-base font-semibold">
+            <span className="text-text-primary">Total</span>
+            <span className="text-cyan">₹{totalAmount.toLocaleString("en-IN")}</span>
+          </div>
+          <p className="text-xs text-text-muted">
+            Government / embassy fees (if any) are shown separately at payment.
+          </p>
+        </div>
+
+        {/* T&C + Pay */}
+        <div className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-border text-cyan accent-cyan"
+            />
+            <span className="text-sm text-text-secondary leading-snug">
+              I agree to the{" "}
+              <a href="/terms" className="text-cyan hover:underline font-medium" onClick={(e) => e.stopPropagation()}>
+                terms and conditions
+              </a>{" "}
+              and understand that the amount above covers service charges only.
+            </span>
+          </label>
+
+          {!razorpayReady && (
+            <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 rounded-xl px-3 py-2">
+              <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+              {razorpayMessage || "Payment gateway is not configured. Contact support."}
+            </div>
+          )}
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            leftIcon={<CreditCard size={18} />}
+            loading={paying}
+            disabled={!termsAccepted || !razorpayReady || paying}
+            onClick={handlePay}
+          >
+            Proceed to Payment
+          </Button>
+
+          <p className="text-xs text-text-muted text-center">
+            Secured by Razorpay · Your payment info is never stored
+          </p>
+        </div>
+
+      </main>
+    </div>
+  );
+};
+
+export default ApplicationSummaryPage;

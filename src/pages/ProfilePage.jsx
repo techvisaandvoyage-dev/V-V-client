@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   User, Mail, Camera, Shield, KeyRound, 
-  Save, X, Edit3, ArrowLeft, Loader2
+  Save, X, Edit3, ArrowLeft, Loader2, Phone
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
@@ -14,10 +14,14 @@ import { useNavigate } from "react-router-dom";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+
+  const handleBack = () => {
+    navigate("/dashboard");
+  };
   
   const { 
     user, updateProfile, uploadProfileImage, 
-    resetPasswordRequest, changeUserPassword, isLoading 
+    changeUserPassword, isLoading 
   } = useAuthStore();
   const { showToast } = useUIStore();
   
@@ -32,8 +36,8 @@ const ProfilePage = () => {
     name: "",
     age: "",
     gender: "",
-    passportNumber: "",
-    email: "" // Read-only
+    email: "", // Read-only
+    phone: "",
   });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "" });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -45,8 +49,8 @@ const ProfilePage = () => {
         name: user.name || "",
         age: user.age || "",
         gender: user.gender || "Other",
-        passportNumber: user.passportNumber || "",
-        email: user.email || ""
+        email: user.email || "",
+        phone: user.phone || "",
       });
     }
   }, [user]);
@@ -63,7 +67,7 @@ const ProfilePage = () => {
       name: formData.name,
       age: formData.age ? Number(formData.age) : undefined,
       gender: formData.gender,
-      passportNumber: formData.passportNumber
+      phone: formData.phone.trim(),
     };
 
     const { success } = await updateProfile(updates);
@@ -84,8 +88,8 @@ const ProfilePage = () => {
         name: user.name || "",
         age: user.age || "",
         gender: user.gender || "Other",
-        passportNumber: user.passportNumber || "",
-        email: user.email || ""
+        email: user.email || "",
+        phone: user.phone || "",
       });
     }
   };
@@ -119,16 +123,6 @@ const ProfilePage = () => {
     }
   };
 
-  // Handle Password Reset Request
-  const handleResetPassword = async () => {
-    const { success } = await resetPasswordRequest();
-    if (success) {
-      showToast("OTP sent to your registered email", "success");
-    } else {
-      showToast("Failed to send reset request", "error");
-    }
-  };
-
   const handleChangePassword = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {
       return showToast("Please fill all password fields", "error");
@@ -152,19 +146,17 @@ const ProfilePage = () => {
     <div className="min-h-screen bg-background flex flex-col pb-20">
       <Navbar />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8">
-        
-        
-      
-        {/* Header & Avatar Section */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 relative">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="absolute -top-12 left-0 flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors mb-4"
-          >
-            <ArrowLeft size={16} /> Dashboard
-          </button>
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
 
+        {/* Header & Avatar Section */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8">
           {/* Avatar Container */}
           <div className="relative group cursor-pointer" onClick={handleImageClick}>
             <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-surface shadow-xl bg-surface-2 flex items-center justify-center relative">
@@ -200,6 +192,16 @@ const ProfilePage = () => {
             <p className="text-text-secondary flex items-center justify-center sm:justify-start gap-2">
               <Mail size={14} /> {user.email}
             </p>
+            {(user.phone || formData.phone) && (
+              <p className="text-text-secondary flex items-center justify-center sm:justify-start gap-2 mt-1 text-sm">
+                <Phone size={14} className="shrink-0" />
+                <span>
+                  {String(user.phone || formData.phone).replace(/\D/g, "").length === 10
+                    ? `+91 ${String(user.phone || formData.phone).replace(/\D/g, "").slice(0, 5)} ${String(user.phone || formData.phone).replace(/\D/g, "").slice(5)}`
+                    : user.phone || formData.phone}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Global Edit Action */}
@@ -248,6 +250,24 @@ const ProfilePage = () => {
                 />
 
                 <Input
+                  label="Mobile number"
+                  name="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  placeholder="10-digit mobile (e.g. 9876543210)"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className={!isEditing ? "opacity-70 bg-surface-2 cursor-default" : ""}
+                  helper={
+                    isEditing
+                      ? "Indian mobile — 10 digits. Saved when you use OTP login too."
+                      : "Add or edit in Edit Profile. Filled automatically after phone OTP log-in."
+                  }
+                />
+
+                <Input
                   label="Age"
                   name="age"
                   type="number"
@@ -272,14 +292,6 @@ const ProfilePage = () => {
                   className={!isEditing ? "opacity-70 bg-surface-2 cursor-default" : ""}
                 />
 
-                <Input
-                  label="Passport Number"
-                  name="passportNumber"
-                  value={formData.passportNumber}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className={!isEditing ? "opacity-70 bg-surface-2 cursor-default" : ""}
-                />
               </div>
 
               {/* Action Buttons */}
@@ -355,18 +367,6 @@ const ProfilePage = () => {
                   Update Password
                 </Button>
 
-                <div className="pt-4 border-t border-border">
-                  <p className="text-[10px] text-text-muted mb-2 uppercase tracking-wider font-semibold">Alternative</p>
-                  <Button 
-                    variant="ghost" 
-                    fullWidth 
-                    size="sm"
-                    onClick={handleResetPassword}
-                    disabled={isLoading}
-                  >
-                    Send Reset OTP instead
-                  </Button>
-                </div>
               </div>
             </Card>
           </div>

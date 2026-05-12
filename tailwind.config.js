@@ -14,25 +14,25 @@ export default {
     extend: {
       // ── Custom Color Palette ──────────────────────────────
       colors: {
-        // Base backgrounds
-        background: "#0a0a0a",     // Deepest background
-        surface:    "#171717",     // Card / sidebar surfaces
-        "surface-2":"#1e1e1e",    // Elevated surface (modals, inputs)
-        "surface-3":"#252525",    // Hover states
+        // Base backgrounds - Light theme
+        background: "#f0f4f8",     // Light blue-gray background
+        surface:    "#ffffff",     // White card / sidebar surfaces
+        "surface-2":"#f8f9fa",    // Light off-white surface
+        "surface-3":"#e9ecf1",    // Light gray hover states
 
-        // Primary accent — Vibrant Cyan
+        // Primary accent — Bright Cyan (adjusted for light theme)
         cyan: {
-          DEFAULT: "#00d4ff",
-          dim:     "#00a8cc",
-          glow:    "rgba(0, 212, 255, 0.15)",
-          border:  "rgba(0, 212, 255, 0.3)",
+          DEFAULT: "#0284c7",
+          dim:     "#0369a1",
+          glow:    "rgba(2, 132, 199, 0.12)",
+          border:  "rgba(2, 132, 199, 0.25)",
         },
 
         // Secondary accent — Gold (pricing, badges, highlights)
         gold: {
-          DEFAULT: "#f5a623",
-          dim:     "#c7861c",
-          glow:    "rgba(245, 166, 35, 0.15)",
+          DEFAULT: "#d97706",
+          dim:     "#b45309",
+          glow:    "rgba(217, 119, 6, 0.12)",
         },
 
         // Status colors
@@ -43,17 +43,17 @@ export default {
           rejected: "#ef4444",   // Red
         },
 
-        // Text hierarchy
+        // Text hierarchy - Light theme
         text: {
-          primary:   "#f5f5f5",
-          secondary: "#a1a1aa",
-          muted:     "#71717a",
+          primary:   "#000000",
+          secondary: "#4b5563",
+          muted:     "#9ca3af",
         },
 
         // Border
         border: {
-          DEFAULT: "#2a2a2a",
-          light:   "#3a3a3a",
+          DEFAULT: "#e5e7eb",
+          light:   "#f3f4f6",
         },
       },
 
@@ -76,11 +76,11 @@ export default {
 
       // ── Box Shadows ───────────────────────────────────────
       boxShadow: {
-        "cyan-glow":  "0 0 20px rgba(0, 212, 255, 0.25)",
-        "cyan-glow-lg":"0 0 40px rgba(0, 212, 255, 0.35)",
-        "gold-glow":  "0 0 20px rgba(245, 166, 35, 0.25)",
-        "card":       "0 4px 24px rgba(0, 0, 0, 0.4)",
-        "modal":      "0 8px 48px rgba(0, 0, 0, 0.6)",
+        "cyan-glow":  "0 0 20px rgba(2, 132, 199, 0.2)",
+        "cyan-glow-lg":"0 0 40px rgba(2, 132, 199, 0.25)",
+        "gold-glow":  "0 0 20px rgba(217, 119, 6, 0.2)",
+        "card":       "0 2px 8px rgba(0, 0, 0, 0.08)",
+        "modal":      "0 4px 16px rgba(0, 0, 0, 0.12)",
       },
 
       // ── Animations ────────────────────────────────────────

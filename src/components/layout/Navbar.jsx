@@ -1,20 +1,10 @@
-// ============================================================
-//  Navbar Component
-//  Top navigation bar — transparent on landing, solid on scroll.
-//  Shows auth buttons (Login/Register) or user avatar dropdown.
-//  Responsive: hamburger icon on mobile.
-// ============================================================
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import {
-  Globe, ChevronDown, User, LayoutDashboard,
-  Shield, LogOut, Menu, X, Plane,
-} from "lucide-react";
+import { User, LayoutDashboard, LogOut, Menu, X, Plane } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
-import Button from "../ui/Button";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -29,10 +19,7 @@ const Navbar = () => {
   const toggleMobileMenu = useUIStore((state) => state.toggleMobileMenu);
   const closeMobileMenu = useUIStore((state) => state.closeMobileMenu);
 
-  // ── Local state ──────────────────────────────────────────
-  const [scrolled, setScrolled] = useState(false);       // Solid bg after scroll
-  const [userMenuOpen, setUserMenuOpen] = useState(false); // User dropdown
-  const userMenuRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
 
   // ── Detect scroll to toggle navbar style ─────────────────
   useEffect(() => {
@@ -41,36 +28,31 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ── Close user dropdown on outside click ─────────────────
   useEffect(() => {
-    const handler = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // ── Close mobile menu on route change ────────────────────
-  useEffect(() => { 
-    closeMobileMenu(); 
-  }, [location.pathname, closeMobileMenu]); // <-- ESLint warning fix
-
-  // ── Public navigation links ───────────────────────────────
-  const navLinks = [
-    { label: "Destinations", href: "/#destinations" },
-    { label: "How It Works", href: "/#how-it-works" },
-    { label: "Pricing", href: "/#pricing" },
-  ];
+    closeMobileMenu();
+  }, [location.pathname, closeMobileMenu]);
 
   const handleLogout = () => {
     logout();
     navigate("/");
-    setUserMenuOpen(false);
   };
 
-  // ── Is this the landing page (for transparent bg logic) ──
+  const handleDashboardOpen = () => {
+    if (user?.role === "admin") {
+      window.location.href = getAdminAppUrl("/");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
+  const handleProfileIconClick = () => {
+    if (isAuthenticated) {
+      handleDashboardOpen();
+    } else {
+      navigate("/login");
+    }
+  };
+
   const isLanding = location.pathname === "/";
 
   return (
@@ -90,142 +72,26 @@ const Navbar = () => {
             <Link
               to="/"
               className="flex items-center gap-2.5 group"
-              aria-label="Visa & Voyage Home"
+              aria-label="VISAANDVOYAGE Home"
             >
               <div className="w-8 h-8 rounded-lg bg-cyan flex items-center justify-center group-hover:shadow-cyan-glow transition-shadow duration-300">
                 <Plane size={16} className="text-background" strokeWidth={2.5} />
               </div>
               <span className="font-bold text-xl tracking-tight">
-                Visa & <span className="text-gradient-cyan">Voyage</span>
+                <span className="text-gradient-cyan">VISAANDVOYAGE</span>
               </span>
             </Link>
 
-            {/* ── Desktop nav links ── */}
-            <nav className="hidden md:flex items-center gap-2" aria-label="Main navigation">
-  {navLinks.map((link) => (
-    <a
-      key={link.label}
-      href={link.href}
-      className="
-        px-4 py-2 text-sm font-medium text-text-secondary 
-        rounded-lg transition-all duration-300 ease-out
-        /* Hover Effects */
-        hover:text-text-primary hover:bg-surface-3 
-        hover:shadow-sm hover:scale-105
-        /* Active/Tap Effect */
-        active:scale-95
-      "
-    >
-      {link.label}
-    </a>
-  ))}
-</nav>
-
-            {/* ── Right side: auth buttons or user menu ── */}
+            {/* ── Right side: profile icon only ── */}
             <div className="hidden md:flex items-center gap-3">
-              {isAuthenticated && user ? (
-                /* User avatar dropdown */
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    id="user-menu-btn"
-                    onClick={() => setUserMenuOpen((v) => !v)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-2 border border-border hover:border-cyan/30 transition-all duration-200"
-                    aria-expanded={userMenuOpen}
-                    aria-label="User menu"
-                  >
-                    {/* Avatar circle */}
-                    <div className="w-7 h-7 rounded-full bg-cyan/20 flex items-center justify-center">
-                      <span className="text-xs font-bold text-cyan">
-                        {user.name?.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium text-text-primary max-w-[100px] truncate">
-                      {user.name}
-                    </span>
-                    <ChevronDown
-                      size={14}
-                      className={`text-text-muted transition-transform ${userMenuOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  {/* Dropdown menu */}
-                  <AnimatePresence>
-                    {userMenuOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal overflow-hidden"
-                      >
-                        {/* Role badge */}
-                        <div className="px-4 py-3 border-b border-border">
-                          <p className="text-xs text-text-muted">Signed in as</p>
-                          <p className="text-sm font-semibold text-text-primary truncate">{user.email}</p>
-                          <span className="text-xs text-cyan capitalize">{user.role}</span>
-                        </div>
-
-                        {/* Dashboard link */}
-                        <button
-                          id="nav-dashboard-link"
-                          onClick={() => {
-                            if (user.role === "admin") {
-                              window.location.href = getAdminAppUrl("/");
-                            } else {
-                              navigate("/dashboard");
-                            }
-                            setUserMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
-                        >
-                          {user.role === "admin" ? <Shield size={15} /> : <LayoutDashboard size={15} />}
-                          {user.role === "admin" ? "Admin Panel" : "Dashboard"}
-                        </button>
-
-                        {/* Profile */}
-                        <button
-                          id="nav-profile-link"
-                          onClick={() => { navigate("/dashboard/profile"); setUserMenuOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
-                        >
-                          <User size={15} />
-                          Profile
-                        </button>
-
-                        {/* Logout */}
-                        <div className="border-t border-border">
-                          <button
-                            id="nav-logout-btn"
-                            onClick={handleLogout}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                          >
-                            <LogOut size={15} />
-                            Sign Out
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                /* Login / Register buttons */
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate("/login")}
-                  >
-                    Sign In
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => navigate("/register")}
-                  >
-                    Get Started
-                  </Button>
-                </>
-              )}
+              <button
+                id="user-dashboard-btn"
+                onClick={handleProfileIconClick}
+                className="w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow transition-all duration-200"
+                aria-label={isAuthenticated ? "Open dashboard" : "Open login"}
+              >
+                <User size={18} />
+              </button>
             </div>
 
             {/* ── Mobile hamburger ── */}
@@ -251,20 +117,16 @@ const Navbar = () => {
               className="md:hidden border-t border-border bg-surface overflow-hidden"
             >
               <div className="px-4 py-4 space-y-1">
-                {/* Nav links */}
-                {navLinks.map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-3 rounded-lg transition-colors"
-                  >
-                    <Globe size={15} />
-                    {link.label}
-                  </a>
-                ))}
-
-                {/* Auth buttons */}
+                {/* Auth actions */}
                 <div className="pt-2 border-t border-border flex flex-col gap-2">
+                  <button
+                    onClick={handleProfileIconClick}
+                    className="self-center w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 transition-all duration-200"
+                    aria-label={isAuthenticated ? "Open dashboard" : "Open login"}
+                  >
+                    <User size={18} />
+                  </button>
+
                   {isAuthenticated ? (
                     <>
                       <button
@@ -289,10 +151,7 @@ const Navbar = () => {
                       </button>
                     </>
                   ) : (
-                    <>
-                      <Button fullWidth variant="ghost" onClick={() => navigate("/login")}>Sign In</Button>
-                      <Button fullWidth variant="primary" onClick={() => navigate("/register")}>Get Started</Button>
-                    </>
+                    null
                   )}
                 </div>
               </div>

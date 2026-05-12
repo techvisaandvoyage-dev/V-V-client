@@ -22,6 +22,7 @@ const Input = ({
   id,
   className = "",
   type = "text",
+  autoComplete = "off",
   ...props
 }) => {
   // Generate a unique id if not provided (for label association)
@@ -52,6 +53,7 @@ const Input = ({
         <input
           id={inputId}
           type={type}
+          autoComplete={autoComplete}
           className={`
             w-full bg-surface-2 text-text-primary placeholder-text-muted
             border rounded-xl transition-all duration-200 [color-scheme:dark]
@@ -86,7 +88,7 @@ const Input = ({
 
 // ── Textarea variant ───────────────────────────────────────
 export const Textarea = ({
-  label, error, helper, id, rows = 4, className = "", ...props
+  label, error, helper, id, rows = 4, className = "", autoComplete = "off", ...props
 }) => {
   const inputId = id || `textarea-${label?.toLowerCase().replace(/\s+/g, "-")}`;
 
@@ -100,6 +102,7 @@ export const Textarea = ({
       <textarea
         id={inputId}
         rows={rows}
+        autoComplete={autoComplete}
         className={`
           w-full bg-surface-2 text-text-primary placeholder-text-muted
           border rounded-xl transition-all duration-200 resize-none [color-scheme:dark]
@@ -118,7 +121,7 @@ export const Textarea = ({
 
 // ── Select variant ─────────────────────────────────────────
 export const Select = ({
-  label, error, helper, id, options = [], placeholder, className = "", ...props
+  label, error, helper, id, options = [], placeholder, className = "", autoComplete = "off", ...props
 }) => {
   const inputId = id || `select-${label?.toLowerCase().replace(/\s+/g, "-")}`;
 
@@ -131,6 +134,7 @@ export const Select = ({
       )}
       <select
         id={inputId}
+        autoComplete={autoComplete}
         className={`
           w-full bg-surface-2 text-text-primary
           border rounded-xl transition-all duration-200 [color-scheme:dark]
@@ -149,6 +153,7 @@ export const Select = ({
         ))}
       </select>
       {error && <p className="text-xs text-red-400">{error}</p>}
+      {!error && helper && <p className="text-xs text-text-muted">{helper}</p>}
     </div>
   );
 };
