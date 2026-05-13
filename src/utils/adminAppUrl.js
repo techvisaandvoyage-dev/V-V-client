@@ -7,13 +7,13 @@ const normalizePath = (path = "/") => {
 
 export const getAdminAppUrl = (path = "/") => {
   const normalizedPath = normalizePath(path);
-
-  if (typeof window !== "undefined" && LOCAL_HOSTS.has(window.location.hostname)) {
-    const adminOrigin = import.meta.env.VITE_ADMIN_APP_ORIGIN || "http://localhost:5174";
-    return `${adminOrigin}${normalizedPath}`;
+  const envAdmin = String(import.meta.env.VITE_ADMIN_APP_ORIGIN || "").trim();
+  if (envAdmin) {
+    const base = envAdmin.replace(/\/+$/, "");
+    return `${base}${normalizedPath}`;
   }
-
-  // Production path assumption: admin is hosted under /admin
+  if (typeof window !== "undefined" && LOCAL_HOSTS.has(window.location.hostname)) {
+    return `http://localhost:5174${normalizedPath}`;
+  }
   return `/admin${normalizedPath === "/" ? "" : normalizedPath}`;
 };
-

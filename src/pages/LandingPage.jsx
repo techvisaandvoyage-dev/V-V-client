@@ -306,12 +306,16 @@ const LandingPage = () => {
             <form
               onSubmit={handleSearch}
               autoComplete="off"
-              className="glass rounded-[2rem] p-4 sm:p-5 border border-cyan/30"
+              className="glass rounded-2xl sm:rounded-[2rem] p-3 sm:p-4 md:p-5 border border-cyan/30"
               role="search"
               aria-label="Search visa destinations"
             >
-              <div className="flex items-center gap-3 px-3 py-2 w-full">
-                <Search size={22} strokeWidth={2.2} className="text-cyan flex-shrink-0" />
+              <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 w-full min-w-0">
+                <Search
+                  strokeWidth={2.2}
+                  className="text-cyan flex-shrink-0 w-[18px] h-[18px] sm:w-[22px] sm:h-[22px]"
+                  aria-hidden
+                />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -319,7 +323,7 @@ const LandingPage = () => {
                   placeholder="Search country, city, or state..."
                   value={searchDestination}
                   onChange={(e) => setSearchDestination(e.target.value)}
-                  className="flex-1 bg-transparent text-text-primary placeholder:text-[#6e8cab] text-2xl focus:outline-none"
+                  className="flex-1 min-w-0 bg-transparent text-text-primary placeholder:text-[#6e8cab] text-base sm:text-lg md:text-xl lg:text-2xl focus:outline-none"
                   aria-label="Destination search"
                   id="hero-destination-input"
                   autoFocus
