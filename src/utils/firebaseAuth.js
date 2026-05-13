@@ -52,16 +52,10 @@ const getFirebaseAuth = async () => {
 };
 
 /**
- * `signInWithRedirect` stores the return URL; on localhost it often resolves incorrectly
- * (e.g. sends you to a deployed Vercel URL or 404). Popup keeps OAuth on the same origin.
+ * Google sign-in uses popup only. `signInWithRedirect` relies on sessionStorage across the
+ * Google redirect; browsers often partition or clear it → "missing initial state". Popup avoids that.
+ * @deprecated kept only if you experiment with redirect again
  */
-export const shouldUseGooglePopupInsteadOfRedirect = () => {
-  if (typeof window === "undefined") return false;
-  const h = window.location.hostname;
-  return h === "localhost" || h === "127.0.0.1";
-};
-
-/** Same-tab OAuth (recommended): full-page Google screen instead of a popup window. */
 export const signInWithGoogleRedirect = async () => {
   try {
     const auth = await getFirebaseAuth();
@@ -85,7 +79,7 @@ export const consumeGoogleRedirectIdToken = async () => {
   }
 };
 
-/** Popup-based OAuth (small separate window) — optional fallback. */
+/** Google OAuth — popup window (required for reliable auth when storage-partitioned). */
 export const signInWithGooglePopup = async () => {
   try {
     const auth = await getFirebaseAuth();
@@ -113,6 +107,13 @@ export const signInWithFacebookPopup = async () => {
 };
 
 const mapFirebaseAuthError = (err) => {
+  const rawMsg = String(err?.message || "");
+  if (/missing initial state/i.test(rawMsg)) {
+    return (
+      "Google could not finish sign-in (browser blocked redirect storage). Try again, allow cookies/storage for this site, or sign in with email. " +
+      "If this persists, use a normal browser window—not embedded WebViews or strict private mode."
+    );
+  }
   const code = err?.code || "";
   if (code === "auth/unauthorized-domain") {
     const host =
