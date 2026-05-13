@@ -14,7 +14,13 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
-import { signInWithGooglePopup, signInWithFacebookPopup } from "../utils/firebaseAuth";
+import {
+  signInWithGoogleRedirect,
+  signInWithGooglePopup,
+  shouldUseGooglePopupInsteadOfRedirect,
+  signInWithFacebookPopup,
+} from "../utils/firebaseAuth";
+import { GOOGLE_OAUTH_RETURN_KEY } from "../components/auth/FirebaseGoogleRedirectHandler";
 import { isValidEmail, parseAuthContactInput } from "../utils/authIdentifier";
 
 const useResendTimer = (seconds = 30) => {
@@ -146,13 +152,22 @@ const LoginPage = () => {
   const handleGoogleLogin = async () => {
     clearError();
     try {
-      const idToken = await signInWithGooglePopup();
-      const { success } = await loginWithFirebaseGoogle(idToken);
-      if (success) {
-        showToast("Logged in with Google.");
-        navigate(postLoginPath, { replace: true });
+      if (shouldUseGooglePopupInsteadOfRedirect()) {
+        const idToken = await signInWithGooglePopup();
+        const { success } = await loginWithFirebaseGoogle(idToken);
+        if (success) {
+          showToast("Logged in with Google.");
+          navigate(postLoginPath, { replace: true });
+        }
+        return;
       }
+      sessionStorage.setItem(
+        GOOGLE_OAUTH_RETURN_KEY,
+        JSON.stringify({ path: postLoginPath }),
+      );
+      await signInWithGoogleRedirect();
     } catch (err) {
+      sessionStorage.removeItem(GOOGLE_OAUTH_RETURN_KEY);
       showToast(err.message || "Google login failed", "error");
     }
   };

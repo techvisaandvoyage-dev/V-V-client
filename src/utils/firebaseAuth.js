@@ -4,6 +4,8 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
@@ -49,6 +51,41 @@ const getFirebaseAuth = async () => {
   return getAuth(app);
 };
 
+/**
+ * `signInWithRedirect` stores the return URL; on localhost it often resolves incorrectly
+ * (e.g. sends you to a deployed Vercel URL or 404). Popup keeps OAuth on the same origin.
+ */
+export const shouldUseGooglePopupInsteadOfRedirect = () => {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1";
+};
+
+/** Same-tab OAuth (recommended): full-page Google screen instead of a popup window. */
+export const signInWithGoogleRedirect = async () => {
+  try {
+    const auth = await getFirebaseAuth();
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithRedirect(auth, provider);
+  } catch (err) {
+    throw new Error(mapFirebaseAuthError(err), { cause: err });
+  }
+};
+
+/** Call once on /login or /register mount after returning from Google redirect. Returns token or null. */
+export const consumeGoogleRedirectIdToken = async () => {
+  try {
+    const auth = await getFirebaseAuth();
+    const result = await getRedirectResult(auth);
+    if (!result?.user) return null;
+    return await result.user.getIdToken();
+  } catch (err) {
+    throw new Error(mapFirebaseAuthError(err), { cause: err });
+  }
+};
+
+/** Popup-based OAuth (small separate window) — optional fallback. */
 export const signInWithGooglePopup = async () => {
   try {
     const auth = await getFirebaseAuth();
