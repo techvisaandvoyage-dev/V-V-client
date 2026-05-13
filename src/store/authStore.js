@@ -240,6 +240,14 @@ export const useAuthStore = create(
        */
       /**
        * Exchange Firebase ID token for app JWT (Google, Email/Password, etc.).
+       *
+       * Perf: the /firebase-auth response already returns the user document we need to
+       * navigate (id/name/email/phone/profileImage/isVerified), so we set auth state and
+       * resolve immediately. The full profile (age/gender/passport, etc.) is enriched in
+       * the background. This shaves one full server roundtrip off the perceived sign-in
+       * time — important on mobile + Render free-tier where the second hop was the visible
+       * 2–5s spinner after the Google popup closed.
+       *
        * @param {"google"|"facebook"|"firebase"} sessionAuthMethod
        */
       loginWithFirebaseIdToken: async (idToken, sessionAuthMethod = "firebase") => {
@@ -248,19 +256,22 @@ export const useAuthStore = create(
           const { data } = await api.post("/users/firebase-auth", { idToken });
           if (data.success) {
             localStorage.setItem("token", data.token);
-            const refreshed = await get().refreshUserFromServer({ sessionAuthMethod });
-            if (!refreshed) {
-              const fallback = mapApiUserToAuthState(data.user);
-              if (fallback) {
-                set({
-                  user: fallback,
-                  isAuthenticated: true,
-                  sessionAuthMethod,
-                });
-              }
+            const initial = mapApiUserToAuthState(data.user);
+            if (initial) {
+              set({
+                user: initial,
+                isAuthenticated: true,
+                sessionAuthMethod,
+                isLoading: false,
+              });
+              get()
+                .refreshUserFromServer({ sessionAuthMethod })
+                .catch(() => {});
+              return { success: true, role: "user" };
             }
+            const refreshed = await get().refreshUserFromServer({ sessionAuthMethod });
             set({ isLoading: false });
-            return { success: true, role: "user" };
+            return { success: !!refreshed, role: refreshed ? "user" : null };
           }
           set({ isLoading: false });
           return { success: false, role: null };

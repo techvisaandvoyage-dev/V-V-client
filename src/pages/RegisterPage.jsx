@@ -18,7 +18,11 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
-import { signInWithGooglePopup, signInWithFacebookPopup } from "../utils/firebaseAuth";
+import {
+  signInWithGooglePopup,
+  signInWithFacebookPopup,
+  prefetchFirebaseAuth,
+} from "../utils/firebaseAuth";
 import { parseAuthContactInput } from "../utils/authIdentifier";
 
 // ── Resend timer ──────────────────────────────────────────────
@@ -92,6 +96,10 @@ const RegisterPage = () => {
   const otpDestinationLabel = signupOtpIsSms
     ? `******${identifier.slice(-4)}`
     : identifier;
+
+  useEffect(() => {
+    prefetchFirebaseAuth();
+  }, []);
 
   // ── Password strength checker ─────────────────────────────
   useEffect(() => {

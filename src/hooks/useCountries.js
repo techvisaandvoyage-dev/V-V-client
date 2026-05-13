@@ -18,16 +18,29 @@ const withBlankImageUrl = (country) => ({
   imageUrl: "",
 });
 
-/** Bump when cached country shape changes (e.g. howItWorks) so clients refetch. */
-const COUNTRIES_CACHE_KEY = "vb_countries_api_v6";
+/**
+ * Bump when cached country shape changes (e.g. howItWorks) so clients refetch.
+ * Persisted in `localStorage` so first paint on subsequent visits / shared links
+ * is instant — without it, mobile users open a link and see blank cards until the
+ * Render API responds (cold start can take 30–60s on the free tier).
+ */
+const COUNTRIES_CACHE_KEY = "vb_countries_api_v7";
+const COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function loadCountriesCache() {
-  if (typeof sessionStorage === "undefined") return null;
+  if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(COUNTRIES_CACHE_KEY);
-    if (!raw) return null;
+    const raw = window.localStorage.getItem(COUNTRIES_CACHE_KEY);
+    if (!raw) {
+      const legacy = window.sessionStorage?.getItem(COUNTRIES_CACHE_KEY);
+      if (!legacy) return null;
+      const legacyPayload = JSON.parse(legacy);
+      if (!Array.isArray(legacyPayload?.countries) || legacyPayload.countries.length === 0) return null;
+      return legacyPayload.countries;
+    }
     const payload = JSON.parse(raw);
     if (!Array.isArray(payload?.countries) || payload.countries.length === 0) return null;
+    if (payload.savedAt && Date.now() - payload.savedAt > COUNTRIES_CACHE_TTL_MS) return null;
     return payload.countries;
   } catch {
     return null;
@@ -35,9 +48,12 @@ function loadCountriesCache() {
 }
 
 function saveCountriesCache(countries) {
-  if (typeof sessionStorage === "undefined") return;
+  if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(COUNTRIES_CACHE_KEY, JSON.stringify({ countries }));
+    window.localStorage.setItem(
+      COUNTRIES_CACHE_KEY,
+      JSON.stringify({ countries, savedAt: Date.now() })
+    );
   } catch {
     /* ignore quota / private mode */
   }

@@ -759,6 +759,8 @@ const CountryDetails = () => {
                     src={country.imageUrl}
                     alt={country.name}
                     className="h-64 sm:h-72"
+                    priority
+                    width={1200}
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
                     <div className="absolute bottom-0 left-0 p-6 sm:p-8">

@@ -52,6 +52,17 @@ const getFirebaseAuth = async () => {
 };
 
 /**
+ * Warm-up: call this from the login / register page on mount so that by the time the
+ * user clicks "Continue with Google" the Firebase config request and SDK init have
+ * already completed. Saves ~300–800ms on the first click on a fresh page load.
+ */
+export const prefetchFirebaseAuth = () => {
+  getFirebaseAuth().catch(() => {
+    /* prefetch is best-effort; real click will surface errors */
+  });
+};
+
+/**
  * Google sign-in uses popup only. `signInWithRedirect` relies on sessionStorage across the
  * Google redirect; browsers often partition or clear it → "missing initial state". Popup avoids that.
  * @deprecated kept only if you experiment with redirect again

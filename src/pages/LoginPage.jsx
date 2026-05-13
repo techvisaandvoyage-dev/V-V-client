@@ -14,7 +14,11 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
-import { signInWithGooglePopup, signInWithFacebookPopup } from "../utils/firebaseAuth";
+import {
+  signInWithGooglePopup,
+  signInWithFacebookPopup,
+  prefetchFirebaseAuth,
+} from "../utils/firebaseAuth";
 import { isValidEmail, parseAuthContactInput } from "../utils/authIdentifier";
 
 const useResendTimer = (seconds = 30) => {
@@ -110,6 +114,10 @@ const LoginPage = () => {
     start: startForgotTimer,
     canResend: canResendForgot,
   } = useResendTimer(30);
+
+  useEffect(() => {
+    prefetchFirebaseAuth();
+  }, []);
 
   const otpLoginIsEmail = otpSentKind === "email";
   const otpStep2Display =
