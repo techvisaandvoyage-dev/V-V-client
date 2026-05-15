@@ -395,10 +395,20 @@ const ApplicationForm = () => {
     (traveler) => {
       if (!String(traveler.name || "").trim()) return false;
       const { enableFileUpload: fileOn, enableGDriveUpload: gdOn } = uploadSettings;
-      if (gdOn && String(traveler.gdriveLink || "").trim()) return true;
-      if (fileOn && docFields.every((f) => traveler.documents[f.key] instanceof File)) {
-        return true;
+      
+      const hasAllFiles = fileOn && docFields.every((f) => traveler.documents[f.key] instanceof File);
+      const hasDriveLink = gdOn && String(traveler.gdriveLink || "").trim();
+
+      // If both are enabled, we require files for the "Complete" status (no warning).
+      // If they only have a Drive link, we consider it pending so they get the warning.
+      if (fileOn && gdOn) {
+        return hasAllFiles;
       }
+
+      // If only one is enabled, that one is enough.
+      if (fileOn) return hasAllFiles;
+      if (gdOn) return hasDriveLink;
+
       return false;
     },
     [docFields, uploadSettings]

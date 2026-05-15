@@ -4,6 +4,8 @@
    glassmorphism utilities + scrollbar + typography
    ============================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+
 /* ── Local Fonts Import ──────────────────────────────────── */
 @font-face {
   font-family: 'Inter';
@@ -25,6 +27,12 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .font-playfair {
+    font-family: "Playfair Display", serif;
+    font-optical-sizing: auto;
+    font-style: normal;
   }
 }
 

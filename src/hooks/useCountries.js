@@ -25,15 +25,104 @@ const withBlankImageUrl = (country) => ({
  * is instant — without it, mobile users open a link and see blank cards until the
  * Render API responds (cold start can take 30–60s on the free tier).
  */
-const COUNTRIES_CACHE_KEY = "vb_countries_api_v13";
+const COUNTRIES_CACHE_KEY = "vb_countries_api_v16";
 const COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_DISPLAY = Object.freeze({
   showVisaType: true,
   showValidity: true,
+  showLengthOfStay: true,
+  showEntryType: true,
   showProcessingDays: true,
   showRequiredDocuments: true,
 });
+
+const DEFAULT_VISA_INFORMATION_ITEMS = Object.freeze([
+  {
+    id: "lengthOfStay",
+    enabled: true,
+    label: "Length of Stay",
+    value: "On request",
+    description: "You can stay up to the approved duration in the country.",
+    icon: "calendar",
+    color: "blue",
+  },
+  {
+    id: "validity",
+    enabled: true,
+    label: "Validity",
+    value: "On request",
+    description: "Your visa remains valid for the approved duration after issue.",
+    icon: "clock3",
+    color: "green",
+  },
+  {
+    id: "entry",
+    enabled: true,
+    label: "Entry",
+    value: "Single",
+    description: "This visa determines how many times you can enter the country.",
+    icon: "door-open",
+    color: "purple",
+  },
+]);
+
+function normalizeVisaInformation(raw, country = {}) {
+  const data = raw && typeof raw === "object" ? raw : {};
+  const defaultsById = new Map(
+    DEFAULT_VISA_INFORMATION_ITEMS.map((item) => [
+      item.id,
+      {
+        ...item,
+        value:
+          item.id === "lengthOfStay"
+            ? country.lengthOfStay || country.validity || item.value
+            : item.id === "validity"
+              ? country.validity || item.value
+              : country.entryType || item.value,
+      },
+    ])
+  );
+  const itemsById = new Map(
+    (Array.isArray(data.items) ? data.items : [])
+      .map((item) => ({
+        id: String(item?.id ?? "").trim(),
+        enabled: item?.enabled !== false,
+        label: String(item?.label ?? "").trim(),
+        value: String(item?.value ?? "").trim(),
+        description: String(item?.description ?? "").trim(),
+        icon: String(item?.icon ?? "").trim(),
+        color: String(item?.color ?? "").trim(),
+      }))
+      .filter((item) => item.id)
+      .map((item) => [item.id, item])
+  );
+
+  return {
+    enabled: data.enabled !== false,
+    badgeText: String(data.badgeText ?? "").trim() || "100% Online Process",
+    title: String(data.title ?? "").trim() || "Visa Information",
+    subtitle:
+      String(data.subtitle ?? "").trim() ||
+      "A 100% online visa application process that is simple, secure and hassle-free.",
+    note:
+      String(data.note ?? "").trim() ||
+      "Visa rules and conditions may change. Please check the latest requirements before applying.",
+    items: DEFAULT_VISA_INFORMATION_ITEMS.map((item) => {
+      const fallback = defaultsById.get(item.id);
+      const next = itemsById.get(item.id);
+      return {
+        ...fallback,
+        enabled: next?.enabled !== false,
+        label: next?.label || fallback.label,
+        value: next?.value || fallback.value,
+        description: next?.description || fallback.description,
+        icon: next?.icon || fallback.icon,
+        color: next?.color || fallback.color,
+      };
+    }),
+  };
+}
 
 /**
  * Normalise the display flags blob returned from /api/countries so a missing or
@@ -44,6 +133,8 @@ function normalizeDisplay(raw) {
   return {
     showVisaType: raw.showVisaType !== false,
     showValidity: raw.showValidity !== false,
+    showLengthOfStay: raw.showLengthOfStay !== false,
+    showEntryType: raw.showEntryType !== false,
     showProcessingDays: raw.showProcessingDays !== false,
     showRequiredDocuments: raw.showRequiredDocuments !== false,
   };
@@ -60,6 +151,8 @@ function normalizeDocumentCatalog(raw) {
     .map((d) => ({
       key: String(d?.key ?? "").trim(),
       label: String(d?.label ?? "").trim(),
+      description: String(d?.description ?? "").trim(),
+      icon: String(d?.icon ?? "").trim(),
       builtIn: d?.builtIn !== false,
     }))
     .filter((d) => d.key && d.label);
@@ -144,7 +237,7 @@ export function normalizeCountryFromApi(c) {
   const locatedIn =
     getLocatedInLabel(c.name) ||
     getCountryRegionLabel({ name: c.name, id: slug, continent });
-  return {
+  const normalized = {
     id: slug,
     _id: c._id,
     name: c.name,
@@ -160,10 +253,16 @@ export function normalizeCountryFromApi(c) {
      */
     visaType: c.visaType || "Tourist Visa",
     validity: typeof c.validity === "string" ? c.validity.trim() : "",
+    lengthOfStay: typeof c.lengthOfStay === "string" ? c.lengthOfStay.trim() : "",
+    entryType: typeof c.entryType === "string" ? c.entryType.trim() : "",
     useGlobalVisaType: c.useGlobalVisaType !== false,
     useGlobalValidity: c.useGlobalValidity !== false,
+    useGlobalLengthOfStay: c.useGlobalLengthOfStay !== false,
+    useGlobalEntryType: c.useGlobalEntryType !== false,
     visaTypeOverride: typeof c.visaTypeOverride === "string" ? c.visaTypeOverride.trim() : "",
     validityOverride: typeof c.validityOverride === "string" ? c.validityOverride.trim() : "",
+    lengthOfStayOverride: typeof c.lengthOfStayOverride === "string" ? c.lengthOfStayOverride.trim() : "",
+    entryTypeOverride: typeof c.entryTypeOverride === "string" ? c.entryTypeOverride.trim() : "",
     continent,
     locatedIn,
     regionLabel: locatedIn,
@@ -181,7 +280,15 @@ export function normalizeCountryFromApi(c) {
       ? c.whyBookNow.map((s) => String(s ?? "").trim()).filter(Boolean)
       : [],
     includedItems: Array.isArray(c.includedItems)
-      ? c.includedItems.map((s) => String(s ?? "").trim()).filter(Boolean)
+      ? c.includedItems.map((x) => {
+          if (typeof x === "string") return x.trim();
+          return {
+            title: String(x?.title ?? "").trim(),
+            description: String(x?.description ?? "").trim(),
+            icon: String(x?.icon ?? "").trim(),
+            color: String(x?.color ?? "blue").trim(),
+          };
+        }).filter(Boolean)
       : [],
     faqs: Array.isArray(c.faqs)
       ? c.faqs
@@ -214,6 +321,10 @@ export function normalizeCountryFromApi(c) {
     excludeDestinationVisaRequirements: Array.isArray(c.excludeDestinationVisaRequirements)
       ? c.excludeDestinationVisaRequirements.map((s) => String(s ?? "").trim().toLowerCase()).filter(Boolean)
       : [],
+  };
+  return {
+    ...normalized,
+    visaInformation: normalizeVisaInformation(c.visaInformation, normalized),
   };
 }
 

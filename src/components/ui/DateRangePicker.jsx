@@ -141,6 +141,28 @@ const DateRangePicker = ({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
 
+  // Auto-scroll into view when opened on mobile.
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    if (window.innerWidth >= 640) return; // Only for mobile
+
+    const timer = window.setTimeout(() => {
+      if (!containerRef.current) return;
+      // Scroll so the top of the container is near the top of the viewport
+      const offset = 80; // Offset for sticky navbar/header
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = containerRef.current.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      const offsetPosition = elementPosition - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
   const months = useMemo(() => {
     const a = anchor;
     const b = stepMonth(a, 1);
@@ -222,8 +244,8 @@ const DateRangePicker = ({
         >
           <CalendarDays size={16} className="text-cyan shrink-0" />
           <span className="flex flex-col min-w-0">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">{startLabel}</span>
-            <span className={`text-sm font-medium truncate ${startDate ? "text-text-primary" : "text-text-muted"}`}>
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary">{startLabel}</span>
+            <span className={`text-sm font-medium truncate ${startDate ? "text-text-primary" : "text-text-secondary"}`}>
               {startDate ? prettyDate(startDate) : startPlaceholder}
             </span>
           </span>
@@ -241,8 +263,8 @@ const DateRangePicker = ({
         >
           <CalendarDays size={16} className="text-cyan shrink-0" />
           <span className="flex flex-col min-w-0">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">{endLabel}</span>
-            <span className={`text-sm font-medium truncate ${endDate ? "text-text-primary" : "text-text-muted"}`}>
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary">{endLabel}</span>
+            <span className={`text-sm font-medium truncate ${endDate ? "text-text-primary" : "text-text-secondary"}`}>
               {endDate ? prettyDate(endDate) : endPlaceholder}
             </span>
           </span>
@@ -261,18 +283,18 @@ const DateRangePicker = ({
             <button
               type="button"
               onClick={() => setAnchor((a) => stepMonth(a, -1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-cyan hover:border-cyan/40 transition-colors"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-surface-2 text-text-primary hover:text-cyan hover:border-cyan/40 transition-colors"
               aria-label="Previous month"
             >
               <ChevronLeft size={16} />
             </button>
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-text-secondary font-medium">
               {startDate && !endDate ? "Pick your return date" : "Pick your travel dates"}
             </p>
             <button
               type="button"
               onClick={() => setAnchor((a) => stepMonth(a, 1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-surface-2 text-text-secondary hover:text-cyan hover:border-cyan/40 transition-colors"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border bg-surface-2 text-text-primary hover:text-cyan hover:border-cyan/40 transition-colors"
               aria-label="Next month"
             >
               <ChevronRight size={16} />
@@ -286,7 +308,7 @@ const DateRangePicker = ({
                 <p className="text-sm font-bold text-text-primary text-center mb-3">{g.label}</p>
                 <div className="grid grid-cols-7 gap-1 mb-1 text-center">
                   {DOW.map((d, i) => (
-                    <span key={i} className="text-[11px] font-semibold text-text-muted">{d}</span>
+                    <span key={i} className="text-[11px] font-semibold text-text-secondary">{d}</span>
                   ))}
                 </div>
                 <div className="grid grid-cols-7 gap-1">
@@ -320,7 +342,7 @@ const DateRangePicker = ({
                     } else if (isHoverPreviewEnd) {
                       classes += " bg-cyan/10 text-text-primary";
                     } else {
-                      classes += " text-text-secondary hover:bg-surface-2 hover:text-text-primary";
+                      classes += " text-text-primary hover:bg-surface-2 hover:text-cyan";
                     }
 
                     return (
@@ -346,7 +368,7 @@ const DateRangePicker = ({
 
           {/* Footer */}
           <div className="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-border">
-            <span className="text-[11px] text-text-muted">
+            <span className="text-[11px] text-text-secondary font-medium">
               {startDate && endDate
                 ? `${dayCount} day${dayCount === 1 ? "" : "s"} selected`
                 : startDate

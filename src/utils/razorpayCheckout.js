@@ -106,8 +106,9 @@ export async function openRazorpayForApplication({
       key,
       amount: order.amount,
       currency: order.currency || "INR",
-      name: "Visa & Voyage",
+      name: "VISAANDVOYAGE",
       description: description || "Visa service payment",
+      image: "/favicon.svg",
       order_id: order.id,
       handler: async (response) => {
         if (!settleOnce()) return;
@@ -146,7 +147,7 @@ export async function openRazorpayForApplication({
         name: applicantName || "",
         email: applicantEmail || "",
       },
-      theme: { color: "#0284c7" },
+      theme: { color: "#00d4ff" },
       modal: {
         ondismiss: async () => {
           if (!settleOnce()) return;

@@ -76,7 +76,7 @@ const ImageWithShimmer = ({
           alt={alt || 'Image'}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
-          fetchpriority={priority ? 'high' : 'auto'}
+          fetchPriority={priority ? 'high' : 'auto'}
           onLoad={(event) => {
             loadedImageCache.add(optimizedSrc);
             if (event.currentTarget.complete) {

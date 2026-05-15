@@ -167,7 +167,7 @@ const ApplicationDetails = () => {
 
   const booking = bookings.find((b) => String(b._id || b.id) === String(id));
   const progress = booking
-    ? getApplicationProgress(booking)
+    ? getApplicationProgress(booking, uploadSettings)
     : { allDocumentsUploaded: false, totalMissingDocuments: 0, missingByTraveler: [] };
 
   useEffect(() => {
@@ -382,7 +382,7 @@ const ApplicationDetails = () => {
   }
 
   const handleUploadTraveler = async (travelerNo) => {
-    if (!canUploadDocuments || travelerSubmissionLocked(travelerNo)) return;
+    if (!canUploadDocuments) return;
     const travelerNoStr = String(travelerNo);
     const travelerName =
       String(travelerNames[travelerNoStr] ?? getSavedTravelerName(travelerNo)).trim() ||
@@ -551,7 +551,7 @@ const ApplicationDetails = () => {
   };
 
   const handleSaveTravelerDriveLink = async (travelerNo, field = "main") => {
-    if (!canUploadDocuments || !uploadSettings.enableGDriveUpload || travelerSubmissionLocked(travelerNo)) return;
+    if (!canUploadDocuments || !uploadSettings.enableGDriveUpload) return;
 
     const travelerNoStr = String(travelerNo);
     const travelerName =
@@ -734,14 +734,24 @@ const ApplicationDetails = () => {
           </Card>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${progress.allDocumentsUploaded ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
-          <p className="text-xs text-text-muted">Application progress</p>
-          <p className={`text-sm font-semibold mt-1 ${progress.allDocumentsUploaded ? "text-emerald-400" : "text-amber-400"}`}>
-            {progress.allDocumentsUploaded
-              ? "All required documents are uploaded."
-              : `${progress.totalMissingDocuments} required document${progress.totalMissingDocuments === 1 ? "" : "s"} still missing.`}
-          </p>
-        </div>
+        {/* Drive link detection */}
+        {(() => {
+          const hasDriveLink = (Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [])
+            .some(entry => typeof entry.gdriveLink === "string" && entry.gdriveLink.trim().length > 0);
+
+          return (
+            <div className={`rounded-2xl border p-4 ${progress.allDocumentsUploaded ? "border-emerald-500/30 bg-emerald-500/5" : hasDriveLink ? "border-cyan/30 bg-cyan/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+              <p className="text-xs text-text-muted">Application progress</p>
+              <p className={`text-sm font-semibold mt-1 ${progress.allDocumentsUploaded ? "text-emerald-400" : hasDriveLink ? "text-cyan" : "text-amber-400"}`}>
+                {progress.allDocumentsUploaded
+                  ? "All required documents are uploaded."
+                  : hasDriveLink
+                  ? "Google Drive link is submitted."
+                  : `${progress.totalMissingDocuments} required document${progress.totalMissingDocuments === 1 ? "" : "s"} still missing.`}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Progress steps */}
         <div className="grid grid-cols-3 gap-2 text-[11px] font-medium">
@@ -770,9 +780,11 @@ const ApplicationDetails = () => {
                   <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${
                     traveler.isComplete
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                      : traveler.gdriveLink
+                      ? "border-cyan/30 bg-cyan/10 text-cyan"
                       : "border-amber-500/30 bg-amber-500/10 text-amber-400"
                   }`}>
-                    {traveler.isComplete ? "Complete" : "Pending"}
+                    {traveler.isComplete ? "Complete" : traveler.gdriveLink ? "Drive Link Submitted" : "Pending"}
                   </span>
                 </div>
                 <div className="space-y-2 text-sm">
@@ -895,7 +907,6 @@ const ApplicationDetails = () => {
                                       }}
                                       placeholder="https://drive.google.com/..."
                                       disabled={submissionLocked}
-                                      onBlur={() => !submissionLocked && handleSaveTravelerNameAndLink(travelerNo)}
                                       className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
                                   </div>
@@ -1106,7 +1117,7 @@ const ApplicationDetails = () => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
                               placeholder="https://drive.google.com/..."
-                              disabled={docUploading || submissionLocked}
+                              disabled={docUploading || !canUploadDocuments || Boolean(getSavedTravelerGdriveFurtherInfoLink(travelerNo))}
                               className="min-w-0 flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted"
                               autoComplete="off"
                             />
@@ -1117,7 +1128,7 @@ const ApplicationDetails = () => {
                               className="shrink-0 sm:min-w-[132px]"
                               leftIcon={<Upload size={14} />}
                               loading={docUploading}
-                              disabled={docUploading || submissionLocked}
+                              disabled={docUploading || !canUploadDocuments || Boolean(getSavedTravelerGdriveFurtherInfoLink(travelerNo))}
                               onClick={() => handleSaveTravelerDriveLink(travelerNo, "further")}
                             >
                               Upload Link
@@ -1149,7 +1160,7 @@ const ApplicationDetails = () => {
                               type="file"
                               multiple
                               accept=".pdf,image/jpeg,image/png,image/webp"
-                              disabled={docUploading || submissionLocked}
+                              disabled={docUploading || !canUploadDocuments || traveler.uploadedOtherDocumentsCount > 0}
                               onChange={(e) => {
                                 handleOtherDocsChange(travelerNo, e.target.files || []);
                                 e.target.value = "";
@@ -1188,7 +1199,7 @@ const ApplicationDetails = () => {
                         size="sm"
                         leftIcon={headerShowsComplete && !hasOtherPending ? <CheckCircle size={14} /> : <Upload size={14} />}
                         loading={docUploading}
-                        disabled={saveDisabled || submissionLocked}
+                        disabled={docUploading || !canUploadDocuments || (Boolean(getSavedTravelerGdriveFurtherInfoLink(travelerNo)) && traveler.uploadedOtherDocumentsCount > 0 && !travelerHasUnsavedChanges(travelerNo))}
                         onClick={() => handleUploadTraveler(travelerNo)}
                         className="w-full sm:w-auto"
                       >

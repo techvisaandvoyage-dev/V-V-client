@@ -155,14 +155,6 @@ const Navbar = () => {
                 </Link>
                 {/* Auth actions */}
                 <div className="pt-2 border-t border-border flex flex-col gap-2">
-                  <button
-                    onClick={handleProfileIconClick}
-                    className="self-center w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 transition-all duration-200"
-                    aria-label={isAuthenticated ? "Open dashboard" : "Open login"}
-                  >
-                    <User size={18} />
-                  </button>
-
                   {isAuthenticated ? (
                     <>
                       <button
@@ -187,7 +179,12 @@ const Navbar = () => {
                       </button>
                     </>
                   ) : (
-                    null
+                    <button
+                      onClick={() => navigate("/login")}
+                      className="mx-4 my-2 px-4 py-2.5 bg-cyan text-background text-sm font-bold rounded-xl hover:bg-cyan/90 transition-all text-center shadow-lg shadow-cyan/20"
+                    >
+                      Sign In
+                    </button>
                   )}
                 </div>
               </div>

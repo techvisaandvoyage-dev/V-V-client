@@ -161,11 +161,17 @@ const ApplicationSummaryPage = () => {
         if (typeof docs === "object" && Object.keys(docs).length > 0) return true;
       }
       if (Array.isArray(entry.otherDocuments) && entry.otherDocuments.length > 0) return true;
-      if (typeof entry.gdriveLink === "string" && entry.gdriveLink.trim().length > 0) return true;
       return false;
     };
     return entries.slice(0, travelerCount).every(entryHasUpload);
   }, [docsSkipped, summaryData, application?.travellerDocuments, travelerCount]);
+
+  const hasDriveLink = useMemo(() => {
+    const entries = Array.isArray(application?.travellerDocuments)
+      ? application.travellerDocuments
+      : [];
+    return entries.some(entry => typeof entry.gdriveLink === "string" && entry.gdriveLink.trim().length > 0);
+  }, [application?.travellerDocuments]);
   const UPLOAD_SECTION_HASH = "#document-upload-section";
 
   const openDocumentUploadSection = () => {
@@ -381,8 +387,8 @@ const ApplicationSummaryPage = () => {
         }`}>
           <div>
             <p className="text-xs text-text-muted">Document Status</p>
-            <p className={`text-sm font-semibold mt-0.5 ${docsUploaded ? "text-emerald-400" : "text-amber-400"}`}>
-              {docsUploaded ? "All documents uploaded" : "Pending Upload"}
+            <p className={`text-sm font-semibold mt-0.5 ${docsUploaded ? "text-emerald-400" : hasDriveLink ? "text-cyan" : "text-amber-400"}`}>
+              {docsUploaded ? "All documents uploaded" : hasDriveLink ? "Google Drive link submitted" : "Pending Upload"}
             </p>
           </div>
           {docsUploaded ? (

@@ -29,6 +29,8 @@ import {
   Car,
   MapPin,
   HeartHandshake,
+  FileEdit,
+  Headphones,
 } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
@@ -44,6 +46,7 @@ import {
   validateRazorpayCheckoutReadiness,
 } from "../utils/razorpayCheckout";
 import ContactVerificationModal from "../components/account/ContactVerificationModal";
+import VisaInformationSection from "../components/country/VisaInformationSection";
 import {
   needsPhoneContactGate,
   needsEmailContactGate,
@@ -107,6 +110,27 @@ const DOCUMENT_ICONS = {
 };
 const getDocumentIcon = (key) => DOCUMENT_ICONS[key] || FileText;
 
+const getVisaRequirementRemixIcon = (title, description = "") => {
+  const text = `${title} ${description}`.toLowerCase();
+
+  if (text.includes("passport")) return "ri-passport-line";
+  if (text.includes("photo") || text.includes("photograph")) return "ri-camera-lens-line";
+  if (text.includes("application form") || text.includes("form")) return "ri-file-edit-line";
+  if (text.includes("travel itinerary") || text.includes("itinerary")) return "ri-route-line";
+  if (text.includes("flight")) return "ri-flight-takeoff-line";
+  if (text.includes("hotel") || text.includes("accommodation")) return "ri-hotel-line";
+  if (text.includes("insurance")) return "ri-shield-check-line";
+  if (text.includes("bank") || text.includes("statement")) return "ri-bank-card-line";
+  if (text.includes("employment") || text.includes("offer letter")) return "ri-briefcase-4-line";
+  if (text.includes("invitation")) return "ri-mail-open-line";
+  if (text.includes("identity") || text.includes("id card") || text.includes("aadhaar")) {
+    return "ri-id-card-line";
+  }
+  if (text.includes("certificate")) return "ri-award-line";
+  if (text.includes("ticket")) return "ri-ticket-2-line";
+  return "ri-file-list-3-line";
+};
+
 // Built-in label fallbacks shown on the public destination page when the live
 // catalog hasn't been fetched yet (and for any built-in key the server might
 // emit). Custom admin docs are resolved via `documentCatalog` from useCountries.
@@ -146,6 +170,67 @@ const DOCUMENT_LABELS = {
   companyRegistration: "Company Registration Certificate",
 };
 
+const DOCUMENT_DESCRIPTIONS = {
+  passport: "Valid passport with minimum 6 months validity.",
+  oldPassport: "Previous passport copies for travel and visa history review.",
+  photo: "Recent passport-size photo matching embassy specifications.",
+  idCard: "Government-issued identity proof for applicant verification.",
+  panCard: "PAN card copy for identity and financial record support.",
+  drivingLicense: "Driving license copy when accepted as supporting ID proof.",
+  birthCertificate: "Birth certificate copy for age and identity confirmation.",
+  dobCertificate: "Proof of date of birth as required by the application.",
+  marriageCertificate: "Marriage certificate for spouse-linked visa applications.",
+  educationCertificate: "Educational documents and academic transcripts.",
+  employmentLetter: "Employment confirmation letter from your current employer.",
+  offerLetter: "Offer or admission letter supporting the purpose of travel.",
+  salarySlip: "Recent salary slips to support employment and finances.",
+  form16: "Form 16 or equivalent tax proof where applicable.",
+  taxReturn: "Income tax return documents to support financial eligibility.",
+  bankStatement: "Recent bank statements showing stable financial capacity.",
+  bankCertificate: "Bank solvency or balance certificate from your bank.",
+  propertyDocuments: "Property ownership proof to strengthen home-ties evidence.",
+  travelInsurance: "Travel insurance covering your planned stay and duration.",
+  healthInsurance: "Health insurance proof if the destination requires it.",
+  flightTicket: "Confirmed flight itinerary or flight reservation.",
+  hotelBooking: "Confirmed hotel reservation for your stay.",
+  itinerary: "Planned day-wise itinerary covering major travel details.",
+  coverLetter: "Cover letter explaining the purpose and plan of travel.",
+  invitationLetter: "Invitation letter from host, company, or family member.",
+  sponsorLetter: "Sponsor letter with relationship and funding confirmation.",
+  policeClearance: "Police clearance certificate for background verification.",
+  noObjectionCertificate: "NOC from employer or institution when required.",
+  yellowFever: "Yellow fever vaccination certificate for eligible destinations.",
+  covidVaccination: "COVID vaccination proof if the embassy asks for it.",
+  visaApplicationForm: "Completed visa application form signed where needed.",
+  businessLicense: "Business license copy for business or self-employed applicants.",
+  companyRegistration: "Company registration proof for business documentation.",
+};
+
+const DOCUMENT_HIGHLIGHT_KEYS = new Set([
+  "passport",
+  "educationCertificate",
+  "hotelBooking",
+  "flightTicket",
+]);
+
+const DOCUMENT_REQUIREMENT_BENEFITS = [
+  {
+    title: "Embassy Verified",
+    description: "All documents are checked as per embassy guidelines.",
+    Icon: ShieldCheck,
+  },
+  {
+    title: "Fast Processing",
+    description: "Quick verification to speed up your application.",
+    Icon: CalendarDays,
+  },
+  {
+    title: "Secure Uploads",
+    description: "Your data is encrypted and handled with care.",
+    Icon: BadgeCheck,
+  },
+];
+
 const createTravelerState = () => ({
   name: "",
 });
@@ -173,6 +258,17 @@ const CountryDetails = () => {
     return `${key.replace(/([A-Z])/g, " $1")} Upload`;
   };
 
+  const getDocumentCatalogIcon = (key) => {
+    const icon = documentCatalog?.find?.((d) => d.key === key)?.icon;
+    return String(icon ?? "").trim();
+  };
+
+  const getDocumentDescription = (key) => {
+    const fromCatalog = documentCatalog?.find?.((d) => d.key === key)?.description;
+    if (String(fromCatalog ?? "").trim()) return String(fromCatalog).trim();
+    return DOCUMENT_DESCRIPTIONS[key] || "Supporting document required for visa processing.";
+  };
+
   // ── All hooks must be called before any conditional return (Rules of Hooks) ──
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [showTravelDetails, setShowTravelDetails] = useState(false);
@@ -196,6 +292,7 @@ const CountryDetails = () => {
   const [destinationPageContent, setDestinationPageContent] = useState(null);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactModalMode, setContactModalMode] = useState("phone");
+  const [openFaqIndex, setOpenFaqIndex] = useState(0);
   const pendingContactAction = useRef(null);
   const [showStickyStartCta, setShowStickyStartCta] = useState(false);
   /**
@@ -290,9 +387,36 @@ const CountryDetails = () => {
     return out;
   };
 
+  const mergeIncludedItems = (globalList, countryList) => {
+    const seen = new Set();
+    const out = [];
+    const pushUnique = (raw) => {
+      let item;
+      if (typeof raw === "string") {
+        item = { title: raw.trim(), description: "", icon: "", color: "blue" };
+      } else {
+        item = {
+          title: String(raw?.title ?? "").trim(),
+          description: String(raw?.description ?? "").trim(),
+          icon: String(raw?.icon ?? "").trim(),
+          color: String(raw?.color ?? "blue").trim(),
+        };
+      }
+      if (!item.title) return;
+      const key = normKey(item.title);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(item);
+    };
+    (Array.isArray(globalList) ? globalList : []).forEach(pushUnique);
+    (Array.isArray(countryList) ? countryList : []).forEach(pushUnique);
+    return out;
+  };
+
   const whyBookNow = useMemo(() => {
+    const useGlobal = country?.useGlobalWhyBookNow !== false;
     const ex = new Set(country?.excludeDestinationWhyBookNow || []);
-    const g = (destinationPageContent?.whyBookNow || []).filter((line) => !ex.has(normKey(line)));
+    const g = useGlobal ? (destinationPageContent?.whyBookNow || []).filter((line) => !ex.has(normKey(line))) : [];
     const merged = mergeStringLists(g, country?.whyBookNow);
     if (merged.length) return merged;
     return [
@@ -303,20 +427,70 @@ const CountryDetails = () => {
   }, [country, destinationPageContent]);
 
   const includedItems = useMemo(() => {
+    const useGlobal = country?.useGlobalIncludedItems !== false;
     const ex = new Set(country?.excludeDestinationIncludedItems || []);
-    const g = (destinationPageContent?.included || []).filter((line) => !ex.has(normKey(line)));
-    const merged = mergeStringLists(g, country?.includedItems ?? country?.included);
-    if (merged.length) return merged;
-    return [
-      "Application form guidance",
-      "Document checklist and validation",
-      "End-to-end support till submission",
+    const g = useGlobal 
+      ? (destinationPageContent?.includedItems || destinationPageContent?.included || [])
+          .filter((line) => !ex.has(normKey(line?.title || line)))
+      : [];
+    
+    const merged = mergeIncludedItems(g, country?.includedItems ?? country?.included);
+
+    const defaultData = [
+      {
+        title: "Application Form Guidance",
+        description: "Step-by-step guidance to fill your visa application form accurately and confidently.",
+        Icon: FileEdit,
+        color: "blue",
+      },
+      {
+        title: "Document Checklist & Validation",
+        description: "We provide a complete checklist and verify your documents to ensure everything is in order.",
+        Icon: ListChecks,
+        color: "green",
+      },
+      {
+        title: "End-to-end Support till Submission",
+        description: "Our experts assist you at every step until your application is successfully submitted.",
+        Icon: Headphones,
+        color: "purple",
+      },
     ];
+
+    if (merged.length === 0) return defaultData;
+
+    return merged.map((item, idx) => {
+      const found = defaultData.find((d) => d.title.toLowerCase() === item.title.toLowerCase());
+      
+      // Fallback description/icon for legacy strings that were auto-converted to objects
+      let desc = item.description;
+      let icon = item.icon;
+      let col = item.color;
+
+      if (!desc && !icon) {
+        // This was likely a legacy string like "Title: Description"
+        const split = item.title.split(/[:\-]\s/);
+        if (split.length > 1) {
+          item.title = split[0];
+          desc = split.slice(1).join(": ");
+        } else {
+          desc = "Professional assistance for your visa application process.";
+        }
+      }
+
+      return {
+        ...item,
+        description: desc,
+        Icon: found ? found.Icon : null,
+        color: col || (idx === 0 ? "blue" : idx === 1 ? "green" : "purple"),
+      };
+    });
   }, [country, destinationPageContent]);
 
   const faqs = useMemo(() => {
+    const useGlobal = country?.useGlobalFaqs !== false;
     const ex = new Set(country?.excludeDestinationFaqQuestions || []);
-    const g = (destinationPageContent?.faqs || []).filter((f) => !ex.has(normKey(f?.question)));
+    const g = useGlobal ? (destinationPageContent?.faqs || []).filter((f) => !ex.has(normKey(f?.question))) : [];
     const merged = mergeFaqLists(g, country?.faqs);
     if (merged.length) return merged;
     return [
@@ -327,8 +501,9 @@ const CountryDetails = () => {
   }, [country, destinationPageContent]);
 
   const howItWorks = useMemo(() => {
+    const useGlobal = country?.useGlobalHowItWorks !== false;
     const ex = new Set(country?.excludeDestinationHowItWorksTitles || []);
-    const g = (destinationPageContent?.howItWorks || []).filter((s) => !ex.has(normKey(s?.title)));
+    const g = useGlobal ? (destinationPageContent?.howItWorks || []).filter((s) => !ex.has(normKey(s?.title))) : [];
     const merged = mergeHowItWorksLists(g, country?.howItWorks);
     if (merged.length) return merged;
     return [
@@ -346,8 +521,9 @@ const CountryDetails = () => {
    * free-text `requirements` array appended as country-specific extras. Duplicates skipped.
    */
   const visaRequirements = useMemo(() => {
+    const useGlobal = country?.useGlobalVisaRequirements !== false;
     const ex = new Set(country?.excludeDestinationVisaRequirements || []);
-    const g = (destinationPageContent?.visaRequirements || []).filter((line) => !ex.has(normKey(line)));
+    const g = useGlobal ? (destinationPageContent?.visaRequirements || []).filter((line) => !ex.has(normKey(line))) : [];
     const merged = mergeStringLists(g, country?.requirements);
     if (merged.length) return merged;
     return [
@@ -607,7 +783,10 @@ const CountryDetails = () => {
   const requiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
     label: getDocumentLabel(key),
+    description: getDocumentDescription(key),
+    iconClass: getDocumentCatalogIcon(key),
     Icon: getDocumentIcon(key),
+    featured: DOCUMENT_HIGHLIGHT_KEYS.has(key),
   }));
 
   const handleBack = () => {
@@ -662,6 +841,48 @@ const CountryDetails = () => {
     const value = String(visaTypeValue || "").trim();
     return value || "Tourist Visa";
   };
+
+  const parsedVisaRequirements = useMemo(() => {
+    const splitRequirement = (raw) => {
+      const text = String(raw || "").trim();
+      if (!text) return null;
+      if (/^note\s*:/i.test(text)) {
+        return {
+          type: "note",
+          content: text.replace(/^note\s*:/i, "").trim(),
+        };
+      }
+
+      const separators = ["::", " — ", " – ", " - ", ":"];
+      for (const separator of separators) {
+        const index = text.indexOf(separator);
+        if (index > 0) {
+          const title = text.slice(0, index).trim();
+          const description = text.slice(index + separator.length).trim();
+          if (title && description) {
+            return { type: "item", title, description };
+          }
+        }
+      }
+
+      return {
+        type: "item",
+        title: text,
+        description: "",
+      };
+    };
+
+    const parsed = visaRequirements.map(splitRequirement).filter(Boolean);
+    const items = parsed.filter((entry) => entry.type === "item");
+    const note = parsed.find((entry) => entry.type === "note");
+
+    return {
+      items,
+      note:
+        note?.content ||
+        "Additional documents may be required depending on your visa type, travel purpose, and embassy guidelines.",
+    };
+  }, [visaRequirements]);
 
   const SUB_NAV = showTravelDetails
     ? [{ id: "travel-details", label: "Travel Details" }]
@@ -992,92 +1213,375 @@ const CountryDetails = () => {
 
   const destinationInfoSections = (
     <>
-      <motion.section id="how-it-works" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-5">
+      <motion.section
+        id="how-it-works"
+        initial="initial"
+        animate="animate"
+        variants={fadeUp}
+        className="rounded-[2rem] bg-gradient-to-b from-transparent via-surface/40 to-transparent p-4 sm:p-8"
+      >
+        <div className="mb-6 flex items-center gap-2">
           <ListChecks size={18} className="text-cyan" />
-          <h2 className="text-xl font-bold text-text-primary">How it works</h2>
+          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">How it works</h2>
         </div>
         <ol className="space-y-4">
           {howItWorks.map((step, idx) => (
-            <li key={`${step.title}-${idx}`} className="flex items-start gap-4">
-              <span className="shrink-0 w-9 h-9 rounded-full bg-cyan/10 border border-cyan/30 text-cyan font-bold text-sm flex items-center justify-center">
+            <motion.li
+              key={`${step.title}-${idx}`}
+              whileHover={{ scale: 1.012, y: -3 }}
+              transition={{ type: "tween", duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+              className="group flex items-start gap-4 rounded-[1.75rem] border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.12)] backdrop-blur-md transition-all duration-300 ease-out hover:border-cyan/25 hover:bg-cyan/[0.04] hover:shadow-[0_24px_55px_rgba(34,211,238,0.10)]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan/20 bg-cyan/10 text-cyan font-bold text-sm transition-transform duration-300 ease-out group-hover:scale-105">
                 {idx + 1}
               </span>
               <div className="flex-1">
-                <p className="font-semibold text-text-primary text-sm sm:text-base">{step.title}</p>
+                <p className="font-semibold text-text-primary text-sm sm:text-base transition-colors duration-300 ease-out group-hover:text-cyan">
+                  {step.title}
+                </p>
                 <p className="text-sm text-text-secondary mt-1 leading-relaxed">{step.description}</p>
               </div>
-            </li>
+            </motion.li>
           ))}
         </ol>
       </motion.section>
 
-      <motion.section id="visa-requirements" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ScrollText size={18} className="text-cyan" />
-          <h2 className="text-xl font-bold text-text-primary">Visa Requirements</h2>
-        </div>
-        <div className="space-y-3">
-          {visaRequirements.map((item, idx) => (
-            <div key={`${item}-${idx}`} className="flex items-start gap-3">
-              <CircleCheck size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-              <p className="text-sm text-text-secondary leading-relaxed">{item}</p>
+      <motion.section
+        id="visa-requirements"
+        initial="initial"
+        animate="animate"
+        variants={fadeUp}
+        className="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-4 py-6 sm:px-8 sm:py-10"
+      >
+        <div className="w-full lg:mx-auto lg:max-w-6xl">
+          <div className="text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-cyan/10 text-cyan">
+              <ScrollText size={34} strokeWidth={2} />
             </div>
-          ))}
+            <h2 className="mt-5 font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">
+              Visa Requirements
+            </h2>
+            <div className="mx-auto mt-4 flex w-full max-w-xs items-center justify-center gap-4 text-cyan">
+              <span className="h-px flex-1 bg-cyan/40" />
+              <ShieldCheck size={18} />
+              <span className="h-px flex-1 bg-cyan/40" />
+            </div>
+            <p className="mx-auto mt-5 max-w-3xl text-base sm:text-xl text-text-secondary">
+              Please ensure you have the following documents ready for a smooth visa application process.
+            </p>
+          </div>
+
+          <div className="mt-10 rounded-[1.75rem] bg-white/80 p-4 sm:p-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {parsedVisaRequirements.items.map((item, idx) => (
+                <motion.div
+                  key={`${item.title}-${idx}`}
+                  whileHover={{ y: -3, scale: 1.01 }}
+                  transition={{ duration: 0.24, ease }}
+                  className="flex items-start gap-4 rounded-[1.4rem] border border-cyan/15 bg-white/85 p-4 sm:p-5"
+                >
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan sm:h-20 sm:w-20">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan text-background shadow-[0_14px_28px_rgba(34,211,238,0.22)] sm:h-12 sm:w-12">
+                      <i
+                        className={`${getVisaRequirementRemixIcon(item.title, item.description)} text-xl leading-none sm:text-2xl`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </div>
+                  <div className="flex-1 border-l border-dashed border-cyan/35 pl-4">
+                    <h3 className="text-base sm:text-lg lg:text-[1.7rem] font-semibold leading-tight text-text-primary">
+                      {item.title}
+                    </h3>
+                    {item.description ? (
+                      <p className="mt-3 text-sm sm:text-base leading-7 text-text-secondary">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-[1.35rem] bg-gradient-to-r from-cyan/10 via-amber-50 to-cyan/5 px-4 py-4 sm:px-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white">
+                  <span className="text-2xl font-semibold leading-none">i</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-lg font-semibold text-amber-700">Please Note</p>
+                  <p className="mt-1 text-xs sm:text-sm lg:text-base text-text-secondary">
+                    {parsedVisaRequirements.note}
+                  </p>
+                </div>
+                <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-amber-500">
+                  <ShieldCheck size={24} strokeWidth={2} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </motion.section>
 
       {countryDisplay?.showRequiredDocuments !== false && (
-        <motion.section id="document-requirements" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-text-primary mb-4">Document Requirements</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <motion.section
+          id="document-requirements"
+          initial="initial"
+          animate="animate"
+          variants={fadeUp}
+          className="overflow-hidden rounded-[2rem] border border-cyan/10 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-6 shadow-[0_24px_60px_rgba(2,132,199,0.08)] sm:px-6 sm:py-10 lg:px-8"
+        >
+          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-cyan/10 bg-[radial-gradient(circle_at_top,rgba(2,132,199,0.08),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-60"
+              aria-hidden="true"
+              style={{
+                background:
+                  "radial-gradient(circle at 15% 35%, rgba(2,132,199,0.12) 0, transparent 18%), radial-gradient(circle at 82% 18%, rgba(59,130,246,0.12) 0, transparent 22%)",
+              }}
+            />
+            <div
+              className="pointer-events-none absolute left-[-4%] top-20 hidden h-48 w-48 opacity-35 lg:block"
+              aria-hidden="true"
+              style={{
+                backgroundImage: "radial-gradient(rgba(59,130,246,0.22) 1.2px, transparent 1.2px)",
+                backgroundSize: "9px 9px",
+                maskImage: "linear-gradient(90deg, black 60%, transparent 100%)",
+                WebkitMaskImage: "linear-gradient(90deg, black 60%, transparent 100%)",
+              }}
+            />
+            <div className="pointer-events-none absolute right-6 top-24 hidden text-cyan/35 lg:block" aria-hidden="true">
+              <Plane size={44} strokeWidth={2} />
+            </div>
+
+            <div className="relative mx-auto max-w-4xl text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan/15 bg-cyan/5 px-4 py-2 text-cyan shadow-[0_12px_30px_rgba(2,132,199,0.08)]">
+                <ShieldCheck size={18} strokeWidth={2.2} />
+                <span className="text-sm font-medium">Verified &amp; Secure</span>
+              </div>
+              <h2 className="mt-6 font-playfair text-2xl font-medium leading-tight text-text-primary sm:text-3xl lg:text-3xl">
+                Documents Required
+                <span className="block text-cyan">for {country.name} Visa</span>
+              </h2>
+              <p className="mx-auto mt-4 max-w-2xl text-sm text-text-secondary sm:text-base">
+                To proceed with the application immediately
+              </p>
+            </div>
+
+            <div className="relative mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {requiredDocumentFields.length ? requiredDocumentFields.map((doc) => {
               const Icon = doc.Icon;
               return (
-                <div
+                <motion.div
                   key={doc.key}
-                  className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-text-secondary flex items-center gap-3"
+                  whileHover={{ y: -3, scale: 1.01 }}
+                  transition={{ duration: 0.2, ease }}
+                  className={`group relative flex items-center gap-3 rounded-[1.5rem] border bg-white/90 px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-4 sm:py-4 ${
+                    doc.featured
+                      ? "border-cyan/45 shadow-[0_18px_40px_rgba(2,132,199,0.14)]"
+                      : "border-cyan/15"
+                  }`}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan/10 text-cyan">
-                    <Icon size={16} strokeWidth={2} />
-                  </span>
-                  <span className="flex-1 leading-snug">{doc.label}</span>
-                  <CircleCheck size={16} className="text-emerald-500 shrink-0" />
-                </div>
+                  {doc.featured ? (
+                    <div className="absolute right-3 top-0 flex h-9 w-8 items-start justify-center rounded-b-2xl bg-cyan text-white shadow-[0_10px_18px_rgba(2,132,199,0.2)]">
+                      <BadgeCheck size={15} strokeWidth={2.4} className="mt-2" />
+                    </div>
+                  ) : null}
+
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                    {doc.iconClass ? (
+                      <i className={`${doc.iconClass} text-xl leading-none`} aria-hidden="true" />
+                    ) : (
+                      <Icon size={18} strokeWidth={2.1} />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 text-left">
+                    <h3 className="text-sm font-normal leading-tight text-text-primary sm:text-sm">
+                      {doc.label}
+                    </h3>
+                  </div>
+
+                  <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
+                    <CircleCheck size={16} strokeWidth={2.4} />
+                    <span>Required</span>
+                  </div>
+                </motion.div>
               );
             }) : (
-              <p className="text-sm text-text-muted">No requirements configured yet.</p>
+              <p className="col-span-full text-sm text-text-muted text-center">
+                No requirements configured yet.
+              </p>
             )}
+            </div>
+
+            <div className="relative mx-auto mt-8 max-w-6xl rounded-[1.75rem] border border-cyan/10 bg-white/80 px-5 py-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] sm:px-8">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
+                {DOCUMENT_REQUIREMENT_BENEFITS.map(({ title, description, Icon }) => (
+                  <div key={title} className="flex items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                      <Icon size={26} strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold leading-tight text-text-primary">{title}</p>
+                      <p className="mt-1 text-base leading-7 text-text-secondary">{description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </motion.section>
       )}
 
-      <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BadgeCheck size={18} className="text-cyan" />
-          <h2 className="text-xl font-bold text-text-primary">Why book now?</h2>
+      <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="mx-auto max-w-4xl rounded-[2rem] bg-white px-3 py-5 sm:px-6 sm:py-7 md:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="flex flex-col items-center gap-2 text-cyan mb-4">
+            <BadgeCheck size={18} />
+            <span className="text-xs font-semibold uppercase tracking-[0.24em]">Why book now</span>
+          </div>
+          <h2 className="font-playfair text-xl sm:text-3xl md:text-4xl font-bold tracking-tight text-text-primary">
+            Visa application made simple and reliable
+          </h2>
         </div>
-        <div className="space-y-3">
-          {whyBookNow.map((item, idx) => (
-            <div key={`${item}-${idx}`} className="flex items-start gap-3">
-              <CircleCheck size={16} className="text-emerald-500 mt-0.5" />
-              <p className="text-sm text-text-secondary">{item}</p>
+
+          <div className="mt-6 overflow-hidden rounded-[1.5rem] bg-white">
+            <div className="grid grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px] items-end">
+              <div className="px-2 sm:px-5 py-2 sm:py-3" />
+              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
+                <span className="text-xs sm:text-sm md:text-xl font-bold tracking-tight text-cyan">We Provides</span>
+              </div>
+              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
+                <span className="text-xs sm:text-sm md:text-lg font-semibold text-text-muted">Others</span>
+              </div>
             </div>
-          ))}
-        </div>
+
+            <div className="divide-y divide-slate-200/80">
+              {whyBookNow.map((item, idx) => (
+                <div
+                  key={`${item}-${idx}`}
+                  className="grid items-center grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px]"
+                >
+                  <div className="px-2 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm md:text-base font-medium text-text-primary">
+                    {item}
+                  </div>
+                  <div className="px-2 sm:px-4 py-2 sm:py-3">
+                    <div className="mx-auto flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-cyan text-background shadow-[0_10px_20px_rgba(34,211,238,0.18)]">
+                      <CircleCheck size={14} strokeWidth={2.4} className="sm:hidden" />
+                      <CircleCheck size={16} strokeWidth={2.4} className="hidden sm:block" />
+                    </div>
+                  </div>
+                  <div className="px-2 sm:px-5 py-3 sm:py-4">
+                    <div className="mx-auto flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-red-300/70 bg-red-100/70 text-red-400">
+                      <X size={14} strokeWidth={2.2} className="sm:hidden" />
+                      <X size={18} strokeWidth={2.2} className="hidden sm:block" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
       </motion.section>
 
-      <motion.section id="whats-included" initial="initial" animate="animate" variants={fadeUp} className="bg-surface border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck size={18} className="text-cyan" />
-          <h2 className="text-xl font-bold text-text-primary">What's Included</h2>
+      <motion.section
+        id="whats-included"
+        initial="initial"
+        animate="animate"
+        variants={fadeUp}
+        className="relative overflow-hidden rounded-[2.5rem] border border-border bg-white px-4 py-10 sm:px-10 sm:py-16 shadow-[0_20px_50px_rgba(0,0,0,0.04)]"
+      >
+        <div className="flex flex-col md:flex-row md:items-center gap-6 mb-12 relative z-10">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-blue-50 text-blue-600 shadow-[0_10px_30px_rgba(37,99,235,0.1)] ring-1 ring-blue-100">
+            <ShieldCheck size={40} strokeWidth={1.5} />
+          </div>
+          <div>
+            <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
+              What's Included
+            </h2>
+            <p className="text-text-secondary mt-2 text-base sm:text-lg max-w-xl">
+              Everything you need for a smooth and hassle-free visa process.
+            </p>
+          </div>
+
+          {/* Decorative background elements */}
+          <div className="absolute -top-10 -right-10 opacity-[0.03] pointer-events-none">
+             <Plane size={300} className="rotate-[-15deg]" />
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {includedItems.map((item, idx) => (
-            <div key={`${item}-${idx}`} className="rounded-xl border border-border bg-surface-2 p-3 text-sm text-text-secondary">
-              {item}
-            </div>
-          ))}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+          {includedItems.map((item, idx) => {
+            const Icon = item.Icon;
+            const isSingleItemLastRow =
+              includedItems.length > 1 &&
+              includedItems.length % 3 === 1 &&
+              idx === includedItems.length - 1;
+            const colorClasses = {
+              blue: {
+                bg: "bg-blue-50",
+                icon: "text-blue-600",
+                ring: "ring-blue-100",
+                shadow: "shadow-[0_15px_40px_rgba(37,99,235,0.12)]"
+              },
+              green: {
+                bg: "bg-emerald-50",
+                icon: "text-emerald-600",
+                ring: "ring-emerald-100",
+                shadow: "shadow-[0_15px_40px_rgba(16,185,129,0.12)]"
+              },
+              purple: {
+                bg: "bg-purple-50",
+                icon: "text-purple-600",
+                ring: "ring-purple-100",
+                shadow: "shadow-[0_15px_40px_rgba(147,51,234,0.12)]"
+              }
+            }[item.color] || {
+              bg: "bg-gray-50",
+              icon: "text-gray-600",
+              ring: "ring-gray-100",
+              shadow: "shadow-md"
+            };
+
+            return (
+              <motion.div
+                key={`${item.title}-${idx}`}
+                whileHover={{ y: -8 }}
+                className={`relative flex flex-col items-center text-center p-8 rounded-[2rem] border border-border bg-white shadow-[0_10px_30px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden ${
+                  isSingleItemLastRow ? "md:col-start-2" : ""
+                }`}
+              >
+                {/* Dots pattern overlay */}
+                <div className="absolute bottom-0 right-0 w-24 h-24 opacity-[0.05] pointer-events-none">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
+                    <defs>
+                      <pattern id={`dots-${idx}`} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <circle cx="2" cy="2" r="1.5" fill="currentColor" />
+                      </pattern>
+                    </defs>
+                    <rect width="100" height="100" fill={`url(#dots-${idx})`} />
+                  </svg>
+                </div>
+
+                <div className={`flex h-24 w-24 items-center justify-center rounded-full ${colorClasses.bg} ${colorClasses.icon} ${colorClasses.shadow} ring-1 ${colorClasses.ring} mb-8`}>
+                  {item.Icon ? (
+                    <item.Icon size={36} strokeWidth={1.5} />
+                  ) : (
+                    <i className={`${item.icon || 'ri-shield-check-line'} text-[42px]`} />
+                  )}
+                </div>
+
+                <h3 className="font-playfair text-xl sm:text-2xl font-bold text-text-primary leading-tight mb-3">
+                  {item.title}
+                </h3>
+                
+                {/* Accent line */}
+                <div className="w-10 h-1 bg-blue-500 rounded-full mb-6 mx-auto opacity-80" />
+
+                <p className="text-sm sm:text-base text-text-secondary leading-relaxed">
+                  {item.description}
+                </p>
+              </motion.div>
+            );
+          })}
         </div>
       </motion.section>
 
@@ -1086,17 +1590,51 @@ const CountryDetails = () => {
         initial="initial"
         animate="animate"
         variants={fadeUp}
-        className="bg-surface border border-border rounded-2xl p-6"
+        className="bg-surface border border-border rounded-2xl p-4 sm:p-6"
       >
-        <div className="flex items-center gap-2 mb-4">
-          <HelpCircle size={18} className="text-cyan" />
-          <h2 className="text-xl font-bold text-text-primary">FAQs</h2>
+        <div className="mb-6">
+          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">
+            Frequently asked questions
+          </h2>
         </div>
-        <div className="space-y-3">
+        <div className="divide-y divide-border/70">
           {faqs.map((faq, idx) => (
-            <div key={`${faq.question}-${idx}`} className="rounded-xl border border-border bg-surface-2 p-4">
-              <p className="font-semibold text-text-primary text-sm">{faq.question}</p>
-              <p className="text-sm text-text-secondary mt-1">{faq.answer}</p>
+            <div key={`${faq.question}-${idx}`} className="py-5 sm:py-6">
+              <button
+                type="button"
+                onClick={() => setOpenFaqIndex((prev) => (prev === idx ? -1 : idx))}
+                className="flex w-full items-start justify-between gap-4 text-left"
+                aria-expanded={openFaqIndex === idx}
+              >
+                <span className="pr-4 text-lg sm:text-[1.7rem] font-semibold leading-tight text-text-primary">
+                  {faq.question}
+                </span>
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-text-primary transition-colors">
+                  {openFaqIndex === idx ? <X size={20} /> : <Plus size={22} />}
+                </span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {openFaqIndex === idx && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.28, ease }}
+                    className="overflow-hidden"
+                  >
+                    <motion.p
+                      initial={{ y: -8 }}
+                      animate={{ y: 0 }}
+                      exit={{ y: -8 }}
+                      transition={{ duration: 0.22, ease }}
+                      className="max-w-5xl pt-4 text-base leading-8 text-text-secondary"
+                    >
+                      {faq.answer}
+                    </motion.p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ))}
         </div>
@@ -1105,7 +1643,15 @@ const CountryDetails = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col font-sans">
+    <div className="relative isolate min-h-screen bg-background flex flex-col font-sans">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
+          style={{ backgroundImage: "url('/images/country-details-bg.jpg')" }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.78)_0%,rgba(248,252,255,0.88)_38%,rgba(244,249,255,0.96)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.10),transparent_42%)]" />
+      </div>
       {/* Post-login resume splash — full-screen overlay shown when we're about
           to forward the user to /apply/:id or the summary page. Sits on top of
           everything (z-[100]) and matches the page background, so the user
@@ -1130,21 +1676,21 @@ const CountryDetails = () => {
 
       {!showTravelDetails && (
         <motion.div initial="initial" animate="animate" variants={fadeUp} className="w-full">
-          <div className="relative left-1/2 w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-hidden rounded-3xl border border-border sm:w-[calc(100vw-3rem)] lg:w-[calc(100vw-4rem)]">
+          <div className="relative mx-auto w-full max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl border border-border sm:max-w-[calc(100vw-3rem)] lg:max-w-[calc(100vw-4rem)]">
             <ImageWithShimmer
               src={country.imageUrl}
               alt={country.name}
-              className="w-full h-64 sm:h-72 md:h-[79vh] object-cover"
+              className="w-full h-[450px] sm:h-[520px] md:h-[79vh] object-cover"
               priority
               width={1600}
               interactiveOverlay
             >
               <div className="absolute inset-0 bg-black/55" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center sm:p-8">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center sm:p-8">
                 <p className="text-white/80 text-sm">{country.flagEmoji} {country.locatedIn ?? country.regionLabel ?? country.continent}</p>
-                <h1 className="mt-3 text-4xl sm:text-6xl font-bold text-white leading-tight">{country.name} Visa</h1>
+                <h1 className="mt-3 text-3xl sm:text-6xl font-bold text-white leading-tight">{country.name} Visa</h1>
 
-                <div className="mx-auto mt-8 grid w-full max-w-lg gap-3 sm:grid-cols-3">
+                <div className="mx-auto mt-8 grid w-full max-w-lg grid-cols-2 gap-3 sm:grid-cols-3">
                   <div>
                     <p className="text-xs text-white/65 uppercase tracking-[0.18em] mb-2">Type</p>
                     <p className="text-base font-semibold text-white">{getCardVisaTypeLabel(country.visaType)}</p>
@@ -1223,7 +1769,7 @@ const CountryDetails = () => {
         </div>
       </div>
 
-      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full">
+      <main className="flex-1 w-full px-3 sm:px-6 py-8 sm:py-12">
         {showTravelDetails && (
           <button
             type="button"
@@ -1235,13 +1781,21 @@ const CountryDetails = () => {
           </button>
         )}
 
-        <div
-          className={
-            showTravelDetails
-              ? "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12"
-              : "flex flex-col gap-8 lg:grid lg:grid-cols-12 lg:gap-12"
-          }
-        >
+        <div className="mx-auto w-full lg:max-w-6xl">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-12">
+            {!showTravelDetails && (
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.5, ease } }}
+                className="order-1 w-full lg:col-span-8"
+              >
+                <VisaInformationSection
+                  visaInformation={country?.visaInformation}
+                  display={countryDisplay}
+                />
+              </motion.section>
+            )}
+
           <div
             className={
               showTravelDetails
@@ -1251,7 +1805,7 @@ const CountryDetails = () => {
           >
             {false && (
               <motion.div initial="initial" animate="animate" variants={fadeUp} className="w-full">
-                <div className="relative left-1/2 w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-hidden rounded-3xl border border-border sm:w-[calc(100vw-3rem)] lg:w-[calc(100vw-4rem)]">
+                <div className="relative mx-auto w-full max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl border border-border sm:max-w-[calc(100vw-3rem)] lg:max-w-[calc(100vw-4rem)]">
                       <ImageWithShimmer
                         src={country.imageUrl}
                         alt={country.name}
@@ -1260,7 +1814,7 @@ const CountryDetails = () => {
                         width={1600}
                       >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+                    <div className="absolute inset-x-0 bottom-0 p-4 sm:p-8">
                       <p className="text-white/80 text-sm">{country.flagEmoji} {country.locatedIn ?? country.regionLabel ?? country.continent}</p>
                       <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight">{country.name} Visa</h1>
 
@@ -1307,7 +1861,7 @@ const CountryDetails = () => {
                 initial="initial"
                 animate="animate"
                 variants={fadeUp}
-                className="bg-surface border border-border rounded-2xl p-6 space-y-6"
+                className="bg-surface border border-border rounded-2xl p-4 sm:p-6 space-y-6"
               >
                 <div>
                   <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-2">Travel Details</p>
@@ -1480,12 +2034,12 @@ const CountryDetails = () => {
             className={
               showTravelDetails
                 ? "lg:col-span-4"
-                : "order-2 w-full lg:col-span-12 lg:col-start-1"
+                : "order-2 w-full lg:col-span-4"
             }
           >
             <motion.div
               ref={showTravelDetails ? undefined : startApplicationCardRef}
-              className="bg-surface border border-border rounded-2xl p-6"
+              className="bg-surface border border-border rounded-2xl p-4 sm:p-6 lg:h-full"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, ease } }}
             >
@@ -1568,15 +2122,15 @@ const CountryDetails = () => {
               )}
             </motion.div>
           </div>
-
-          {!showTravelDetails && (
-            <div className="order-3 w-full lg:col-span-12">
-              <div className="w-full space-y-8">
-                {destinationInfoSections}
-              </div>
-            </div>
-          )}
         </div>
+      </div>
+        { !showTravelDetails && (
+          <div className="mt-10 w-full max-w-[calc(100vw-1.5rem)] xl:max-w-[1440px] mx-auto">
+            <div className="w-full space-y-8">
+              {destinationInfoSections}
+            </div>
+          </div>
+        )}
       </main>
 
       {paymentSummaryOpen && (
@@ -1592,7 +2146,7 @@ const CountryDetails = () => {
             aria-label="Close"
             onClick={closePaymentSummaryModal}
           />
-          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-surface shadow-modal p-6 sm:p-8">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-surface shadow-modal p-4 sm:p-8">
             <button
               type="button"
               onClick={closePaymentSummaryModal}
@@ -1712,6 +2266,29 @@ const CountryDetails = () => {
         onClose={clearContactGate}
         onCompleted={completeContactGate}
       />
+
+      <AnimatePresence>
+        {!showTravelDetails && showStickyStartCta && (
+          <motion.div
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            exit={{ y: 100 }}
+            transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed bottom-0 left-0 right-0 z-50 sm:hidden border-t border-border bg-background/80 px-4 py-3 backdrop-blur-xl"
+          >
+            <Button
+              variant="primary"
+              fullWidth
+              size="lg"
+              onClick={handleStartApplication}
+              className="shadow-xl shadow-cyan/20"
+              id="country-details-sticky-bottom-start-application-btn"
+            >
+              Start Application
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </div>

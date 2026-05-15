@@ -81,11 +81,19 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashContactOpen, setDashContactOpen] = useState(false);
   const [dashContactMode, setDashContactMode] = useState("phone");
+  const [uploadSettings, setUploadSettings] = useState({
+    enableGDriveUpload: true,
+    enableFileUpload: true,
+  });
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
+        const { data } = await api.get("/config/upload-settings");
+        if (data?.success && data.config) {
+          setUploadSettings(data.config);
+        }
         await fetchUserApplications();
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
@@ -370,7 +378,7 @@ const UserDashboard = () => {
                   </Card>
                 ) : (
                   filteredBookings.map((booking, i) => {
-                    const progress = getApplicationProgress(booking);
+                    const progress = getApplicationProgress(booking, uploadSettings);
                     const nextPendingTraveler = progress.missingByTraveler.find((item) => item.missingLabels.length);
                     const paymentLabel =
                       booking.paymentStatus === "completed"
@@ -399,92 +407,106 @@ const UserDashboard = () => {
                         <Card
                           hoverable
                           padding="sm"
-                          className="flex flex-wrap items-center gap-4"
+                          className="flex items-start sm:items-center gap-3 sm:gap-4"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/dashboard/application/${booking._id || booking.id}`);
                           }}
                         >
-                          <div className="w-12 h-12 rounded-xl bg-surface-3 flex items-center justify-center text-2xl flex-shrink-0">
+                          <div className="w-12 h-12 rounded-xl bg-surface-3 flex items-center justify-center text-2xl flex-shrink-0 mt-0.5 sm:mt-0">
                             {booking.flagEmoji || "🛂"}
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <h3 className="font-semibold text-text-primary">
+                              <h3 className="font-semibold text-text-primary truncate">
                                 {booking.countryName || "Unknown Country"}
                               </h3>
                               <StatusBadge status={booking.status || "pending"} />
-                              <span className={`text-2xs font-medium rounded-full px-2 py-0.5 border ${paymentClass}`}>
+                              <span className={`hidden sm:inline-block text-2xs font-medium rounded-full px-2 py-0.5 border ${paymentClass}`}>
                                 {paymentLabel}
                               </span>
                               {booking.detailsPending && (
-                                <span className="text-2xs font-medium text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">
+                                <span className="hidden sm:inline-block text-2xs font-medium text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">
                                   Complete details
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-text-muted">{booking.visaType || "Visa Application"}</p>
-                            <div className="flex items-center gap-3 mt-1.5">
-                              <span className="flex items-center gap-1 text-xs text-text-muted">
-                                <Calendar size={11} />
-                                Applied: {fmtDate(booking.createdAt)}
-                              </span>
-                              <span className="flex items-center gap-1 text-xs text-text-muted">
-                                ✈️ Travel: {fmtDate(booking.travelDate)}
-                              </span>
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className={`text-xs font-medium ${progress.allDocumentsUploaded ? "text-emerald-400" : "text-amber-400"}`}>
-                                {progress.allDocumentsUploaded
-                                  ? "All required documents uploaded"
-                                  : `${progress.totalMissingDocuments} document${progress.totalMissingDocuments === 1 ? "" : "s"} missing`}
-                              </span>
-                              {booking.visaFilePath && (
-                                <span className="text-xs text-emerald-400">
-                                  Visa file received
-                                </span>
+                            
+                            {/* Simplified pending message for mobile */}
+                            <div className="sm:hidden mt-1 space-y-0.5">
+                              {!progress.allDocumentsUploaded && (
+                                <p className="text-[10px] font-medium text-amber-500">
+                                  {progress.totalMissingDocuments} document{progress.totalMissingDocuments === 1 ? "" : "s"} missing
+                                </p>
                               )}
-                              {!progress.allDocumentsUploaded && nextPendingTraveler && (
-                                <div className="flex items-center gap-2 text-xs text-text-muted min-w-0">
-                                  <span className="shrink-0">{nextPendingTraveler.travelerName}:</span>
-                                  {/* Icon chip row for the first 5 missing docs.
-                                      Hover/tap each chip to see the full label.
-                                      Falls back to legacy comma text when keys
-                                      aren't available (older progress payloads). */}
-                                  {nextPendingTraveler.missingKeys?.length ? (
+                              {booking.detailsPending && (
+                                <p className="text-[10px] font-medium text-amber-500">
+                                  Complete details required
+                                </p>
+                              )}
+                            </div>
+                            
+                            {/* Detailed info hidden on mobile for a cleaner look */}
+                            <div className="hidden sm:block">
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="flex items-center gap-1 text-xs text-text-muted">
+                                  <Calendar size={11} />
+                                  Applied: {fmtDate(booking.createdAt)}
+                                </span>
+                                <span className="flex items-center gap-1 text-xs text-text-muted">
+                                  ✈️ Travel: {fmtDate(booking.travelDate)}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className={`text-xs font-medium ${progress.allDocumentsUploaded ? "text-emerald-400" : "text-amber-400"}`}>
+                                  {progress.allDocumentsUploaded
+                                    ? "All required documents uploaded"
+                                    : `${progress.totalMissingDocuments} document${progress.totalMissingDocuments === 1 ? "" : "s"} missing`}
+                                </span>
+                                {booking.visaFilePath && (
+                                  <span className="text-xs text-emerald-400">
+                                    Visa file received
+                                  </span>
+                                )}
+                                {!progress.allDocumentsUploaded && nextPendingTraveler && (
+                                  <div className="flex items-center gap-2 text-xs text-text-muted min-w-0">
+                                    <span className="shrink-0">{nextPendingTraveler.travelerName}:</span>
                                     <div className="flex items-center gap-1 flex-wrap">
-                                      {nextPendingTraveler.missingKeys.slice(0, 5).map((key) => {
-                                        const Icon = getDocumentIcon(key);
-                                        const label = DOCUMENT_LABELS[key] || key;
-                                        return (
-                                          <span
-                                            key={key}
-                                            title={label}
-                                            aria-label={label}
-                                            className="h-5 w-5 inline-flex items-center justify-center rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20"
-                                          >
-                                            <Icon size={11} strokeWidth={2} />
-                                          </span>
-                                        );
-                                      })}
-                                      {nextPendingTraveler.missingKeys.length > 5 && (
+                                      {nextPendingTraveler.missingKeys?.length ? (
+                                        nextPendingTraveler.missingKeys.slice(0, 5).map((key) => {
+                                          const Icon = getDocumentIcon(key);
+                                          const label = DOCUMENT_LABELS[key] || key;
+                                          return (
+                                            <span
+                                              key={key}
+                                              title={label}
+                                              aria-label={label}
+                                              className="h-5 w-5 inline-flex items-center justify-center rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20"
+                                            >
+                                              <Icon size={11} strokeWidth={2} />
+                                            </span>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className="truncate">
+                                          {nextPendingTraveler.missingLabels.slice(0, 2).join(", ")}
+                                        </span>
+                                      )}
+                                      {nextPendingTraveler.missingKeys?.length > 5 && (
                                         <span className="text-[11px] text-amber-400">
                                           +{nextPendingTraveler.missingKeys.length - 5}
                                         </span>
                                       )}
                                     </div>
-                                  ) : (
-                                    <span className="truncate">
-                                      {nextPendingTraveler.missingLabels.slice(0, 2).join(", ")}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="text-right flex-shrink-0">
+                          <div className="text-right flex-shrink-0 self-start sm:self-center">
                             <div className="text-sm font-bold text-text-primary">
                               ₹{Number(booking.fee || 0).toLocaleString("en-IN")}
                             </div>
