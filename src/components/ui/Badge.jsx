@@ -99,7 +99,8 @@ export const StatusBadge = ({ status, ...props }) => {
     doc_pending: "Doc Pending",
   };
   const tooltips = {
-    pending: "Your application is saved and waiting for the next step from your side or our team.",
+    pending: "Upload required documents",
+    doc_pending: "Upload required documents",
     review: "Our team is checking your documents and details. We will update the status after review.",
   };
   return (
