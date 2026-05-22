@@ -20,6 +20,16 @@ const SUMMARY_UPLOAD_MAX_BYTES = 300 * 1024;
 const ALLOWED_PASSPORT_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
 const INVALID_PASSPORT_TYPE_ERROR = "Only PDF, JPG, JPEG and PNG files are allowed.";
 const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
+const isReusableUnpaidApplication = (application) => {
+  const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
+  return ["pending_payment", "failed", "cancelled"].includes(paymentStatus);
+};
+
+const formatFileSize = (size = 0) => {
+  if (!size) return "0 KB";
+  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const normalizeProcessingDays = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -449,7 +459,7 @@ const ApplicationSummaryPage = () => {
     if (!appId && id) {
       try {
         const { data } = await api.get(`/users/applications/${id}`);
-        if (data?.success && data.application?._id) {
+        if (data?.success && data.application?._id && isReusableUnpaidApplication(data.application)) {
           app = data.application;
           appId = data.application._id;
           setApplication(data.application);
@@ -520,14 +530,7 @@ const ApplicationSummaryPage = () => {
       showToast(INVALID_PASSPORT_TYPE_ERROR, "error");
       return;
     }
-    if (file.size > SUMMARY_UPLOAD_MAX_BYTES) {
-      setUploadModalErrors((prev) => ({
-        ...prev,
-        [index]: PASSPORT_FILE_SIZE_ERROR,
-      }));
-      showToast(PASSPORT_FILE_SIZE_ERROR, "error");
-      return;
-    }
+    setUploadModalUploading((prev) => ({ ...prev, [index]: true }));
     const { file: optimizedFile, error } = await optimizeUploadFile(file, {
       targetBytes: SUMMARY_UPLOAD_MAX_BYTES,
     });
@@ -537,6 +540,11 @@ const ApplicationSummaryPage = () => {
         [index]: error || "Could not prepare this passport file for upload.",
       }));
       showToast(error || "Could not prepare this passport file for upload.", "error");
+      setUploadModalUploading((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
       return;
     }
     if (optimizedFile.size > SUMMARY_UPLOAD_MAX_BYTES) {
@@ -545,6 +553,11 @@ const ApplicationSummaryPage = () => {
         [index]: PASSPORT_FILE_SIZE_ERROR,
       }));
       showToast(PASSPORT_FILE_SIZE_ERROR, "error");
+      setUploadModalUploading((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
       return;
     }
     setUploadModalErrors((prev) => {
@@ -552,7 +565,6 @@ const ApplicationSummaryPage = () => {
       delete next[index];
       return next;
     });
-    setUploadModalUploading((prev) => ({ ...prev, [index]: true }));
     try {
       const { appId } = await ensureApplicationDraft();
       const travelerNo = index + 1;
@@ -1094,6 +1106,7 @@ const ApplicationSummaryPage = () => {
                             ? traveler.passportFile.name
                             : "PDF, JPG, PNG - max 300 KB"
                         }
+                        fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}
                         savedText="Document saved securely"
                         reuploadLabel="Replace File"
                         onChange={(file) => handleUploadModalPassportChange(index, file)}
@@ -1124,6 +1137,7 @@ const ApplicationSummaryPage = () => {
             onChange={setUploadModalDriveLink}
             onSave={handleDriveLinkBlurSave}
             showSkipHint={application?.paymentStatus !== "completed"}
+            savedLink={application?.gdriveLink || ""}
           />
         </div>
       </Modal>

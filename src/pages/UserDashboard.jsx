@@ -249,7 +249,7 @@ const UserDashboard = () => {
         uploadedDocSuccesses
       );
       const resolvedStatus = resolveApplicationStatus(b, derivedProgress);
-      return resolvedStatus === "pending" || resolvedStatus === "doc_pending";
+      return resolvedStatus === "pending" || resolvedStatus === "doc_pending" || resolvedStatus === "drive_link_pending";
     }).length,
     review: safeBookings.filter((b) => {
       const uploadedDocSuccesses = getStoredUploadSuccesses(b);
@@ -655,8 +655,8 @@ const UserDashboard = () => {
                     id="status-filter"
                   >
                     <option value="all">All Status</option>
-                    <option value="pending">Pending Payment</option>
                     <option value="doc_pending">Doc Pending</option>
+                    <option value="drive_link_pending">Upload Drive Link</option>
                     <option value="review">Under Review</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
@@ -741,13 +741,13 @@ const UserDashboard = () => {
                             </p>
                             <p className="text-xs text-text-muted">{booking.visaType || "Visa Application"}</p>
                             
-                            <div className="hidden sm:block">
+                            <div>
                               <div className="flex items-center gap-3 mt-1.5">
                                 <span className="flex items-center gap-1 text-xs text-text-muted">
                                   <Calendar size={11} />
                                   Applied: {fmtDate(booking.createdAt)}
                                 </span>
-                                <span className="flex items-center gap-1 text-xs text-text-muted">
+                                <span className="hidden sm:flex items-center gap-1 text-xs text-text-muted">
                                   ✈️ Travel: {fmtDate(booking.travelDate)}
                                 </span>
                               </div>
@@ -801,11 +801,15 @@ const UserDashboard = () => {
                                   if (hasDrive) {
                                     return (
                                       <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                        <ExternalLink size={11} /> Drive linked
+                                        <ExternalLink size={11} /> Drive link added
                                       </span>
                                     );
                                   }
-                                  return null;
+                                  return (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
+                                      <ExternalLink size={11} /> Drive link not added
+                                    </span>
+                                  );
                                 })()}
                               </div>
                             </div>

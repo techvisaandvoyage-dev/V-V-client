@@ -8,10 +8,9 @@ import {
   HelpCircle,
   BadgeCheck,
   CalendarDays,
-  Users,
-  Minus,
   Plus,
   X,
+  Trash2,
   ListChecks,
   ScrollText,
   FileText,
@@ -79,6 +78,39 @@ const normalizeProcessingDays = (value) => {
 const ALLOWED_PASSPORT_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
 const INVALID_PASSPORT_TYPE_ERROR = "Only PDF, JPG, JPEG and PNG files are allowed.";
 const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
+const PAYMENT_CONFIG_CACHE_KEY = "vb_payment_config_v1";
+const isReusableUnpaidApplication = (application) => {
+  const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
+  return ["pending_payment", "failed", "cancelled"].includes(paymentStatus);
+};
+
+const loadCachedPaymentConfig = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PAYMENT_CONFIG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      gstEnabled: typeof parsed.gstEnabled === "boolean" ? parsed.gstEnabled : null,
+      gstRate: Number.isFinite(Number(parsed.gstRate)) ? Number(parsed.gstRate) : 18,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const saveCachedPaymentConfig = (config) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PAYMENT_CONFIG_CACHE_KEY, JSON.stringify({
+      gstEnabled: typeof config?.gstEnabled === "boolean" ? config.gstEnabled : null,
+      gstRate: Number.isFinite(Number(config?.gstRate)) ? Number(config.gstRate) : 18,
+    }));
+  } catch {
+    /* ignore storage issues */
+  }
+};
 
 const formatFileSize = (size = 0) => {
   if (!size) return "0 KB";
@@ -254,12 +286,11 @@ const DOCUMENT_DESCRIPTIONS = {
   companyRegistration: "Company registration proof for business documentation.",
 };
 
-const DOCUMENT_HIGHLIGHT_KEYS = new Set([
-  "passport",
-  "educationCertificate",
-  "hotelBooking",
-  "flightTicket",
-]);
+
+
+
+
+
 
 const createTravelerState = () => ({
   name: "",
@@ -331,6 +362,7 @@ const CountryDetails = () => {
   const [passportSuccesses, setPassportSuccesses] = useState({});
   const [passportDetails, setPassportDetails] = useState({});
   const travelerNameInputRefs = useRef({});
+  const sharedDriveLinkInputRef = useRef(null);
   const startApplicationCardRef = useRef(null);
   const driveLinkSaveTimerRef = useRef(null);
   const startApplicationCardSeenRef = useRef(false);
@@ -363,8 +395,8 @@ const CountryDetails = () => {
   const postLoginHandlersRef = useRef({});
 
   const travellerCount = travelers.length;
-  const [gstEnabled, setGstEnabled] = useState(true);
-  const [gstRate, setGstRate] = useState(18);
+  const [gstEnabled, setGstEnabled] = useState(() => loadCachedPaymentConfig()?.gstEnabled ?? null);
+  const [gstRate, setGstRate] = useState(() => loadCachedPaymentConfig()?.gstRate ?? 18);
 
   useEffect(() => {
     let alive = true;
@@ -375,6 +407,10 @@ const CountryDetails = () => {
         setGstEnabled(data.gstEnabled !== false);
         const serverRate = Number(data.gstRate);
         setGstRate(Number.isFinite(serverRate) && serverRate >= 0 ? serverRate : 18);
+        saveCachedPaymentConfig({
+          gstEnabled: data.gstEnabled !== false,
+          gstRate: Number.isFinite(serverRate) && serverRate >= 0 ? serverRate : 18,
+        });
       } catch {
         /* ignore */
       }
@@ -384,17 +420,19 @@ const CountryDetails = () => {
     };
   }, []);
 
-  const effectiveGstEnabled = country?.gstEnabled ?? gstEnabled;
-  const effectiveGstRate = Number.isFinite(Number(country?.gstRate))
+  const usesCountrySpecificGst = country?.useGlobalGst === false && typeof country?.gstEnabled === "boolean";
+  const isGstResolved = usesCountrySpecificGst || typeof gstEnabled === "boolean";
+  const effectiveGstEnabled = usesCountrySpecificGst ? country.gstEnabled : Boolean(gstEnabled);
+  const effectiveGstRate = usesCountrySpecificGst && Number.isFinite(Number(country?.gstRate))
     ? Number(country.gstRate)
     : gstRate;
 
   const { serviceAmount, gstAmount, payableToUs } = useMemo(() => {
     const perTravelerFee = Number.isFinite(Number(country?.basePrice)) ? Number(country.basePrice) : 0;
     const service = perTravelerFee * travellerCount;
-    const gst = effectiveGstEnabled ? Math.round(service * (effectiveGstRate / 100)) : 0;
+    const gst = isGstResolved && effectiveGstEnabled ? Math.round(service * (effectiveGstRate / 100)) : 0;
     return { serviceAmount: service, gstAmount: gst, payableToUs: service + gst };
-  }, [country?.basePrice, travellerCount, effectiveGstEnabled, effectiveGstRate]);
+  }, [country?.basePrice, travellerCount, effectiveGstEnabled, effectiveGstRate, isGstResolved]);
 
   /**
    * Destination-page copy:
@@ -979,7 +1017,7 @@ const CountryDetails = () => {
     description: getDocumentDescription(key),
     iconClass: getDocumentCatalogIcon(key),
     Icon: getDocumentIcon(key),
-    featured: DOCUMENT_HIGHLIGHT_KEYS.has(key),
+    featured: false,
   }));
 
   const handleBack = () => {
@@ -1004,8 +1042,30 @@ const CountryDetails = () => {
     setTravelers((prev) => [...prev, createTravelerState()]);
   };
 
-  const removeLastTraveler = () => {
-    setTravelers((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  const removeTravelerAt = (indexToRemove) => {
+    setTravelers((prev) => (prev.length > 1
+      ? prev.filter((_, index) => index !== indexToRemove)
+      : prev));
+    setPassportUploading((prev) => {
+      const next = { ...prev };
+      delete next[indexToRemove + 1];
+      return next;
+    });
+    setPassportErrors((prev) => {
+      const next = { ...prev };
+      delete next[indexToRemove + 1];
+      return next;
+    });
+    setPassportSuccesses((prev) => {
+      const next = { ...prev };
+      delete next[indexToRemove + 1];
+      return next;
+    });
+    setPassportDetails((prev) => {
+      const next = { ...prev };
+      delete next[indexToRemove + 1];
+      return next;
+    });
   };
 
   const updateTravelerName = (index, name) => {
@@ -1533,7 +1593,8 @@ const CountryDetails = () => {
       }
 
       const fallback = candidateBookings
-        .filter((b) => (b?.countryId && b.countryId === country.id) || b?.countryName === country.name)
+        .filter((b) => ((b?.countryId && b.countryId === country.id) || b?.countryName === country.name))
+        .filter((b) => isReusableUnpaidApplication(b))
         .sort((a, b) => {
           const ta = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
           const tb = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
@@ -1781,17 +1842,8 @@ const CountryDetails = () => {
                   key={doc.key}
                   whileHover={{ y: -3, scale: 1.01 }}
                   transition={{ duration: 0.2, ease }}
-                  className={`group relative flex items-center gap-3 rounded-[1.5rem] border bg-white/90 px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-4 sm:py-4 ${
-                    doc.featured
-                      ? "border-cyan/45 shadow-[0_18px_40px_rgba(2,132,199,0.14)]"
-                      : "border-cyan/15"
-                  }`}
+                  className="group relative flex items-center gap-3 rounded-[1.5rem] border border-cyan/15 bg-white/90 px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-4 sm:py-4"
                 >
-                  {doc.featured ? (
-                    <div className="absolute right-3 top-0 flex h-9 w-8 items-start justify-center rounded-b-2xl bg-cyan text-white shadow-[0_10px_18px_rgba(2,132,199,0.2)]">
-                      <BadgeCheck size={15} strokeWidth={2.4} className="mt-2" />
-                    </div>
-                  ) : null}
 
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
                     {doc.iconClass ? (
@@ -2319,35 +2371,6 @@ const CountryDetails = () => {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-border bg-surface-2 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                      <Users size={16} className="text-cyan" />
-                      No. of Traveler
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={removeLastTraveler}
-                        className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center hover:border-cyan/40 disabled:opacity-40"
-                        disabled={travelers.length <= 1}
-                        aria-label="Remove traveler"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-6 text-center font-semibold text-text-primary">{travelers.length}</span>
-                      <button
-                        type="button"
-                        onClick={addTraveler}
-                        className="w-8 h-8 rounded-full border border-border bg-background text-text-primary flex items-center justify-center hover:border-cyan/40"
-                        aria-label="Add traveler"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-4">
                   {travelers.map((traveler, index) => (
                     <div
@@ -2358,7 +2381,18 @@ const CountryDetails = () => {
                         <p className="text-sm font-semibold text-text-primary">
                           Traveler {index + 1}
                         </p>
-                        <span className="text-xs text-text-muted">Name only</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-text-muted">Name only</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTravelerAt(index)}
+                            disabled={travelers.length <= 1}
+                            aria-label={`Remove traveler ${index + 1}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-text-muted transition-colors hover:border-red-500/40 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label htmlFor={`traveler-name-${index}`} className="text-xs text-text-muted block mb-1.5">
@@ -2396,7 +2430,7 @@ const CountryDetails = () => {
                             } else {
                               // Last traveler — drop focus so the global typing
                               // capture stops, and let the user proceed.
-                              e.currentTarget.blur();
+                              sharedDriveLinkInputRef.current?.focus();
                             }
                           }}
                           placeholder="Enter name"
@@ -2450,6 +2484,16 @@ const CountryDetails = () => {
 
                     </div>
                   ))}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={addTraveler}
+                      className="inline-flex items-center gap-2 rounded-xl border border-cyan/30 bg-cyan/10 px-4 py-2.5 text-sm font-semibold text-cyan transition-colors hover:bg-cyan/15"
+                    >
+                      <Plus size={16} />
+                      Add traveler
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.45)]">
@@ -2518,6 +2562,7 @@ const CountryDetails = () => {
                         <Link2 size={18} />
                       </span>
                       <input
+                        ref={sharedDriveLinkInputRef}
                         type="url"
                         autoComplete="off"
                         value={sharedDriveLink}
@@ -2592,7 +2637,7 @@ const CountryDetails = () => {
                       <p className="mt-3 text-5xl font-extrabold tracking-tight text-slate-950">₹{payableToUs.toLocaleString("en-IN")}</p>
                     </div>
                     <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                      {effectiveGstEnabled && (
+                      {isGstResolved && effectiveGstEnabled && (
                         <div className="flex items-center justify-between gap-4">
                           <span className="text-xs uppercase tracking-[0.24em] text-slate-500">GST ({effectiveGstRate}%)</span>
                           <span className="text-lg font-semibold text-slate-900">₹{gstAmount.toLocaleString("en-IN")}</span>
@@ -2628,7 +2673,7 @@ const CountryDetails = () => {
                     </div>
 
                     <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                      {effectiveGstEnabled && (
+                      {isGstResolved && effectiveGstEnabled && (
                         <div className="flex items-center justify-between gap-4">
                           <span className="text-xs uppercase tracking-[0.24em] text-slate-500">GST ({effectiveGstRate}%)</span>
                           <span className="text-lg font-semibold text-slate-900">₹{gstAmount.toLocaleString("en-IN")}</span>
@@ -2741,7 +2786,7 @@ const CountryDetails = () => {
                     ₹{serviceAmount.toLocaleString("en-IN")}
                   </span>
                 </div>
-                {effectiveGstEnabled && (
+                {isGstResolved && effectiveGstEnabled && (
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">GST ({effectiveGstRate}%)</span>
                     <span className="font-medium text-text-primary">

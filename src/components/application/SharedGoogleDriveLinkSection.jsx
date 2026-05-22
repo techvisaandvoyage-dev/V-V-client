@@ -1,5 +1,5 @@
+import { useEffect, useState, useRef } from "react";
 import { CheckCircle, Info, Link2 } from "lucide-react";
-import Button from "../ui/Button";
 
 const DriveShareGuidePopover = ({ showSkipHint = true }) => (
   <span className="pointer-events-none absolute right-0 bottom-full z-30 mb-2 hidden w-80 rounded-2xl border border-border bg-surface p-4 text-[11px] font-normal leading-relaxed text-text-secondary shadow-xl group-hover:block">
@@ -40,7 +40,59 @@ export default function SharedGoogleDriveLinkSection({
   className = "",
 }) {
   const trimmedSaved = String(savedLink || "").trim();
-  const showSaved = trimmedSaved && String(value || "").trim() === trimmedSaved;
+  const [localSaving, setLocalSaving] = useState(false);
+  const [localSuccess, setLocalSuccess] = useState(false);
+  const timerRef = useRef(null);
+  const isFirstMount = useRef(true);
+
+  useEffect(() => {
+    if (trimmedSaved && String(value || "").trim() === trimmedSaved) {
+      setLocalSuccess(true);
+    } else {
+      setLocalSuccess(false);
+    }
+  }, [trimmedSaved, value]);
+
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
+    if (!onSave || disabled) return;
+
+    const trimmedValue = String(value || "").trim();
+    if (!trimmedValue || trimmedValue === trimmedSaved) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setLocalSaving(false);
+      return;
+    }
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    setLocalSaving(true);
+
+    timerRef.current = setTimeout(async () => {
+      try {
+        await onSave();
+        setLocalSuccess(true);
+      } catch (err) {
+        console.error("Auto-save Google Drive link failed:", err);
+      } finally {
+        setLocalSaving(false);
+      }
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [value, onSave, disabled, trimmedSaved]);
+
+  const showSaved = (trimmedSaved && String(value || "").trim() === trimmedSaved) || localSuccess;
 
   return (
     <div
@@ -77,12 +129,12 @@ export default function SharedGoogleDriveLinkSection({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-text-primary">Google Drive link saved</p>
                   <a
-                    href={trimmedSaved}
+                    href={trimmedSaved || value}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-[10px] text-cyan hover:underline truncate block max-w-full"
                   >
-                    {trimmedSaved}
+                    {trimmedSaved || value}
                   </a>
                 </div>
               </div>
@@ -94,23 +146,15 @@ export default function SharedGoogleDriveLinkSection({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="https://drive.google.com/your-folder-link"
-            disabled={disabled || loading}
+            disabled={disabled || loading || localSaving}
             autoComplete="off"
             className="mt-4 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-cyan/50 disabled:opacity-50"
           />
-          {onSave ? (
-            <div className="mt-4 flex justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                leftIcon={<Link2 size={14} />}
-                loading={loading}
-                disabled={disabled || !String(value || "").trim()}
-                onClick={onSave}
-              >
-                Save Drive Link
-              </Button>
+
+          {localSaving && !showSaved ? (
+            <div className="mt-2 text-xs text-cyan animate-pulse flex items-center gap-1.5 px-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan inline-block animate-ping"></span>
+              Auto-saving link...
             </div>
           ) : null}
         </div>

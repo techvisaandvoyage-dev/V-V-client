@@ -138,6 +138,7 @@ export const getDerivedApplicationProgress = (
   if (!application || typeof application !== "object") {
     return {
       allDocumentsUploaded: false,
+      allPassportsUploaded: false,
       totalMissingDocuments: 0,
       hasDriveLink: false,
     };
@@ -162,6 +163,7 @@ export const getDerivedApplicationProgress = (
   );
 
   let totalMissingDocuments = 0;
+  let allPassportsUploaded = true;
   for (let travelerNo = 1; travelerNo <= travellerCount; travelerNo += 1) {
     const uploadedTraveler = travellers.find((entry) => Number(entry?.travelerNo) === travelerNo);
     const savedDocuments = uploadedTraveler?.documents;
@@ -169,6 +171,10 @@ export const getDerivedApplicationProgress = (
       .filter((path) => Number(getTravelerNoFromDocumentPath(path)) === travelerNo)
       .map(getDocumentKeyFromPath)
       .filter(Boolean);
+    const passportSavedValue = getStoredDocumentValue(savedDocuments, "passport");
+    const passportLocalSuccess = uploadedDocSuccesses[`${travelerNo}-passport`];
+    const hasPassport = Boolean(passportSavedValue || passportLocalSuccess || rootDocKeys.includes("passport"));
+    if (!hasPassport) allPassportsUploaded = false;
     const missingCount = requiredDocuments.filter((key) => {
       const savedValue = getStoredDocumentValue(savedDocuments, key);
       const localSuccess = uploadedDocSuccesses[`${travelerNo}-${key}`];
@@ -179,6 +185,7 @@ export const getDerivedApplicationProgress = (
 
   return {
     allDocumentsUploaded: totalMissingDocuments === 0,
+    allPassportsUploaded,
     totalMissingDocuments,
     hasDriveLink,
   };
@@ -197,8 +204,7 @@ export const resolveApplicationStatus = (
   ) {
     return application.status;
   }
-  if (application.paymentStatus === "completed") {
-    return derivedProgress.allDocumentsUploaded ? "review" : "doc_pending";
-  }
-  return "pending";
+  if (!derivedProgress.allPassportsUploaded) return "doc_pending";
+  if (!derivedProgress.hasDriveLink) return "drive_link_pending";
+  return "review";
 };

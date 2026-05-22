@@ -61,6 +61,22 @@ const Navbar = () => {
     }
   };
 
+  const handleLogoClick = (event) => {
+    event.preventDefault();
+    closeMobileMenu();
+
+    if (location.pathname === "/") {
+      window.dispatchEvent(new CustomEvent("vb:reset-home-search"));
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      return;
+    }
+
+    navigate("/", {
+      replace: isTransientPage,
+      state: { resetSearch: true },
+    });
+  };
+
   return (
     <>
       <header
@@ -78,6 +94,7 @@ const Navbar = () => {
             <Link
               to="/"
               replace
+              onClick={handleLogoClick}
               className="flex items-center gap-2.5 group"
               aria-label="VISAANDVOYAGE Home"
             >

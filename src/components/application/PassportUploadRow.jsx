@@ -9,19 +9,28 @@ const PassportUploadRow = ({
   saved = false,
   disabled = false,
   helperText = "",
+  fileSizeText = "",
   savedText = "Document saved securely",
   reuploadLabel = "Re-upload",
   onChange,
   onReupload,
   className = "",
 }) => {
-  const statusText = file
-    ? helperText
-    : saved && helperText
+  const normalizeHelperText = (text) => String(text || "")
+    .replace(/Ãƒâ€šÃ‚Â·/g, " - ")
+    .replace(/Ã‚Â·/g, " - ")
+    .replace(/Â·/g, " - ");
+
+  const statusText = normalizeHelperText(
+    file
       ? helperText
-      : saved
-        ? savedText
-        : helperText;
+      : saved && helperText
+        ? helperText
+        : saved
+          ? savedText
+          : helperText
+  );
+  const normalizedFileSizeText = normalizeHelperText(fileSizeText);
 
   return (
     <div className={`space-y-1 ${className}`.trim()}>
@@ -43,7 +52,12 @@ const PassportUploadRow = ({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium text-text-primary">{label}</p>
-          <p className="truncate text-[10px] text-text-muted">{statusText}</p>
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-[10px] text-text-muted">{statusText}</p>
+            {normalizedFileSizeText ? (
+              <span className="shrink-0 text-[10px] text-text-muted">{normalizedFileSizeText}</span>
+            ) : null}
+          </div>
         </div>
         {saved ? (
           <div className="flex items-center gap-2 shrink-0">

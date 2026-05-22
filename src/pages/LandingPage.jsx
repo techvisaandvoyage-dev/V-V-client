@@ -12,7 +12,7 @@ import {
   useMemo,
   startTransition,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search, MapPin,
   ArrowRight, ShieldCheck, FileText, Lock, Zap,
@@ -57,8 +57,10 @@ const DEFAULT_HERO_HIGHLIGHTS = [
 // ── Animation variants ─────────────────────────────────────
 const LandingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const countryCardRefs = useRef({});
   const searchInputRef = useRef(null);
+  const searchFormRef = useRef(null);
   const geocodeAbortRef = useRef(null);
   const geocodeReqSeq = useRef(0);
   const homeExitGuardRef = useRef(false);
@@ -129,10 +131,34 @@ const LandingPage = () => {
 
   // Search bar state
   const [searchDestination, setSearchDestination] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   /** Full place list from Nominatim — updated in startTransition to keep typing smooth. */
   const [geocodePlaces, setGeocodePlaces] = useState([]);
 
   const searchTerm = searchDestination.trim().toLowerCase();
+
+  useEffect(() => {
+    const resetHomeSearch = () => {
+      setSearchDestination("");
+      setGeocodePlaces([]);
+      setIsSearchFocused(false);
+    };
+
+    window.addEventListener("vb:reset-home-search", resetHomeSearch);
+    return () => window.removeEventListener("vb:reset-home-search", resetHomeSearch);
+  }, []);
+
+  useEffect(() => {
+    if (!location.state?.resetSearch) return;
+    setSearchDestination("");
+    setGeocodePlaces([]);
+    setIsSearchFocused(false);
+    window.history.replaceState(
+      { ...window.history.state, usr: { ...window.history.state?.usr, resetSearch: false } },
+      "",
+      window.location.href
+    );
+  }, [location.state]);
 
   useEffect(() => {
     const q = searchDestination.trim();
@@ -269,6 +295,7 @@ const LandingPage = () => {
   }, [searchDestination, allCountries, scrollToCountry, geocodePlaces]);
 
   const handleSuggestionRowClick = (row) => {
+    setIsSearchFocused(false);
     if (row.kind === "country") {
       setSearchDestination(row.country.name);
       setTimeout(() => scrollToCountry(getCountryRouteId(row.country)), 150);
@@ -280,6 +307,7 @@ const LandingPage = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setIsSearchFocused(false);
     const term = searchDestination.trim();
     if (!term) {
       return;
@@ -445,6 +473,12 @@ const LandingPage = () => {
                       placeholder="Search country, city, or state..."
                       value={searchDestination}
                       onChange={(e) => setSearchDestination(e.target.value)}
+                      onFocus={() => setIsSearchFocused(true)}
+                      onBlur={(e) => {
+                        const nextFocused = e.relatedTarget;
+                        if (searchFormRef.current?.contains(nextFocused)) return;
+                        window.setTimeout(() => setIsSearchFocused(false), 120);
+                      }}
                       className="flex-1 min-w-0 bg-transparent text-lg text-text-primary placeholder:text-[#8ea0bb] focus:outline-none sm:text-2xl"
                       aria-label="Destination search"
                       id="hero-destination-input"
@@ -459,15 +493,19 @@ const LandingPage = () => {
                     </button>
                   </div>
 
-                  {searchTerm && (
+                  {searchTerm && isSearchFocused && (
                     <div className="absolute left-0 right-0 top-[calc(100%+16px)] z-30 text-left">
-                      <div className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+                      <div
+                        ref={searchFormRef}
+                        className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+                      >
                       {suggestionRows.length > 0 ? (
                         <div className="overflow-y-auto overscroll-contain divide-y divide-border">
                           {suggestionRows.map((row) => (
                             <button
                               type="button"
                               key={row.key}
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => handleSuggestionRowClick(row)}
                               className="w-full flex items-start justify-between gap-3 px-4 py-3 text-sm text-text-primary hover:bg-surface-2 transition-colors text-left"
                             >
@@ -549,7 +587,7 @@ const LandingPage = () => {
         display={countryDisplay}
         documentCatalog={documentCatalog}
         globalRequirements={globalRequirements}
-        showVisaRequirements={showVisaRequirements}
+        showVisaRequirements={countryDisplay?.showRequiredDocuments !== false}
         onNavigateDestination={handleNavigateDestination}
         onNavigateAll={handleNavigateAll}
       />

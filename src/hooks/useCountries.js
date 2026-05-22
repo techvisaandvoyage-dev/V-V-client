@@ -154,8 +154,9 @@ function normalizeDocumentCatalog(raw) {
       description: String(d?.description ?? "").trim(),
       icon: String(d?.icon ?? "").trim(),
       builtIn: d?.builtIn !== false,
+      deleted: !!d?.deleted,
     }))
-    .filter((d) => d.key && d.label);
+    .filter((d) => d.key && d.label && !d.deleted);
 }
 
 function loadCountriesCache() {

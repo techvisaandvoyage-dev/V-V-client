@@ -52,6 +52,10 @@ import {
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
 const OPTIMIZE_ERROR = "Could not prepare this file for upload.";
+const isReusableUnpaidApplication = (application) => {
+  const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
+  return ["pending_payment", "failed", "cancelled"].includes(paymentStatus);
+};
 
 const getApplicationDocSuccessStorageKey = (applicationId) =>
   applicationId ? `application-doc-successes:${applicationId}` : "";
@@ -580,7 +584,7 @@ const ApplicationForm = () => {
     if (existingDraftId) {
       try {
         const { data } = await api.get(`/users/applications/${existingDraftId}`);
-        if (data?.success && data.application?._id) {
+        if (data?.success && data.application?._id && isReusableUnpaidApplication(data.application)) {
           return { appId: String(data.application._id), application: data.application };
         }
       } catch {
@@ -697,59 +701,70 @@ const ApplicationForm = () => {
         delete copy[inputKey];
         return copy;
       });
-      if (!file) {
-        setDocErrors(prev => ({ ...prev, [inputKey]: null }));
-        setTravelers(prev =>
-          prev.map((t, i) =>
-            i === index
-              ? { ...t, documents: { ...t.documents, [key]: null } }
-              : t
-          )
-        );
-        return;
-      }
-      if (key === "passport" && !ALLOWED_PASSPORT_MIME_TYPES.has(String(file.type || "").toLowerCase())) {
-        showToast(INVALID_PASSPORT_TYPE_ERROR, "error");
-        setDocErrors((prev) => ({ ...prev, [inputKey]: INVALID_PASSPORT_TYPE_ERROR }));
-        return;
-      }
-      const { maxBytes, label } = getUploadLimitForDocType(key);
-      // Reject files that are already too big before optimisation
-      if (file.size > maxBytes) {
-        const message = key === "passport"
-          ? PASSPORT_FILE_SIZE_ERROR
-          : `File must be below ${label} before optimization.`;
-        showToast(message, "error");
-        setDocErrors(prev => ({ ...prev, [inputKey]: message }));
-        setRejectedFiles(prev => ({ ...prev, [inputKey]: { name: file.name, size: file.size } }));
-        return;
-      }
-      const { file: optimizedFile, error } = await optimizeUploadFile(file, { targetBytes: maxBytes });
-      if (error || !optimizedFile) {
-        const message = error || OPTIMIZE_ERROR;
-        showToast(message, "error");
-        setDocErrors(prev => ({ ...prev, [inputKey]: message }));
-        return;
-      }
-      if (optimizedFile.size > maxBytes) {
-        const message = key === "passport"
-          ? PASSPORT_FILE_SIZE_ERROR
-          : `File must be below ${label} after optimization.`;
-        showToast(message, "error");
-        setDocErrors(prev => ({ ...prev, [inputKey]: message }));
-        return;
-      }
+    if (!file) {
+      setDocUploading((prev) => {
+        const next = { ...prev };
+        delete next[inputKey];
+        return next;
+      });
       setDocErrors(prev => ({ ...prev, [inputKey]: null }));
       setTravelers(prev =>
         prev.map((t, i) =>
           i === index
-            ? { ...t, documents: { ...t.documents, [key]: optimizedFile } }
+            ? { ...t, documents: { ...t.documents, [key]: null } }
             : t
         )
       );
+      return;
+    }
+    setDocUploading((prev) => ({ ...prev, [inputKey]: true }));
+    if (key === "passport" && !ALLOWED_PASSPORT_MIME_TYPES.has(String(file.type || "").toLowerCase())) {
+      showToast(INVALID_PASSPORT_TYPE_ERROR, "error");
+      setDocErrors((prev) => ({ ...prev, [inputKey]: INVALID_PASSPORT_TYPE_ERROR }));
+      setDocUploading((prev) => {
+        const next = { ...prev };
+        delete next[inputKey];
+        return next;
+      });
+      return;
+    }
+    const { maxBytes, label } = getUploadLimitForDocType(key);
+    const { file: optimizedFile, error } = await optimizeUploadFile(file, { targetBytes: maxBytes });
+    if (error || !optimizedFile) {
+      const message = error || OPTIMIZE_ERROR;
+      showToast(message, "error");
+      setDocErrors(prev => ({ ...prev, [inputKey]: message }));
+      setDocUploading((prev) => {
+        const next = { ...prev };
+        delete next[inputKey];
+        return next;
+      });
+      return;
+    }
+    if (optimizedFile.size > maxBytes) {
+      const message = key === "passport"
+        ? PASSPORT_FILE_SIZE_ERROR
+        : `File must be below ${label} after optimization.`;
+      showToast(message, "error");
+      setDocErrors(prev => ({ ...prev, [inputKey]: message }));
+      setRejectedFiles(prev => ({ ...prev, [inputKey]: { name: file.name, size: file.size } }));
+      setDocUploading((prev) => {
+        const next = { ...prev };
+        delete next[inputKey];
+        return next;
+      });
+      return;
+    }
+    setDocErrors(prev => ({ ...prev, [inputKey]: null }));
+    setTravelers(prev =>
+      prev.map((t, i) =>
+        i === index
+          ? { ...t, documents: { ...t.documents, [key]: optimizedFile } }
+          : t
+      )
+    );
 
-      setDocUploading((prev) => ({ ...prev, [inputKey]: true }));
-      try {
+    try {
         const travelersSnapshot = travelers.map((traveler, travelerIndex) => (
           travelerIndex === index
             ? { ...traveler, documents: { ...traveler.documents, [key]: optimizedFile } }
@@ -1493,20 +1508,25 @@ const ApplicationForm = () => {
                               ? `${file.name} Â· ${formatFileSize(file.size)}`
                               : rejectedFiles[zoneKey]
                                 ? `${rejectedFiles[zoneKey].name} Â· ${formatFileSize(rejectedFiles[zoneKey].size)}`
-                                : "PDF, JPG, PNG Â· max 500 KB"}
+                                : "PDF, JPG, PNG · max 300 KB"}
                           </p>
                         </div>
                         <label
                           htmlFor={`traveler-${index}-${field.key}`}
-                          className="shrink-0 cursor-pointer rounded-md bg-cyan/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan hover:bg-cyan/25"
+                          className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
+                            docUploading[zoneKey]
+                              ? "cursor-wait bg-cyan/10 text-cyan/80"
+                              : "cursor-pointer bg-cyan/15 text-cyan hover:bg-cyan/25"
+                          }`}
                         >
-                          {file ? "Replace" : "Upload"}
+                          {docUploading[zoneKey] ? "Uploading..." : file ? "Replace" : "Upload"}
                         </label>
                         <input
                           id={`traveler-${index}-${field.key}`}
                           type="file"
                           accept=".pdf,image/jpeg,image/png,image/webp"
                           className="sr-only"
+                          disabled={Boolean(docUploading[zoneKey])}
                           onChange={(e) => {
                             updateTravelerDoc(index, field.key, e.target.files?.[0] || null);
                             e.target.value = "";
