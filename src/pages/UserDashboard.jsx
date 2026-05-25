@@ -732,9 +732,11 @@ const UserDashboard = () => {
                                 {booking.countryName || "Unknown Country"}
                               </h3>
                               <StatusBadge status={resolvedStatus} />
-                              <span className={`hidden sm:inline-block text-2xs font-medium rounded-full px-2 py-0.5 border ${paymentClass}`}>
-                                {paymentLabel}
-                              </span>
+                              {resolvedStatus !== "pending_payment" && (
+                                <span className={`hidden sm:inline-block text-2xs font-medium rounded-full px-2 py-0.5 border ${paymentClass}`}>
+                                  {paymentLabel}
+                                </span>
+                              )}
                             </div>
                             <p className="text-[11px] font-mono text-text-muted mb-1">
                               Application ID: {booking.applicationId || booking._id || booking.id}
