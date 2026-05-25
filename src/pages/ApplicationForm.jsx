@@ -278,6 +278,7 @@ const ApplicationForm = () => {
   const [draggingKey, setDraggingKey] = useState("");
   const [docErrors, setDocErrors] = useState({});
   const [docUploading, setDocUploading] = useState({});
+  const [docOptimizing, setDocOptimizing] = useState({});
   const [uploadedDocSuccesses, setUploadedDocSuccesses] = useState({});
   const [uploadedDocDetails, setUploadedDocDetails] = useState({});
   const [applicationDraftId, setApplicationDraftId] = useState("");
@@ -745,7 +746,13 @@ const ApplicationForm = () => {
       return;
     }
     const { maxBytes, label } = getUploadLimitForDocType(key);
+    setDocOptimizing((prev) => ({ ...prev, [inputKey]: true }));
     const { file: optimizedFile, error } = await optimizeUploadFile(file, { targetBytes: maxBytes });
+    setDocOptimizing((prev) => {
+      const next = { ...prev };
+      delete next[inputKey];
+      return next;
+    });
     if (error || !optimizedFile) {
       const message = error || OPTIMIZE_ERROR;
       showToast(message, "error");
@@ -758,9 +765,7 @@ const ApplicationForm = () => {
       return;
     }
     if (optimizedFile.size > maxBytes) {
-      const message = key === "passport"
-        ? PASSPORT_FILE_SIZE_ERROR
-        : `File must be below ${label} after optimization.`;
+      const message = "Document is too large. Please upload a smaller PDF or split the document.";
       showToast(message, "error");
       setDocErrors(prev => ({ ...prev, [inputKey]: message }));
       setRejectedFiles(prev => ({ ...prev, [inputKey]: { name: file.name, size: file.size } }));
@@ -884,7 +889,7 @@ const ApplicationForm = () => {
         return;
       }
       if (optimizedFile.size > MAX_DOCUMENT_SIZE_BYTES) {
-        showToast("File must be below 500 KB after optimization.", "error");
+        showToast("Document is too large. Please upload a smaller PDF or split the document.", "error");
         return;
       }
       optimizedFiles.push(optimizedFile);
@@ -1565,12 +1570,14 @@ const ApplicationForm = () => {
                         <label
                           htmlFor={`traveler-${index}-${field.key}`}
                           className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-                            docUploading[zoneKey]
-                              ? "cursor-wait bg-cyan/10 text-cyan/80"
-                              : "cursor-pointer bg-cyan/15 text-cyan hover:bg-cyan/25"
+                            docOptimizing[zoneKey]
+                              ? "cursor-wait bg-cyan/5 text-cyan animate-pulse border border-cyan/20"
+                              : docUploading[zoneKey]
+                                ? "cursor-wait bg-cyan/10 text-cyan/80"
+                                : "cursor-pointer bg-cyan/15 text-cyan hover:bg-cyan/25"
                           }`}
                         >
-                          {docUploading[zoneKey] ? "Uploading..." : file ? "Replace" : "Upload"}
+                          {docOptimizing[zoneKey] ? "Optimizing..." : docUploading[zoneKey] ? "Uploading..." : file ? "Replace" : "Upload"}
                         </label>
                         <input
                           id={`traveler-${index}-${field.key}`}

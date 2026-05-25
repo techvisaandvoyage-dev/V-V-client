@@ -280,6 +280,7 @@ const ApplicationDetails = () => {
   const { documentCatalog } = useCountries();
 
   const [uploadingStates, setUploadingStates] = useState({});
+  const [optimizingStates, setOptimizingStates] = useState({});
   const [selectedDocs, setSelectedDocs] = useState({});
   const [travelerNames, setTravelerNames] = useState({});
   const [sharedDriveLink, setSharedDriveLink] = useState("");
@@ -327,6 +328,16 @@ const ApplicationDetails = () => {
 
   const isUploadingState = (key) => Boolean(uploadingStates[key]);
   const docUploading = Object.keys(uploadingStates).length > 0;
+
+  const setOptimizingState = (key, value) => {
+    setOptimizingStates((prev) => {
+      if (value) return { ...prev, [key]: true };
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+  const isOptimizingState = (key) => Boolean(optimizingStates[key]);
 
   const clearAutoUploadTimer = (travelerNo) => {
     const key = String(travelerNo);
@@ -720,9 +731,11 @@ const ApplicationDetails = () => {
       return;
     }
     const { maxBytes, label } = getUploadLimitForDocType(docKey);
+    setOptimizingState(prepareStateKey, true);
     const { file: optimizedFile, error, originalSize, compressedSize, wasCompressed } = await optimizeUploadFile(file, {
       targetBytes: maxBytes,
     });
+    setOptimizingState(prepareStateKey, false);
     if (error || !optimizedFile) {
       const message = error || OPTIMIZE_ERROR;
       showToast(message, "error");
@@ -737,9 +750,7 @@ const ApplicationDetails = () => {
       return;
     }
     if (optimizedFile.size > maxBytes) {
-      const message = docKey === "passport"
-        ? PASSPORT_FILE_SIZE_ERROR
-        : `File must be below ${label} after optimization.`;
+      const message = "Document is too large. Please upload a smaller PDF or split the document.";
       showToast(message, "error");
       setDocErrors((prev) => ({ ...prev, [inputKey]: message }));
       setSelectedDocs((prev) => ({ ...prev, [inputKey]: null }));
@@ -771,18 +782,22 @@ const ApplicationDetails = () => {
     const travelerNoStr = String(travelerNo);
     const incoming = Array.from(files || []);
     const optimizedFiles = [];
+    setOptimizingState(`traveler-prepare-other-${travelerNoStr}`, true);
     for (const rawFile of incoming) {
       const { file: optimizedFile, error, originalSize, compressedSize, wasCompressed } = await optimizeUploadFile(rawFile);
       if (error || !optimizedFile) {
+        setOptimizingState(`traveler-prepare-other-${travelerNoStr}`, false);
         showToast(error || OPTIMIZE_ERROR, "error");
         return;
       }
       if (optimizedFile.size > MAX_DOCUMENT_SIZE_BYTES) {
-        showToast("File must be below 300 KB after optimization.", "error");
+        setOptimizingState(`traveler-prepare-other-${travelerNoStr}`, false);
+        showToast("Document is too large. Please upload a smaller PDF or split the document.", "error");
         return;
       }
       optimizedFiles.push(attachCompressionMeta(optimizedFile, { originalSize, compressedSize, wasCompressed }));
     }
+    setOptimizingState(`traveler-prepare-other-${travelerNoStr}`, false);
     const fileSig = (f) => `${f.name}|${f.size}|${f.lastModified}`;
     setSelectedDocs((prev) => {
       const key = `${travelerNoStr}-otherDocuments`;
@@ -1663,6 +1678,7 @@ const ApplicationDetails = () => {
                 isUploadingState(`traveler-upload-${travelerNo}`)
                 || isUploadingState(`traveler-auto-${travelerNo}`)
                 || isUploadingState(`traveler-prepare-${travelerNoStr}-passport`);
+              const isPassportOptimizing = isOptimizingState(`traveler-prepare-${travelerNoStr}-passport`);
               const passportError = docErrors[passportInputKey];
               const hasSuccessfulUpload = !selectedFile
                 && (Boolean(savedPassportUrl) || Boolean(localSuccess));
@@ -1683,6 +1699,7 @@ const ApplicationDetails = () => {
                   file={selectedFile}
                   error={passportError}
                   uploading={isPassportUploading}
+                  optimizing={isPassportOptimizing}
                   saved={hasSuccessfulUpload}
                   disabled={disabled}
                   helperText={
@@ -1738,6 +1755,7 @@ const ApplicationDetails = () => {
                               isTravelerUploadLoading
                               || isUploadingState(`traveler-auto-${travelerNo}`)
                               || isUploadingState(`traveler-prepare-${travelerNoStr}-passport`);
+                            const isPassportOptimizing = isOptimizingState(`traveler-prepare-${travelerNoStr}-passport`);
                             const dirty = travelerHasUnsavedChanges(travelerNo);
                             const headerShowsComplete = serverComplete && !dirty;
                             const otherList = selectedDocs[`${travelerNoStr}-otherDocuments`] || [];
@@ -1794,6 +1812,7 @@ const ApplicationDetails = () => {
                                   file={passportSelectedFile}
                                   error={docErrors[passportInputKey]}
                                   uploading={isAnyFileUploading}
+                                  optimizing={isPassportOptimizing}
                                   saved={passportHasSuccessfulUpload}
                                   disabled={isTravelerUploadLoading}
                                   helperText={
@@ -1829,6 +1848,11 @@ const ApplicationDetails = () => {
                                         <div className="text-[10px] text-cyan animate-pulse flex items-center gap-1.5 shrink-0 bg-cyan/5 px-2.5 py-1.5 rounded-xl border border-cyan/20">
                                           <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-ping" />
                                           Uploading...
+                                        </div>
+                                      ) : isOptimizingState(`traveler-prepare-other-${travelerNoStr}`) ? (
+                                        <div className="text-[10px] text-cyan animate-pulse flex items-center gap-1.5 shrink-0 bg-cyan/5 px-2.5 py-1.5 rounded-xl border border-cyan/20">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-ping" />
+                                          Optimizing...
                                         </div>
                                       ) : (
                                         <label

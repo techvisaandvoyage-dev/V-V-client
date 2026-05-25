@@ -209,6 +209,7 @@ const ApplicationSummaryPage = () => {
   const [uploadModalDriveLink, setUploadModalDriveLink] = useState("");
   const [uploadModalErrors, setUploadModalErrors] = useState({});
   const [uploadModalUploading, setUploadModalUploading] = useState({});
+  const [uploadModalOptimizing, setUploadModalOptimizing] = useState({});
   const [uploadSuccesses, setUploadSuccesses] = useState({});
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayMessage, setRazorpayMessage] = useState("");
@@ -561,6 +562,7 @@ const ApplicationSummaryPage = () => {
     );
     setUploadModalErrors({});
     setUploadModalUploading({});
+    setUploadModalOptimizing({});
     setUploadDocumentsModalOpen(true);
   };
 
@@ -593,8 +595,14 @@ const ApplicationSummaryPage = () => {
       return;
     }
     setUploadModalUploading((prev) => ({ ...prev, [index]: true }));
+    setUploadModalOptimizing((prev) => ({ ...prev, [index]: true }));
     const { file: optimizedFile, error } = await optimizeUploadFile(file, {
       targetBytes: SUMMARY_UPLOAD_MAX_BYTES,
+    });
+    setUploadModalOptimizing((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
     });
     if (error || !optimizedFile) {
       setUploadModalErrors((prev) => ({
@@ -610,11 +618,12 @@ const ApplicationSummaryPage = () => {
       return;
     }
     if (optimizedFile.size > SUMMARY_UPLOAD_MAX_BYTES) {
+      const message = "Document is too large. Please upload a smaller PDF or split the document.";
       setUploadModalErrors((prev) => ({
         ...prev,
-        [index]: PASSPORT_FILE_SIZE_ERROR,
+        [index]: message,
       }));
-      showToast(PASSPORT_FILE_SIZE_ERROR, "error");
+      showToast(message, "error");
       setUploadModalUploading((prev) => {
         const next = { ...prev };
         delete next[index];
@@ -1202,6 +1211,7 @@ const ApplicationSummaryPage = () => {
                         file={traveler.passportFile}
                         error={uploadModalErrors[index]}
                         uploading={Boolean(uploadModalUploading[index])}
+                        optimizing={Boolean(uploadModalOptimizing[index])}
                         saved={Boolean(traveler.passportUploaded && !traveler.passportFile)}
                         helperText={
                           traveler.passportFile

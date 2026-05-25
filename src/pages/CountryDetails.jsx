@@ -363,6 +363,7 @@ const CountryDetails = () => {
   const [draftCreating, setDraftCreating] = useState(false);
   const [travelValidationAttempted, setTravelValidationAttempted] = useState(false);
   const [passportUploading, setPassportUploading] = useState({});
+  const [passportOptimizing, setPassportOptimizing] = useState({});
   const [passportErrors, setPassportErrors] = useState({});
   const [passportSuccesses, setPassportSuccesses] = useState({});
   const [passportDetails, setPassportDetails] = useState({});
@@ -1149,13 +1150,19 @@ const CountryDetails = () => {
       return;
     }
     if (rawFile.size > RAW_UPLOAD_LIMIT_BYTES) {
-      const message = "File must be below 8 MB.";
+      const message = "File must be below 20 MB.";
       setPassportErrors((prev) => ({ ...prev, [travelerNo]: message }));
       showToast(message, "error");
       return;
     }
+    setPassportOptimizing((prev) => ({ ...prev, [travelerNo]: true }));
     const { file: optimizedFile, error } = await optimizeUploadFile(rawFile, {
       targetBytes: PASSPORT_UPLOAD_MAX_BYTES,
+    });
+    setPassportOptimizing((prev) => {
+      const next = { ...prev };
+      delete next[travelerNo];
+      return next;
     });
     if (error || !optimizedFile) {
       const message = error || "Could not prepare passport file for upload.";
@@ -1164,8 +1171,9 @@ const CountryDetails = () => {
       return;
     }
     if (optimizedFile.size > PASSPORT_UPLOAD_MAX_BYTES) {
-      setPassportErrors((prev) => ({ ...prev, [travelerNo]: PASSPORT_FILE_SIZE_ERROR }));
-      showToast(PASSPORT_FILE_SIZE_ERROR, "error");
+      const sizeError = "Document is too large. Please upload a smaller PDF or split the document.";
+      setPassportErrors((prev) => ({ ...prev, [travelerNo]: sizeError }));
+      showToast(sizeError, "error");
       return;
     }
     updateTravelerPassportFile(index, optimizedFile);
@@ -1774,7 +1782,7 @@ const CountryDetails = () => {
       >
         <div className="mb-6 flex items-center justify-center gap-2">
           <ListChecks size={18} className="text-cyan" />
-          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary text-center">How it works</h2>
+          <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary text-center">How it works</h2>
         </div>
         <ol className="space-y-4">
           {howItWorks.map((step, idx) => (
@@ -1811,8 +1819,8 @@ const CountryDetails = () => {
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-cyan/10 text-cyan">
                 <ScrollText size={34} strokeWidth={2} />
               </div>
-              <h2 className="mt-5 font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">
-                Visa Requirements
+              <h2 className="mt-5 font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
+                Documents Required
               </h2>
               <div className="mx-auto mt-4 flex w-full max-w-xs items-center justify-center gap-4 text-cyan">
                 <span className="h-px flex-1 bg-cyan/40" />
@@ -1912,7 +1920,7 @@ const CountryDetails = () => {
                 <ShieldCheck size={18} strokeWidth={2.2} />
                 <span className="text-sm font-medium">Verified &amp; Secure</span>
               </div>
-              <h2 className="mt-6 font-playfair text-2xl font-medium leading-tight text-text-primary sm:text-3xl lg:text-3xl">
+              <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
                 Documents Required
                 <span className="block text-cyan">for {country.name} Visa</span>
               </h2>
@@ -1969,7 +1977,7 @@ const CountryDetails = () => {
             <BadgeCheck size={18} />
             <span className="text-xs font-semibold uppercase tracking-[0.24em]">Why book now</span>
           </div>
-          <h2 className="font-playfair text-xl sm:text-3xl md:text-4xl font-bold tracking-tight text-text-primary">
+          <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
             Visa application made simple and reliable
           </h2>
         </div>
@@ -2538,6 +2546,7 @@ const CountryDetails = () => {
                         file={traveler.passportFile}
                         error={passportErrors[index + 1]}
                         uploading={Boolean(passportUploading[index + 1])}
+                        optimizing={Boolean(passportOptimizing[index + 1])}
                         saved={Boolean(passportSuccesses[index + 1] && !traveler.passportFile)}
                         helperText={
                           traveler.passportFile

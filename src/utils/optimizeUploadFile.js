@@ -5,7 +5,7 @@ import * as pdfjs from "pdfjs-dist";
 // Set worker source for pdfjs using a reliable CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-export const RAW_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
+export const RAW_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
 export const FINAL_UPLOAD_TARGET_BYTES = 300 * 1024;
 /** All document uploads now share the same 300 KB target. */
 export const PASSPORT_UPLOAD_MAX_BYTES = 300 * 1024;
@@ -185,12 +185,15 @@ export const optimizeUploadFile = async (file, options = {}) => {
     : FINAL_UPLOAD_TARGET_BYTES;
 
   if (file.size > RAW_UPLOAD_LIMIT_BYTES) {
-    return { error: "File must be below 8 MB." };
+    return { error: "File must be below 20 MB." };
   }
 
   // Handle PDF Optimization
   if (file.type === "application/pdf") {
     const optimizedFile = await optimizePdf(file, targetBytes);
+    console.log(`[PDF Optimization] Original Size: ${(originalSize / 1024).toFixed(2)} KB`);
+    console.log(`[PDF Optimization] Compressed Size: ${(optimizedFile.size / 1024).toFixed(2)} KB`);
+    console.log(`[PDF Optimization] Compression Ratio: ${((1 - (optimizedFile.size / originalSize)) * 100).toFixed(2)}%`);
     return {
       file: optimizedFile,
       originalSize,

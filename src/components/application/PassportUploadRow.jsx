@@ -6,6 +6,7 @@ const PassportUploadRow = ({
   file,
   error,
   uploading = false,
+  optimizing = false,
   saved = false,
   disabled = false,
   helperText = "",
@@ -73,6 +74,11 @@ const PassportUploadRow = ({
                 {reuploadLabel}
               </button>
             )}
+          </div>
+        ) : file && optimizing ? (
+          <div className="flex items-center gap-1.5 rounded-md border border-cyan/20 bg-cyan/5 px-2.5 py-1.5 text-[10px] text-cyan shrink-0 animate-pulse">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-ping" />
+            Optimizing document...
           </div>
         ) : file && uploading ? (
           <div className="flex items-center gap-1.5 rounded-md border border-cyan/20 bg-cyan/5 px-2.5 py-1.5 text-[10px] text-cyan shrink-0 animate-pulse">
