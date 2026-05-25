@@ -1772,9 +1772,9 @@ const CountryDetails = () => {
         variants={fadeUp}
         className="rounded-[2rem] bg-gradient-to-b from-transparent via-surface/40 to-transparent p-4 sm:p-8"
       >
-        <div className="mb-6 flex items-center gap-2">
+        <div className="mb-6 flex items-center justify-center gap-2">
           <ListChecks size={18} className="text-cyan" />
-          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">How it works</h2>
+          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary text-center">How it works</h2>
         </div>
         <ol className="space-y-4">
           {howItWorks.map((step, idx) => (
@@ -2019,7 +2019,7 @@ const CountryDetails = () => {
         variants={fadeUp}
         className="relative overflow-hidden rounded-[2.5rem] border border-border bg-white px-4 py-10 sm:px-10 sm:py-16 shadow-[0_20px_50px_rgba(0,0,0,0.04)]"
       >
-        <div className="flex flex-col md:flex-row md:items-center gap-6 mb-12 relative z-10">
+        <div className="flex flex-col items-center text-center gap-4 mb-12 relative z-10">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-blue-50 text-blue-600 shadow-[0_10px_30px_rgba(37,99,235,0.1)] ring-1 ring-blue-100">
             <ShieldCheck size={40} strokeWidth={1.5} />
           </div>
@@ -2027,7 +2027,7 @@ const CountryDetails = () => {
             <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
               What's Included
             </h2>
-            <p className="text-text-secondary mt-2 text-base sm:text-lg max-w-xl">
+            <p className="text-text-secondary mt-2 text-base sm:text-lg max-w-xl mx-auto">
               Everything you need for a smooth and hassle-free visa process.
             </p>
           </div>
@@ -2122,9 +2122,9 @@ const CountryDetails = () => {
         variants={fadeUp}
         className="bg-surface border border-border rounded-2xl p-4 sm:p-6"
       >
-        <div className="mb-6">
-          <h2 className="font-playfair text-2xl sm:text-4xl font-bold tracking-tight text-text-primary">
-            Frequently asked questions
+        <div className="mb-6 text-center">
+          <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary text-center">
+            Frequently Asked Questions
           </h2>
         </div>
         <div className="divide-y divide-border/70">
@@ -2136,7 +2136,7 @@ const CountryDetails = () => {
                 className="flex w-full items-start justify-between gap-4 text-left"
                 aria-expanded={openFaqIndex === idx}
               >
-                <span className="pr-4 text-lg sm:text-[1.7rem] font-semibold leading-tight text-text-primary">
+                <span className="pr-4 text-lg sm:text-xl font-normal leading-tight text-text-primary">
                   {faq.question}
                 </span>
                 <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-text-primary transition-colors">
