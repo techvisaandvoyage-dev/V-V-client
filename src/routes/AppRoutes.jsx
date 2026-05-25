@@ -68,6 +68,9 @@ const AppRoutes = () => {
   const reduceMotion = useReducedMotion();
   const isHomepage = location.pathname === "/";
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const shouldShowChat = 
+    location.pathname.startsWith("/destination/") ||
+    location.pathname.startsWith("/dashboard/application/");
   const [siteStateLoading, setSiteStateLoading] = useState(true);
   const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
 
@@ -222,7 +225,7 @@ const AppRoutes = () => {
           </Routes>
         </motion.div>
       </AnimatePresence>
-      {!isHomepage && !isAuthPage && <SupportChatWidget />}
+      {shouldShowChat && <SupportChatWidget />}
     </Suspense>
   );
 };
