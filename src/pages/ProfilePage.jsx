@@ -659,22 +659,7 @@ const ProfilePage = () => {
               </div>
             </SectionShell>
 
-            <Card className="rounded-[2rem] border border-white/70 bg-white/90 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#EEF4FF_0%,#F5F9FF_100%)] text-[#235BFF] shadow-[0_10px_28px_rgba(37,99,235,0.12)]">
-                    <Settings2 size={19} />
-                  </span>
-                  <div>
-                    <h3 className="text-[1.35rem] font-bold tracking-tight text-slate-900">Preferences</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                      Manage your notification and communication preferences.
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={22} className="mt-1 text-slate-400" />
-              </div>
-            </Card>
+
           </div>
         </div>
       </main>
