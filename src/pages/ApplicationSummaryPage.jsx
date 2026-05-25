@@ -259,14 +259,13 @@ const ApplicationSummaryPage = () => {
     setUploadSuccesses((prev) => ({ ...prev, ...merged }));
   }, [application, applicationIdForUploads]);
 
+  const targetAppId = id || summaryData?.applicationId;
+
   useEffect(() => {
-    if (!id && fallbackApplication) {
-      setApplication(fallbackApplication);
-      setLoading(false);
-      return;
-    }
-    if (!id) {
-      if (summaryData) {
+    if (!targetAppId) {
+      if (fallbackApplication) {
+        setApplication(fallbackApplication);
+      } else if (summaryData) {
         setApplication({
           _id: null,
           countryName: summaryData.countryName || "Visa",
@@ -285,7 +284,7 @@ const ApplicationSummaryPage = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/users/applications/${id}`);
+        const { data } = await api.get(`/users/applications/${targetAppId}`);
         if (data?.success) setApplication(data.application);
         else showToast(data?.message || "Could not load application.", "error");
       } catch (err) {
@@ -302,7 +301,7 @@ const ApplicationSummaryPage = () => {
       }
     };
     load();
-  }, [fallbackApplication, id, summaryData, showToast]);
+  }, [fallbackApplication, targetAppId, summaryData, showToast]);
 
   useEffect(() => {
     let mounted = true;
@@ -447,10 +446,6 @@ const ApplicationSummaryPage = () => {
    *   3. Otherwise inspect each traveler entry on the server record.
    */
   const docsUploaded = useMemo(() => {
-    if (docsSkipped) return false;
-    if (summaryData && typeof summaryData.docsUploaded === "boolean") {
-      return summaryData.docsUploaded;
-    }
     const allPassportUploadsStored = Array.from({ length: travelerCount }).every((_, index) =>
       Boolean(uploadSuccesses[`${index + 1}-passport`])
     );
@@ -469,7 +464,14 @@ const ApplicationSummaryPage = () => {
       if (Array.isArray(entry.otherDocuments) && entry.otherDocuments.length > 0) return true;
       return false;
     };
-    return entries.slice(0, travelerCount).every(entryHasUpload);
+    const allUploadsPresent = entries.length >= travelerCount
+      && entries.slice(0, travelerCount).every(entryHasUpload);
+    if (allUploadsPresent) return true;
+    if (docsSkipped) return false;
+    if (summaryData && typeof summaryData.docsUploaded === "boolean") {
+      return summaryData.docsUploaded;
+    }
+    return false;
   }, [docsSkipped, summaryData, uploadSuccesses, application?.travellerDocuments, travelerCount]);
 
   const travelerPassportSuccesses = useMemo(
@@ -561,6 +563,24 @@ const ApplicationSummaryPage = () => {
     setUploadModalUploading({});
     setUploadDocumentsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!uploadDocumentsModalOpen) return;
+    setUploadModalTravelers((prev) => (
+      prev.length
+        ? prev.map((traveler, index) => ({
+            ...traveler,
+            name: travelerNames[index] || `Traveler ${index + 1}`,
+            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]),
+          }))
+        : Array.from({ length: travelerCount }).map((_, index) => ({
+            id: index + 1,
+            name: travelerNames[index] || `Traveler ${index + 1}`,
+            passportFile: null,
+            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]),
+          }))
+    ));
+  }, [uploadDocumentsModalOpen, travelerCount, travelerNames, travelerPassportSuccesses]);
 
   const handleUploadModalPassportChange = async (index, file) => {
     if (!file) return;
@@ -702,12 +722,29 @@ const ApplicationSummaryPage = () => {
       return str;
     };
 
+    const travelDetailsPassportSuccesses = {};
+    if (travelerPassportSuccesses && typeof travelerPassportSuccesses === "object") {
+      Object.entries(travelerPassportSuccesses).forEach(([key, val]) => {
+        if (key.endsWith("-passport")) {
+          const num = key.replace("-passport", "");
+          if (val) {
+            travelDetailsPassportSuccesses[num] = true;
+          }
+        } else if (!isNaN(Number(key))) {
+          if (val) {
+            travelDetailsPassportSuccesses[key] = true;
+          }
+        }
+      });
+    }
+
     const restoreTravelDetails = {
       travelDateFrom: formatDateToYmd(summaryData?.travelDateFrom ?? application?.travelDate),
       travelDateTo: formatDateToYmd(summaryData?.travelDateTo ?? application?.returnDate),
       visaOption: summaryData?.visaType || application?.visaType,
       sharedDriveLink: String(summaryData?.sharedDriveLink || application?.gdriveLink || "").trim(),
       applicationDraftId: id || applicationIdForUploads || null,
+      passportSuccesses: travelDetailsPassportSuccesses,
       travelers: Array.isArray(summaryData?.travelers) && summaryData.travelers.length
         ? summaryData.travelers.map((traveler) => ({
             ...traveler,
@@ -772,6 +809,8 @@ const ApplicationSummaryPage = () => {
             visaOption: restoreTravelDetails.visaOption,
             sharedDriveLink: restoreTravelDetails.sharedDriveLink,
             travelers: restoreTravelDetails.travelers,
+            passportSuccesses: travelDetailsPassportSuccesses,
+            passportDetails: summaryData?.uploadedDocDetails || {},
             showTravelDetails: true,
           });
         }
@@ -809,6 +848,8 @@ const ApplicationSummaryPage = () => {
             visaOption: restoreTravelDetails.visaOption,
             sharedDriveLink: restoreTravelDetails.sharedDriveLink,
             travelers: restoreTravelDetails.travelers,
+            passportSuccesses: travelDetailsPassportSuccesses,
+            passportDetails: summaryData?.uploadedDocDetails || {},
             showTravelDetails: true,
           });
         }
@@ -1168,7 +1209,7 @@ const ApplicationSummaryPage = () => {
                             : "PDF, JPG, PNG - max 300 KB"
                         }
                         fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}
-                        savedText="Document saved securely"
+                        savedText="Passport uploaded"
                         reuploadLabel="Replace File"
                         onChange={(file) => handleUploadModalPassportChange(index, file)}
                         onReupload={() => {

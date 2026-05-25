@@ -464,7 +464,7 @@ const ApplicationDetails = () => {
     return buildDisplayDocFields(preferredKeys, documentCatalog).filter((field) => field.key !== "passport");
   }, [documentCatalog, visibleRequiredDocFields]);
   const detailsHeaderStatus = useMemo(() => {
-    if (["approved", "rejected", "cancelled", "review", "doc_pending", "drive_link_pending"].includes(resolvedApplicationStatus)) {
+    if (["approved", "rejected", "cancelled", "review", "doc_pending", "drive_link_pending", "pending_payment"].includes(resolvedApplicationStatus)) {
       return resolvedApplicationStatus;
     }
     return "";
@@ -1691,7 +1691,7 @@ const ApplicationDetails = () => {
                       : `PDF, JPG, PNG - max ${getUploadLimitForDocType("passport").label}`
                   }
                   fileSizeText={selectedFile ? formatFileSize(selectedFile.size) : ""}
-                  savedText="Document saved securely"
+                  savedText="Passport uploaded"
                   onChange={(file) => handleDocFieldChange(travelerNo, "passport", file)}
                   onReupload={canUploadDocuments ? resetPassportUploadState : undefined}
                 />
@@ -1802,7 +1802,7 @@ const ApplicationDetails = () => {
                                       : `PDF, JPG, PNG - max ${getUploadLimitForDocType("passport").label}`
                                   }
                                   fileSizeText={passportSelectedFile ? formatFileSize(passportSelectedFile.size) : ""}
-                                  savedText="Document saved securely"
+                                  savedText="Passport uploaded"
                                   onChange={(file) => handleDocFieldChange(travelerNo, "passport", file)}
                                   onReupload={() => {
                                     setUnlockedDocs((prev) => ({ ...prev, [passportInputKey]: true }));

@@ -893,6 +893,12 @@ const CountryDetails = () => {
     if (draft.applicationId) {
       setCurrentApplicationId(String(draft.applicationId));
     }
+    if (draft.passportSuccesses && typeof draft.passportSuccesses === "object") {
+      setPassportSuccesses(draft.passportSuccesses);
+    }
+    if (draft.passportDetails && typeof draft.passportDetails === "object") {
+      setPassportDetails(draft.passportDetails);
+    }
     if (draft.showTravelDetails) {
       setShowTravelDetails(true);
       window.setTimeout(() => {
@@ -918,6 +924,12 @@ const CountryDetails = () => {
       }
       if (Array.isArray(restore.travelers)) {
         setTravelers(restore.travelers.map((t) => ({ ...createTravelerState(), name: String(t.name || "") })));
+      }
+      if (restore.passportSuccesses && typeof restore.passportSuccesses === "object") {
+        setPassportSuccesses(restore.passportSuccesses);
+      }
+      if (restore.passportDetails && typeof restore.passportDetails === "object") {
+        setPassportDetails(restore.passportDetails);
       }
       if (location.state?.applicationDraftId || restore.applicationDraftId) {
         setCurrentApplicationId(String(location.state?.applicationDraftId || restore.applicationDraftId));
@@ -1059,6 +1071,8 @@ const CountryDetails = () => {
         visaOption,
         sharedDriveLink,
         travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        passportSuccesses,
+        passportDetails,
         showTravelDetails: false,
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1193,8 +1207,10 @@ const CountryDetails = () => {
         fileSize: optimizedFile.size,
         mimeType: optimizedFile.type,
       };
-      setPassportSuccesses((prev) => ({ ...prev, [travelerNo]: true }));
-      setPassportDetails((prev) => ({ ...prev, [travelerNo]: detail }));
+      const nextPassportSuccesses = { ...passportSuccesses, [travelerNo]: true };
+      const nextPassportDetails = { ...passportDetails, [travelerNo]: detail };
+      setPassportSuccesses(nextPassportSuccesses);
+      setPassportDetails(nextPassportDetails);
       updateTravelerPassportFile(index, null);
       saveTravelDraft(countryId, {
         applicationId: appId,
@@ -1203,8 +1219,32 @@ const CountryDetails = () => {
         visaOption,
         sharedDriveLink,
         travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        passportSuccesses: nextPassportSuccesses,
+        passportDetails: nextPassportDetails,
         showTravelDetails: true,
       });
+      // Sync to application doc successes local storage key used by summary page
+      try {
+        const docSuccessKey = `application-doc-successes:${appId}`;
+        const existingDocSuccesses = (() => {
+          try {
+            const raw = localStorage.getItem(docSuccessKey);
+            return raw ? JSON.parse(raw) : {};
+          } catch {
+            return {};
+          }
+        })();
+        localStorage.setItem(
+          docSuccessKey,
+          JSON.stringify({
+            ...existingDocSuccesses,
+            [`${travelerNo}-passport`]: true,
+          })
+        );
+      } catch (err) {
+        console.error("Failed to write application-doc-successes key", err);
+      }
+
       await fetchUserApplications();
       showToast("Passport uploaded successfully.", "success");
     } catch (err) {
@@ -1439,6 +1479,8 @@ const CountryDetails = () => {
       visaOption,
       sharedDriveLink,
       travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+      passportSuccesses,
+      passportDetails,
       showTravelDetails: true,
     });
     localStorage.setItem("lastActiveCountryId", countryId);
@@ -1470,6 +1512,7 @@ const CountryDetails = () => {
     gateContactOrRun(() => {
       navigate(`/apply/${country.id}`, {
         state: {
+          applicationDraftId: String(currentApplicationId || "").trim() || undefined,
           travelerNames: getTravelerNames(),
           travellerCount,
           travelDateFrom,

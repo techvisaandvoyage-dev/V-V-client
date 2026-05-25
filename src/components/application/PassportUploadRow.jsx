@@ -10,7 +10,7 @@ const PassportUploadRow = ({
   disabled = false,
   helperText = "",
   fileSizeText = "",
-  savedText = "Document saved securely",
+  savedText = "Passport uploaded",
   reuploadLabel = "Re-upload",
   onChange,
   onReupload,

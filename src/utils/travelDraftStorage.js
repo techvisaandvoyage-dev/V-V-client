@@ -18,6 +18,12 @@ export function saveTravelDraft(countryId, draft) {
             name: traveler?.name ?? traveler?.fullName ?? "",
           }))
         : [],
+      passportSuccesses: typeof draft.passportSuccesses === "object" && draft.passportSuccesses
+        ? draft.passportSuccesses
+        : {},
+      passportDetails: typeof draft.passportDetails === "object" && draft.passportDetails
+        ? draft.passportDetails
+        : {},
       showTravelDetails: draft.showTravelDetails !== false,
     });
     localStorage.setItem(travelDraftStorageKey(countryId), payload);

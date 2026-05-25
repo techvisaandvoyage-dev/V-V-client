@@ -196,15 +196,23 @@ export const resolveApplicationStatus = (
   derivedProgress = { allDocumentsUploaded: false }
 ) => {
   if (!application || typeof application !== "object") return "pending";
+
+  const isPaid = application.paymentStatus === "completed" || application.paymentStatus === "Paid";
+
   if (
     application.status === "approved" ||
     application.status === "rejected" ||
-    application.status === "cancelled" ||
-    application.status === "review"
+    application.status === "cancelled"
   ) {
     return application.status;
   }
+
+  if (application.status === "review") {
+    return isPaid ? "review" : "pending_payment";
+  }
+
   if (!derivedProgress.allPassportsUploaded) return "doc_pending";
   if (!derivedProgress.hasDriveLink) return "drive_link_pending";
-  return "review";
+  
+  return isPaid ? "review" : "pending_payment";
 };
