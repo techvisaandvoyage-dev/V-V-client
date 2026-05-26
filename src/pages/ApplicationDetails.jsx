@@ -1719,7 +1719,7 @@ const ApplicationDetails = () => {
                   helperText={
                     selectedFile
                       ? selectedFile.name
-                      : `PDF, JPG, PNG - max ${getUploadLimitForDocType("passport").label}`
+                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType("passport").label}`
                   }
                   fileSizeText={selectedFile ? formatFileSize(selectedFile.size) : ""}
                   savedText="Passport uploaded"
@@ -1832,7 +1832,7 @@ const ApplicationDetails = () => {
                                   helperText={
                                     passportSelectedFile
                                       ? passportSelectedFile.name
-                                      : `PDF, JPG, PNG - max ${getUploadLimitForDocType("passport").label}`
+                                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType("passport").label}`
                                   }
                                   fileSizeText={passportSelectedFile ? formatFileSize(passportSelectedFile.size) : ""}
                                   savedText="Passport uploaded"
@@ -1997,7 +1997,7 @@ const ApplicationDetails = () => {
                   const helperCopy =
                     field.description
                     || DOCUMENT_HELPER_COPY[field.key]
-                    || `PDF, JPG, PNG - max ${getUploadLimitForDocType(field.key).label}`;
+                    || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType(field.key).label}`;
 
                   return (
                     <div
@@ -2049,7 +2049,7 @@ const ApplicationDetails = () => {
                     const helperCopy =
                       field.description
                       || DOCUMENT_HELPER_COPY[field.key]
-                      || `PDF, JPG, PNG - max ${getUploadLimitForDocType(field.key).label}`;
+                      || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType(field.key).label}`;
                     return (
                       <div
                         key={`other-doc-option-${inputKey}`}
