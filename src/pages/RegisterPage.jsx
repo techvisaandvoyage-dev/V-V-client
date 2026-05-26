@@ -278,18 +278,8 @@ const RegisterPage = () => {
                 </button>
               </div>
 
-              <div className="my-6 flex items-center gap-4">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">OR</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
 
-              <p className="text-center text-[12px] text-text-muted -mt-2 mb-3 px-1">
-                Use one email or mobile field — we send the code to your inbox for email, or by SMS for phone
-                (SMS91 in Admin). Mobile numbers use the last 10 digits.
-              </p>
-
-              <form onSubmit={handleSignupSubmit} className="space-y-4" noValidate>
+              <form onSubmit={handleSignupSubmit} className="space-y-4 mt-6" noValidate>
                 <AnimatePresence>
                   {error && (
                     <motion.div

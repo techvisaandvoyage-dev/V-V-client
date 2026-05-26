@@ -77,8 +77,8 @@ const normalizeProcessingDays = (value) => {
   return Number(matches[matches.length - 1]);
 };
 
-const ALLOWED_PASSPORT_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
-const INVALID_PASSPORT_TYPE_ERROR = "Only PDF, JPG, JPEG and PNG files are allowed.";
+const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
+const INVALID_PASSPORT_TYPE_ERROR = "Only JPG, JPEG and PNG files are allowed.";
 const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
 const PAYMENT_CONFIG_CACHE_KEY = "vb_payment_config_v1";
 const isReusableUnpaidApplication = (application) => {
@@ -347,6 +347,25 @@ const CountryDetails = () => {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [showTravelDetails, setShowTravelDetails] = useState(false);
   const [visaOption, setVisaOption] = useState("e-Visa");
+  const [activeVisaTypes, setActiveVisaTypes] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    api.get("/visa-types/active").then(res => {
+      if (mounted && res.data?.success) {
+        setActiveVisaTypes(res.data.visaTypes);
+        setVisaOption(prev => {
+          const types = res.data.visaTypes;
+          if (types.length > 0 && !types.some(t => t.name === prev)) {
+            return types[0].name;
+          }
+          return prev;
+        });
+      }
+    }).catch(err => console.error("Failed to fetch visa types", err));
+    return () => { mounted = false; };
+  }, []);
+
   const [travelDateFrom, setTravelDateFrom] = useState("");
   const [travelDateTo, setTravelDateTo] = useState("");
   /** Open/closed state for the date-range calendar popup. */
@@ -1171,7 +1190,7 @@ const CountryDetails = () => {
       return;
     }
     if (optimizedFile.size > PASSPORT_UPLOAD_MAX_BYTES) {
-      const sizeError = "Document is too large. Please upload a smaller PDF or split the document.";
+      const sizeError = "Document is too large. Please upload a smaller file.";
       setPassportErrors((prev) => ({ ...prev, [travelerNo]: sizeError }));
       showToast(sizeError, "error");
       return;
@@ -2553,7 +2572,7 @@ const CountryDetails = () => {
                             ? `${traveler.passportFile.name} - ${formatFileSize(traveler.passportFile.size)}`
                             : passportDetails[index + 1]?.fileName
                               ? `${passportDetails[index + 1].fileName} - ${formatFileSize(passportDetails[index + 1].fileSize)}`
-                              : "PDF, JPG, PNG - max 300 KB"
+                              : "JPG, JPEG, PNG - max 300 KB"
                         }
                         savedText="Passport uploaded"
                         reuploadLabel="Replace File"

@@ -17,8 +17,8 @@ import { formatOrdinalDate } from "../utils/dateUtils";
 import { saveTravelDraft } from "../utils/travelDraftStorage";
 
 const SUMMARY_UPLOAD_MAX_BYTES = 300 * 1024;
-const ALLOWED_PASSPORT_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
-const INVALID_PASSPORT_TYPE_ERROR = "Only PDF, JPG, JPEG and PNG files are allowed.";
+const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
+const INVALID_PASSPORT_TYPE_ERROR = "Only JPG, JPEG and PNG files are allowed.";
 const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
 const isReusableUnpaidApplication = (application) => {
   const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
@@ -308,7 +308,7 @@ const ApplicationSummaryPage = () => {
     let mounted = true;
     const check = async () => {
       const result = await validateRazorpayCheckoutReadiness();
-      if (!mounted) return;
+      if (!mounted) return; 
       setRazorpayReady(!!result.ok);
       setRazorpayMessage(result.ok ? "" : result.message || "Razorpay unavailable.");
     };
@@ -618,7 +618,7 @@ const ApplicationSummaryPage = () => {
       return;
     }
     if (optimizedFile.size > SUMMARY_UPLOAD_MAX_BYTES) {
-      const message = "Document is too large. Please upload a smaller PDF or split the document.";
+      const message = "Document is too large. Please upload a smaller file.";
       setUploadModalErrors((prev) => ({
         ...prev,
         [index]: message,
@@ -662,6 +662,16 @@ const ApplicationSummaryPage = () => {
       setUploadSuccesses((prev) => {
         const next = { ...prev, [`${travelerNo}-passport`]: true };
         setStoredApplicationDocSuccesses(appId, next);
+        
+        const allUploaded = Array.from({ length: travelerCount }).every((_, i) =>
+          Boolean(next[`${i + 1}-passport`])
+        );
+        if (allUploaded) {
+          setTimeout(() => {
+            setUploadDocumentsModalOpen(false);
+          }, 800);
+        }
+        
         return next;
       });
       setUploadModalTravelers((prev) =>
@@ -717,6 +727,9 @@ const ApplicationSummaryPage = () => {
       if (data?.success && data.application) {
         setApplication(data.application);
         showToast("Google Drive link saved.", "success");
+        setTimeout(() => {
+          setUploadDocumentsModalOpen(false);
+        }, 800);
       }
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Could not save Drive link.", "error");
@@ -1004,30 +1017,37 @@ const ApplicationSummaryPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <Button
-            variant="secondary"
-            size="md"
-            fullWidth
-            onClick={openUploadDocumentsModal}
-          >
-            Upload your documents now
-          </Button>
-        </div>
+        {!docsUploaded || !Boolean(String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim()) ? (
+          <>
+            <div className="rounded-2xl border border-border bg-surface p-5">
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={openUploadDocumentsModal}
+              >
+                Upload your documents now
+              </Button>
+            </div>
 
-        {(!docsUploaded || docsSkipped) && (
-          <div className="rounded-2xl border border-cyan/30 bg-cyan/5 p-4">
-            <div className="flex items-start gap-3">
-              <Info size={18} className="text-cyan mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-text-primary">
-                  No worries — you can upload your documents anytime later.
-                </p>
-                <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
-                  After payment, your application will remain available in <span className="text-text-primary font-medium">My Dashboard → Open Your Application → Upload Documents</span>, where you can upload documents for each traveler whenever it’s convenient for you.
-                </p>
+            <div className="rounded-2xl border border-cyan/30 bg-cyan/5 p-4">
+              <div className="flex items-start gap-3">
+                <Info size={18} className="text-cyan mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">
+                    No worries — you can upload your documents anytime later.
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
+                    After payment, your application will remain available in <span className="text-text-primary font-medium">My Dashboard → Open Your Application → Upload Documents</span>, where you can upload documents for each traveler whenever it’s convenient for you.
+                  </p>
+                </div>
               </div>
             </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-2 text-emerald-600 font-medium text-sm justify-center">
+            <CheckCircle size={18} />
+            All documents submitted
           </div>
         )}
 
@@ -1216,7 +1236,7 @@ const ApplicationSummaryPage = () => {
                         helperText={
                           traveler.passportFile
                             ? traveler.passportFile.name
-                            : "PDF, JPG, PNG - max 300 KB"
+                            : "JPG, JPEG, PNG - max 300 KB"
                         }
                         fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}
                         savedText="Passport uploaded"

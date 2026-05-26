@@ -86,7 +86,7 @@ const LoginPage = () => {
   } = useAuthStore();
   const { showToast } = useUIStore();
 
-  const [loginMethod, setLoginMethod] = useState("password");
+  const [loginMethod, setLoginMethod] = useState("");
   const [otpStep, setOtpStep] = useState(1);
   const [identifier, setIdentifier] = useState("");
   const [otpIdentifier, setOtpIdentifier] = useState("");
@@ -348,7 +348,21 @@ const LoginPage = () => {
                 </h1>
               </div>
 
-              {!forgotMode && (
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    key="login-error"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500 mb-4"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {!forgotMode ? (
                 <div className="space-y-3">
                   <button
                     type="button"
@@ -370,206 +384,155 @@ const LoginPage = () => {
                     Continue with Facebook
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={switchToPhoneOtpLogin}
-                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 flex items-center justify-center gap-3"
-                  >
-                    <Smartphone size={18} className="text-text-primary" />
-                    Log in with phone/Email OTP
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={switchToFirebaseEmailLogin}
-                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 flex items-center justify-center gap-3"
-                  >
-                    <KeyRound size={18} className="text-text-primary" />
-                    Continue with Email
-                  </button>
-                </div>
-              )}
-
-              {!forgotMode && (
-                <>
-                  <div className="my-6 flex items-center gap-4">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">OR</span>
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
-                  {loginMethod === "password" && (
-                    <p className="text-center text-[12px] text-text-muted -mt-2 mb-2 px-1">
-                      Use the email or 10-digit mobile number you registered with.
-                    </p>
-                  )}
-                  {loginMethod === "firebase_email" && (
-                    <p className="text-center text-[12px] text-text-muted -mt-2 mb-2 px-1">
-                      Use the email and password on your account.
-                    </p>
-                  )}
-                  {loginMethod === "otp" && (
-                    <p className="text-center text-[12px] text-text-muted -mt-2 mb-2 px-1">
-                      Enter the email or mobile on your account. We&apos;ll email or text a code.
-                    </p>
-                  )}
-                </>
-              )}
-
-              <form
-                onSubmit={
-                  forgotMode
-                    ? (forgotStep === 1 ? handleForgotRequestOtp : handleForgotReset)
-                    : loginMethod === "password"
-                      ? handlePasswordSubmit
-                      : loginMethod === "firebase_email"
-                        ? handleFirebaseEmailSubmit
-                        : handleRequestOtp
-                }
-                className="space-y-4"
-                noValidate
-              >
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      key="login-error"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500"
+                  {/* OTP Login Accordion */}
+                  <div className="rounded-3xl border border-border bg-surface overflow-hidden transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginMethod(loginMethod === "otp" ? "" : "otp");
+                        clearError();
+                      }}
+                      className="w-full px-4 py-3.5 text-[15px] font-medium text-text-primary hover:bg-surface-2 flex items-center justify-center gap-3"
                     >
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {!forgotMode && loginMethod === "password" && (
-                  <>
-                    <Input
-                      label=""
-                      type="text"
-                      placeholder="Email or mobile number"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      autoComplete="username"
-                      className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                      required
-                    />
-                    <Input
-                      label=""
-                      type={showPass ? "text" : "password"}
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
-                      className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                      rightIcon={
-                        <button
-                          type="button"
-                          onClick={() => setShowPass((value) => !value)}
-                          className="hover:text-text-primary text-text-muted transition-colors mr-2 mt-0.5"
+                      <Smartphone size={18} className="text-text-primary" />
+                      Log in with phone/Email OTP
+                    </button>
+                    <AnimatePresence>
+                      {loginMethod === "otp" && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
                         >
-                          {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      }
-                      required
-                    />
-                    <div className="flex justify-end -mt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForgotMode(true);
-                          const parsed = parseAuthContactInput(identifier.trim());
-                          setForgotEmail(parsed ? parsed.value : identifier.trim());
-                          clearError();
-                        }}
-                        className="text-[13px] text-text-muted transition-colors hover:text-text-primary font-medium"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {!forgotMode && loginMethod === "firebase_email" && (
-                  <>
-                    <Input
-                      label=""
-                      type="email"
-                      autoComplete="email"
-                      placeholder="Email address"
-                      value={firebaseEmail}
-                      onChange={(e) => setFirebaseEmail(e.target.value)}
-                      className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                      required
-                    />
-                    <Input
-                      label=""
-                      type={firebaseShowPass ? "text" : "password"}
-                      autoComplete="current-password"
-                      placeholder="Password"
-                      value={firebasePassword}
-                      onChange={(e) => setFirebasePassword(e.target.value)}
-                      className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                      rightIcon={
-                        <button
-                          type="button"
-                          onClick={() => setFirebaseShowPass((value) => !value)}
-                          className="hover:text-text-primary text-text-muted transition-colors mr-2 mt-0.5"
-                        >
-                          {firebaseShowPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      }
-                      required
-                    />
-                    <div className="flex justify-center -mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginMethod("password");
-                          clearError();
-                        }}
-                        className="text-[13px] text-text-muted transition-colors hover:text-text-primary font-medium"
-                      >
-                        Use app password instead
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {!forgotMode && loginMethod === "otp" && (
-                  <div className="space-y-1">
-                    <Input
-                      label=""
-                      type="text"
-                      inputMode="text"
-                      autoComplete="username"
-                      placeholder="Email or mobile number"
-                      value={otpIdentifier}
-                      onChange={(e) => setOtpIdentifier(e.target.value)}
-                      className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                      required
-                    />
-                    {otpIdentifier.trim() && (
-                      <p
-                        className={`px-4 text-[12px] leading-snug ${
-                          otpContactPreview
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        {otpContactPreview
-                          ? otpContactPreview.type === "phone"
-                            ? `We'll text a code — mobile …${otpContactPreview.value.slice(-4)}`
-                            : "We'll email a code to this address"
-                          : otpIdentifier.includes("@")
-                            ? "Enter a valid email address"
-                            : "Enter a valid mobile (10 digits, country code optional)"}
-                      </p>
-                    )}
+                          <div className="p-4 pt-1 border-t border-border/30">
+                            <form onSubmit={handleRequestOtp} className="space-y-3" noValidate>
+                              <Input
+                                label=""
+                                type="text"
+                                inputMode="text"
+                                autoComplete="username"
+                                placeholder="Email or mobile number"
+                                value={otpIdentifier}
+                                onChange={(e) => setOtpIdentifier(e.target.value)}
+                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                required
+                              />
+                              {otpIdentifier.trim() && (
+                                <p className={`px-4 text-[12px] leading-snug ${otpContactPreview ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                                  {otpContactPreview
+                                    ? otpContactPreview.type === "phone"
+                                      ? `We'll text a code — mobile …${otpContactPreview.value.slice(-4)}`
+                                      : "We'll email a code to this address"
+                                    : otpIdentifier.includes("@")
+                                      ? "Enter a valid email address"
+                                      : "Enter a valid mobile (10 digits, country code optional)"}
+                                </p>
+                              )}
+                              <Button
+                                type="submit"
+                                variant="primary"
+                                fullWidth
+                                loading={isLoading}
+                                className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
+                              >
+                                Send OTP
+                              </Button>
+                            </form>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                )}
 
-                {forgotMode && (
+                  {/* Email Login Accordion */}
+                  <div className="rounded-3xl border border-border bg-surface overflow-hidden transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginMethod(loginMethod === "password" ? "" : "password");
+                        clearError();
+                      }}
+                      className="w-full px-4 py-3.5 text-[15px] font-medium text-text-primary hover:bg-surface-2 flex items-center justify-center gap-3"
+                    >
+                      <KeyRound size={18} className="text-text-primary" />
+                      Continue with Email
+                    </button>
+                    <AnimatePresence>
+                      {loginMethod === "password" && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="p-4 pt-1 border-t border-border/30">
+                            <form onSubmit={handlePasswordSubmit} className="space-y-3" noValidate>
+                              <Input
+                                label=""
+                                type="text"
+                                placeholder="Email or mobile number"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                autoComplete="username"
+                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                required
+                              />
+                              <Input
+                                label=""
+                                type={showPass ? "text" : "password"}
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="current-password"
+                                className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                rightIcon={
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPass((value) => !value)}
+                                    className="hover:text-text-primary text-text-muted transition-colors mr-2 mt-0.5"
+                                  >
+                                    {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                  </button>
+                                }
+                                required
+                              />
+                              <div className="flex justify-end -mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setForgotMode(true);
+                                    const parsed = parseAuthContactInput(identifier.trim());
+                                    setForgotEmail(parsed ? parsed.value : identifier.trim());
+                                    clearError();
+                                  }}
+                                  className="text-[13px] text-text-muted transition-colors hover:text-text-primary font-medium"
+                                >
+                                  Forgot password?
+                                </button>
+                              </div>
+                              <Button
+                                type="submit"
+                                variant="primary"
+                                fullWidth
+                                loading={isLoading}
+                                className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
+                              >
+                                Continue
+                              </Button>
+                            </form>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={forgotStep === 1 ? handleForgotRequestOtp : handleForgotReset}
+                  className="space-y-4"
+                  noValidate
+                >
                   <div className="space-y-4 rounded-3xl border border-border bg-surface p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[15px] font-medium text-text-primary">Forgot Password</p>
@@ -705,30 +668,8 @@ const LoginPage = () => {
                       </>
                     )}
                   </div>
-                )}
-
-                {!forgotMode && loginMethod === "otp" && (
-                  <p className="px-1 text-[13px] text-text-muted text-center">
-                    Use the same email or mobile you signed up with. The code expires in about 10 minutes.
-                  </p>
-                )}
-
-                {!forgotMode && (
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    fullWidth
-                    loading={isLoading}
-                    className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
-                  >
-                    {loginMethod === "password"
-                      ? "Continue"
-                      : loginMethod === "firebase_email"
-                        ? "Continue with Email"
-                        : "Send OTP"}
-                  </Button>
-                )}
-              </form>
+                </form>
+              )}
 
               <div className="mt-8 text-center text-[14px]">
                 <p className="text-text-primary font-medium">

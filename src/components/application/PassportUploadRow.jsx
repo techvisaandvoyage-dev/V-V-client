@@ -98,7 +98,7 @@ const PassportUploadRow = ({
         <input
           id={inputId}
           type="file"
-          accept=".pdf,image/jpeg,image/png"
+          accept="image/jpeg,image/png"
           className="sr-only"
           disabled={disabled}
           onChange={(e) => {
