@@ -10,8 +10,9 @@ import axios from "axios";
 // ── Axios Instance ───────────────────────────────────────────
 /** Backend origin only (no /api). Strips trailing /api so VITE_API_URL=http://host:5000/api does not become .../api/api. */
 const normalizeServerUrl = (url) => {
-  let s = String(url ?? "http://localhost:5000").trim();
-  if (!s) s = "http://localhost:5000";
+  const fallback = import.meta.env.PROD ? "https://api.visavo.in" : "http://localhost:5000";
+  let s = String(url ?? fallback).trim();
+  if (!s) s = fallback;
   s = s.replace(/\/+$/, "");
   while (/\/api$/i.test(s)) {
     s = s.replace(/\/api$/i, "").replace(/\/+$/, "");
