@@ -71,6 +71,26 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
 };
 
+const getCountryVisibilityIdCandidates = (country) =>
+  [
+    country?._id,
+    country?.id,
+    country?.slug,
+    country?.name,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+const isGlobalItemVisibleForCountry = (item, country) => {
+  if (!item || item.showInAllActiveCountries !== false) return true;
+  const selected = Array.isArray(item.selectedCountries)
+    ? item.selectedCountries.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+  if (!selected.length) return false;
+  const candidates = new Set(getCountryVisibilityIdCandidates(country));
+  return selected.some((value) => candidates.has(value));
+};
+
 const normalizeProcessingDays = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const matches = String(value || "").match(/\d+/g);
@@ -352,7 +372,8 @@ const CountryDetails = () => {
 
   useEffect(() => {
     let mounted = true;
-    api.get("/visa-types/active").then(res => {
+    const countryId = country?._id || country?.slug || country?.id || "";
+    api.get("/visa-types/active", { params: countryId ? { countryId } : {} }).then(res => {
       if (mounted && res.data?.success) {
         setActiveVisaTypes(res.data.visaTypes);
         setVisaOption(prev => {
@@ -365,7 +386,7 @@ const CountryDetails = () => {
       }
     }).catch(err => console.error("Failed to fetch visa types", err));
     return () => { mounted = false; };
-  }, []);
+  }, [country?._id, country?.slug, country?.id]);
 
   const [travelDateFrom, setTravelDateFrom] = useState("");
   const [travelDateTo, setTravelDateTo] = useState("");
@@ -585,7 +606,12 @@ const CountryDetails = () => {
   const whyBookNow = useMemo(() => {
     const useGlobal = country?.useGlobalWhyBookNow !== false;
     const ex = new Set(country?.excludeDestinationWhyBookNow || []);
-    const g = useGlobal ? (destinationPageContent?.whyBookNow || []).filter((line) => !ex.has(normKey(line))) : [];
+    const g = useGlobal
+      ? (destinationPageContent?.whyBookNow || [])
+          .filter((item) => isGlobalItemVisibleForCountry(item, country))
+          .map((item) => String(item?.text ?? item ?? "").trim())
+          .filter((line) => line && !ex.has(normKey(line)))
+      : [];
     const merged = mergeStringLists(g, country?.whyBookNow);
     if (merged.length) return merged;
     return [
@@ -600,6 +626,7 @@ const CountryDetails = () => {
     const ex = new Set(country?.excludeDestinationIncludedItems || []);
     const g = useGlobal 
       ? (destinationPageContent?.includedItems || destinationPageContent?.included || [])
+          .filter((item) => isGlobalItemVisibleForCountry(item, country))
           .filter((line) => !ex.has(normKey(line?.title || line)))
       : [];
     
@@ -659,7 +686,11 @@ const CountryDetails = () => {
   const faqs = useMemo(() => {
     const useGlobal = country?.useGlobalFaqs !== false;
     const ex = new Set(country?.excludeDestinationFaqQuestions || []);
-    const g = useGlobal ? (destinationPageContent?.faqs || []).filter((f) => !ex.has(normKey(f?.question))) : [];
+    const g = useGlobal
+      ? (destinationPageContent?.faqs || [])
+          .filter((item) => isGlobalItemVisibleForCountry(item, country))
+          .filter((f) => !ex.has(normKey(f?.question)))
+      : [];
     const merged = mergeFaqLists(g, country?.faqs);
     if (merged.length) return merged;
     return [
@@ -672,7 +703,11 @@ const CountryDetails = () => {
   const howItWorks = useMemo(() => {
     const useGlobal = country?.useGlobalHowItWorks !== false;
     const ex = new Set(country?.excludeDestinationHowItWorksTitles || []);
-    const g = useGlobal ? (destinationPageContent?.howItWorks || []).filter((s) => !ex.has(normKey(s?.title))) : [];
+    const g = useGlobal
+      ? (destinationPageContent?.howItWorks || [])
+          .filter((item) => isGlobalItemVisibleForCountry(item, country))
+          .filter((s) => !ex.has(normKey(s?.title)))
+      : [];
     const merged = mergeHowItWorksLists(g, country?.howItWorks);
     if (merged.length) return merged;
     return [
@@ -692,7 +727,12 @@ const CountryDetails = () => {
   const visaRequirements = useMemo(() => {
     const useGlobal = country?.useGlobalVisaRequirements !== false;
     const ex = new Set(country?.excludeDestinationVisaRequirements || []);
-    const g = useGlobal ? (destinationPageContent?.visaRequirements || []).filter((line) => !ex.has(normKey(line))) : [];
+    const g = useGlobal
+      ? (destinationPageContent?.visaRequirements || [])
+          .filter((item) => isGlobalItemVisibleForCountry(item, country))
+          .map((item) => String(item?.text ?? item ?? "").trim())
+          .filter((line) => line && !ex.has(normKey(line)))
+      : [];
     const merged = mergeStringLists(g, country?.requirements);
     if (merged.length) return merged;
     return [

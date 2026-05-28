@@ -6,7 +6,7 @@ import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import Button from "../components/ui/Button";
 import DestinationCard from "../components/country/DestinationCard";
-import { useCountries } from "../hooks/useCountries";
+import { isCountryActive, useCountries } from "../hooks/useCountries";
 import { getCountryRouteId } from "../utils/countryRouting";
 
 const fadeUp = {
@@ -19,6 +19,7 @@ const fadeUp = {
 const AllDestinationsPage = () => {
   const navigate = useNavigate();
   const { countries, display, documentCatalog } = useCountries();
+  const activeCountries = countries.filter((country) => isCountryActive(country));
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -63,12 +64,12 @@ const AllDestinationsPage = () => {
               <h2 className="text-2xl sm:text-3xl font-bold text-text-primary">
                 Available Countries
               </h2>
-              <p className="mt-2 text-text-secondary">{countries.length} destinations ready to explore</p>
+              <p className="mt-2 text-text-secondary">{activeCountries.length} destinations ready to explore</p>
             </div>
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {countries.map((country, index) => (
+            {activeCountries.map((country, index) => (
               <DestinationCard
                 key={getCountryRouteId(country)}
                 country={country}

@@ -230,6 +230,8 @@ const resolveImageUrl = (url) => {
   return `${base.replace(/\/*$/, '')}/${url}`;
 };
 
+export const isCountryActive = (country) => country?.isActive !== false;
+
 /** Normalise one country document from GET `/countries` or GET `/countries/:slug`. */
 export function normalizeCountryFromApi(c) {
   if (!c) return null;
@@ -242,6 +244,7 @@ export function normalizeCountryFromApi(c) {
     id: slug,
     _id: c._id,
     name: c.name,
+    isActive: isCountryActive(c),
     flagEmoji: getCountryFlagEmoji(c.name, c.flagEmoji),
     basePrice: c.basePrice,
     useGlobalBasePrice: c.useGlobalBasePrice === true,
@@ -398,15 +401,15 @@ function buildInitialCountriesState() {
       })
     );
     return {
-      countries: withResolved,
-      trendingCountries: withResolved.filter((c) => c.trending),
+      countries: withResolved.filter((c) => c.isActive !== false),
+      trendingCountries: withResolved.filter((c) => c.isActive !== false).filter((c) => c.trending),
       display: cached.display,
       documentCatalog: cached.documentCatalog,
     };
   }
   return {
-    countries: COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))),
-    trendingCountries: TRENDING_COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))),
+    countries: COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))).filter((c) => c.isActive !== false),
+    trendingCountries: TRENDING_COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))).filter((c) => c.isActive !== false),
     display: { ...DEFAULT_DISPLAY },
     documentCatalog: [],
   };
@@ -433,13 +436,13 @@ export function useCountries() {
           const nextCatalog = normalizeDocumentCatalog(data.documentCatalog);
 
           saveCountriesCache(normalised, nextDisplay, nextCatalog);
-          setCountries(normalised);
-          setTrendingCountries(normalised.filter((c) => c.trending));
+          setCountries(normalised.filter((c) => c.isActive !== false));
+          setTrendingCountries(normalised.filter((c) => c.isActive !== false).filter((c) => c.trending));
           setDisplay(nextDisplay);
           setDocumentCatalog(nextCatalog);
         } else if (!cancelled) {
-          setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))));
-          setTrendingCountries(TRENDING_COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))));
+          setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))).filter((c) => c.isActive !== false));
+          setTrendingCountries(TRENDING_COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))).filter((c) => c.isActive !== false));
         }
         // If DB returns empty (very first boot before seed finishes) keep static
       } catch {

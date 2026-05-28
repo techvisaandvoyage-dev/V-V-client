@@ -70,6 +70,8 @@ const LandingPage = () => {
   const [globalRequirements, setGlobalRequirements] = useState([]);
   const [showVisaRequirements, setShowVisaRequirements] = useState(true);
   const [heroHighlights, setHeroHighlights] = useState(DEFAULT_HERO_HIGHLIGHTS);
+  const [popularCountries, setPopularCountries] = useState(["USA", "UK", "EU Schengen", "Dubai", "Japan"]);
+  const [showPopularCountries, setShowPopularCountries] = useState(true);
 
   useEffect(() => {
     if (homeExitGuardRef.current) return undefined;
@@ -112,6 +114,10 @@ const LandingPage = () => {
         if (alive && data?.success) {
           if (data.config?.visaRequirements) setGlobalRequirements(data.config.visaRequirements);
           if (data.config?.showVisaRequirements !== undefined) setShowVisaRequirements(data.config.showVisaRequirements);
+          if (data.config?.showPopularCountries !== undefined) setShowPopularCountries(data.config.showPopularCountries);
+          if (Array.isArray(data.config?.popularCountries) && data.config.popularCountries.length) {
+            setPopularCountries(data.config.popularCountries);
+          }
           if (Array.isArray(data.config?.landingHeroHighlights) && data.config.landingHeroHighlights.length) {
             setHeroHighlights(
               DEFAULT_HERO_HIGHLIGHTS.map((fallback, index) => ({
@@ -559,21 +565,23 @@ const LandingPage = () => {
                   ))}
                 </div>
 
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 pt-5 text-center sm:gap-3">
-                  <span className="mr-1 text-xs font-medium text-[#8092ad]">Popular:</span>
-                  {["USA", "UK", "EU Schengen", "Dubai", "Japan"].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => {
-                        setSearchDestination(tag);
-                      }}
-                      className="rounded-full border border-sky-100 bg-sky-50 px-3.5 py-1.5 text-xs font-medium text-[#146fd8] transition-colors hover:border-cyan/40 hover:bg-cyan/10 hover:text-cyan"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+                {showPopularCountries && popularCountries.length > 0 && (
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 pt-5 text-center sm:gap-3">
+                    <span className="mr-1 text-xs font-medium text-[#8092ad]">Popular:</span>
+                    {popularCountries.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSearchDestination(tag);
+                        }}
+                        className="rounded-full border border-sky-100 bg-sky-50 px-3.5 py-1.5 text-xs font-medium text-[#146fd8] transition-colors hover:border-cyan/40 hover:bg-cyan/10 hover:text-cyan"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
