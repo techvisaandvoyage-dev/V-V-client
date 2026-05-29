@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, ShieldCheck, Info, FileText } from "lucide-react";
 import SharedGoogleDriveLinkSection from "../components/application/SharedGoogleDriveLinkSection";
 import PassportUploadRow from "../components/application/PassportUploadRow";
 import Navbar from "../components/layout/Navbar";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
-import { api, useAuthStore } from "../store/authStore";
+import { api, SERVER_URL, useAuthStore } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
 import { openRazorpayForApplication, validateRazorpayCheckoutReadiness } from "../utils/razorpayCheckout";
 import { slugifyCountryRoute } from "../utils/countryRouting";
@@ -56,6 +56,45 @@ const formatSummaryDate = (value) => {
   return formatOrdinalDate(parsed);
 };
 
+const resolveDocumentPreviewUrl = (value) => {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${SERVER_URL}${url}`;
+  return `${SERVER_URL}/${url}`;
+};
+
+const getTravelerPassportDetail = (application, travelerNo) => {
+  const traveler = Array.isArray(application?.travellerDocuments)
+    ? application.travellerDocuments.find((entry) => Number(entry?.travelerNo) === Number(travelerNo))
+    : null;
+  if (!traveler) return null;
+
+  const docs = traveler.documents;
+  const url =
+    docs instanceof Map
+      ? docs.get("passport")
+      : typeof docs?.get === "function"
+        ? docs.get("passport")
+        : docs?.passport;
+  if (!url) return null;
+
+  const details = traveler.documentDetails;
+  const detail =
+    details instanceof Map
+      ? details.get("passport")
+      : typeof details?.get === "function"
+        ? details.get("passport")
+        : details?.passport;
+
+  return {
+    url,
+    fileName: detail?.fileName || String(url).split("/").pop() || "Passport",
+    fileSize: Number(detail?.fileSize || 0),
+    mimeType: detail?.mimeType || "",
+  };
+};
+
 const hasUploadedPassport = (entry) => {
   const docs = entry?.documents;
   if (!docs) return false;
@@ -68,7 +107,7 @@ const hasUploadedPassport = (entry) => {
 const buildTravelerPassportSuccessMap = ({ application, summaryData, uploadSuccesses, travelerCount }) => {
   const applicationSuccesses = buildSuccessMapFromApplication(application);
   const summarySuccesses =
-    summaryData?.uploadedDocSuccesses && typeof summaryData.uploadedDocSuccesses === "object"
+    !application && summaryData?.uploadedDocSuccesses && typeof summaryData.uploadedDocSuccesses === "object"
       ? summaryData.uploadedDocSuccesses
       : {};
   const merged = {
@@ -89,6 +128,60 @@ const buildTravelerPassportSuccessMap = ({ application, summaryData, uploadSucce
   });
 
   return merged;
+};
+
+const buildTravelerPassportDetailsMap = (application, travelerCount) => {
+  const details = {};
+
+  Array.from({ length: travelerCount }).forEach((_, index) => {
+    const travelerNo = index + 1;
+    const passportDetail = getTravelerPassportDetail(application, travelerNo);
+    if (passportDetail?.url) {
+      details[travelerNo] = passportDetail;
+    }
+  });
+
+  return details;
+};
+
+const syncPaymentSummarySource = ({ application, applicationId, summaryData, docsSkipped, hiddenUploadedPassportNos }) => {
+  try {
+    const raw = sessionStorage.getItem("paymentSummarySource");
+    const existing = raw ? JSON.parse(raw) : {};
+    const travelerCount = Math.max(
+      1,
+      Number(application?.travellerCount || summaryData?.travellerCount || 1)
+    );
+    const nextSummaryData = {
+      ...(existing?.summaryData && typeof existing.summaryData === "object" ? existing.summaryData : {}),
+      ...(summaryData && typeof summaryData === "object" ? summaryData : {}),
+      applicationId: application?._id || applicationId || summaryData?.applicationId || existing?.applicationDraftId || null,
+      sharedDriveLink: String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim(),
+      uploadedDocSuccesses: buildTravelerPassportSuccessMap({
+        application,
+        summaryData,
+        uploadSuccesses: {},
+        travelerCount,
+      }),
+      uploadedDocDetails: buildTravelerPassportDetailsMap(application, travelerCount),
+      hiddenPassportTravelerNos:
+        hiddenUploadedPassportNos && typeof hiddenUploadedPassportNos === "object"
+          ? hiddenUploadedPassportNos
+          : {},
+    };
+
+    sessionStorage.setItem(
+      "paymentSummarySource",
+      JSON.stringify({
+        ...(existing && typeof existing === "object" ? existing : {}),
+        applicationDraftId: nextSummaryData.applicationId,
+        docsSkipped,
+        summaryData: nextSummaryData,
+      })
+    );
+  } catch {
+    /* ignore storage errors */
+  }
 };
 
 const getApplicationDocSuccessStorageKey = (applicationId) =>
@@ -212,6 +305,16 @@ const ApplicationSummaryPage = () => {
   const [uploadModalUploading, setUploadModalUploading] = useState({});
   const [uploadModalOptimizing, setUploadModalOptimizing] = useState({});
   const [uploadSuccesses, setUploadSuccesses] = useState({});
+  const [hiddenUploadedPassportNos, setHiddenUploadedPassportNos] = useState(
+    () => (
+      summaryData?.hiddenPassportTravelerNos && typeof summaryData.hiddenPassportTravelerNos === "object"
+        ? summaryData.hiddenPassportTravelerNos
+        : summaryData?.hiddenUploadedPassportNos && typeof summaryData.hiddenUploadedPassportNos === "object"
+          ? summaryData.hiddenUploadedPassportNos
+          : {}
+    )
+  );
+  const [passportPreview, setPassportPreview] = useState(null);
   const [uploadSettings, setUploadSettings] = useState({ allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayMessage, setRazorpayMessage] = useState("");
@@ -260,6 +363,29 @@ const ApplicationSummaryPage = () => {
       /* ignore storage errors */
     }
   }, [docsSkipped, id, location.state?.docsSkipped, persistedSummarySource, summaryData]);
+
+  useEffect(() => {
+    const nextHidden =
+      summaryData?.hiddenPassportTravelerNos && typeof summaryData.hiddenPassportTravelerNos === "object"
+        ? summaryData.hiddenPassportTravelerNos
+        : summaryData?.hiddenUploadedPassportNos && typeof summaryData.hiddenUploadedPassportNos === "object"
+          ? summaryData.hiddenUploadedPassportNos
+          : null;
+    if (nextHidden) {
+      setHiddenUploadedPassportNos(nextHidden);
+    }
+  }, [summaryData]);
+
+  useEffect(() => {
+    if (!application) return;
+    syncPaymentSummarySource({
+      application,
+      applicationId: applicationIdForUploads,
+      summaryData,
+      docsSkipped,
+      hiddenUploadedPassportNos,
+    });
+  }, [application, applicationIdForUploads, docsSkipped, hiddenUploadedPassportNos, summaryData]);
 
   useEffect(() => {
     setUploadSuccesses(getStoredApplicationDocSuccesses(applicationIdForUploads));
@@ -332,6 +458,37 @@ const ApplicationSummaryPage = () => {
     check();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!targetAppId) return;
+    let cancelled = false;
+
+    const refreshApplication = async () => {
+      try {
+        const { data } = await api.get(`/users/applications/${targetAppId}`);
+        if (!cancelled && data?.success && data.application) {
+          setApplication(data.application);
+        }
+      } catch {
+        /* non-blocking background refresh */
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshApplication();
+      }
+    };
+
+    window.addEventListener("focus", refreshApplication);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshApplication);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [targetAppId]);
 
   useEffect(() => {
     if (!termsModalOpen) return;
@@ -464,6 +621,10 @@ const ApplicationSummaryPage = () => {
    *   3. Otherwise inspect each traveler entry on the server record.
    */
   const docsUploaded = useMemo(() => {
+    const hasHiddenRequiredPassport = Array.from({ length: travelerCount }).some((_, index) =>
+      Boolean(hiddenUploadedPassportNos[index + 1])
+    );
+    if (hasHiddenRequiredPassport) return false;
     const allPassportUploadsStored = Array.from({ length: travelerCount }).every((_, index) =>
       Boolean(uploadSuccesses[`${index + 1}-passport`])
     );
@@ -483,14 +644,14 @@ const ApplicationSummaryPage = () => {
       return false;
     };
     const allUploadsPresent = entries.length >= travelerCount
-      && entries.slice(0, travelerCount).every(entryHasUpload);
+      && entries.slice(0, travelerCount).every((entry, index) => !hiddenUploadedPassportNos[index + 1] && entryHasUpload(entry));
     if (allUploadsPresent) return true;
     if (docsSkipped) return false;
-    if (summaryData && typeof summaryData.docsUploaded === "boolean") {
+    if (!application && summaryData && typeof summaryData.docsUploaded === "boolean") {
       return summaryData.docsUploaded;
     }
     return false;
-  }, [docsSkipped, summaryData, uploadSuccesses, application?.travellerDocuments, travelerCount]);
+  }, [application, docsSkipped, summaryData, uploadSuccesses, application?.travellerDocuments, hiddenUploadedPassportNos, travelerCount]);
 
   const travelerPassportSuccesses = useMemo(
     () => buildTravelerPassportSuccessMap({
@@ -501,6 +662,11 @@ const ApplicationSummaryPage = () => {
     }),
     [application, summaryData, uploadSuccesses, travelerCount]
   );
+
+  const passportPreviewIsPdf = passportPreview?.mimeType.includes("pdf")
+    || /\.pdf($|\?)/i.test(String(passportPreview?.url || ""));
+  const passportPreviewIsImage = /^image\//i.test(String(passportPreview?.mimeType || ""))
+    || /\.(png|jpe?g|gif|webp|bmp|svg)($|\?)/i.test(String(passportPreview?.url || ""));
 
   useEffect(() => {
     if (!applicationIdForUploads || !Object.keys(travelerPassportSuccesses).length) return;
@@ -571,7 +737,7 @@ const ApplicationSummaryPage = () => {
         name: travelerNames[index] || `Traveler ${index + 1}`,
         passportFile: null,
         passportUploaded:
-          Boolean(travelerPassportSuccesses[`${index + 1}-passport`]),
+          Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
       }))
     );
     setUploadModalDriveLink(
@@ -583,6 +749,65 @@ const ApplicationSummaryPage = () => {
     setUploadDocumentsModalOpen(true);
   };
 
+  const openPassportPreview = (travelerNo) => {
+    const detail = getTravelerPassportDetail(application, travelerNo);
+    const previewUrl = resolveDocumentPreviewUrl(detail?.url);
+    if (!detail || !previewUrl) {
+      showToast("Preview is not available for this file yet.", "error");
+      return;
+    }
+    setPassportPreview({
+      url: previewUrl,
+      fileName: detail.fileName || `Traveler ${travelerNo} Passport`,
+      mimeType: String(detail.mimeType || "").toLowerCase(),
+    });
+  };
+
+  const closePassportPreview = () => {
+    setPassportPreview(null);
+  };
+
+  const removeUploadedPassport = async (travelerNo, index) => {
+    try {
+      const { appId } = await ensureApplicationDraft();
+      const { data } = await api.put(`/users/applications/${appId}`, {
+        travelerUpdate: {
+          travelerNo: String(travelerNo),
+          removeDocumentTypes: ["passport"],
+        },
+      });
+      if (!data?.success || !data.application) {
+        throw new Error(data?.message || "Could not remove passport.");
+      }
+
+      setApplication(data.application);
+      setHiddenUploadedPassportNos((prev) => {
+        const next = { ...prev };
+        delete next[travelerNo];
+        return next;
+      });
+      setUploadSuccesses((prev) => {
+        const next = { ...prev };
+        delete next[`${travelerNo}-passport`];
+        setStoredApplicationDocSuccesses(appId, next);
+        return next;
+      });
+      setUploadModalTravelers((prev) =>
+        prev.map((traveler, travelerIndex) => (
+          travelerIndex === index
+            ? { ...traveler, passportFile: null, passportUploaded: false }
+            : traveler
+        ))
+      );
+      if (passportPreview) {
+        closePassportPreview();
+      }
+      showToast("Passport removed successfully.", "success");
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.message || "Could not remove passport.", "error");
+    }
+  };
+
   useEffect(() => {
     if (!uploadDocumentsModalOpen) return;
     setUploadModalTravelers((prev) => (
@@ -590,16 +815,16 @@ const ApplicationSummaryPage = () => {
         ? prev.map((traveler, index) => ({
             ...traveler,
             name: travelerNames[index] || `Traveler ${index + 1}`,
-            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]),
+            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
           }))
         : Array.from({ length: travelerCount }).map((_, index) => ({
             id: index + 1,
             name: travelerNames[index] || `Traveler ${index + 1}`,
             passportFile: null,
-            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]),
+            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
           }))
     ));
-  }, [uploadDocumentsModalOpen, travelerCount, travelerNames, travelerPassportSuccesses]);
+  }, [uploadDocumentsModalOpen, travelerCount, travelerNames, travelerPassportSuccesses, hiddenUploadedPassportNos]);
 
   const handleUploadModalPassportChange = async (index, file) => {
     if (!file) return;
@@ -678,19 +903,14 @@ const ApplicationSummaryPage = () => {
       }
 
       setApplication(data.application);
+      setHiddenUploadedPassportNos((prev) => {
+        const next = { ...prev };
+        delete next[travelerNo];
+        return next;
+      });
       setUploadSuccesses((prev) => {
         const next = { ...prev, [`${travelerNo}-passport`]: true };
         setStoredApplicationDocSuccesses(appId, next);
-        
-        const allUploaded = Array.from({ length: travelerCount }).every((_, i) =>
-          Boolean(next[`${i + 1}-passport`])
-        );
-        if (allUploaded) {
-          setTimeout(() => {
-            setUploadDocumentsModalOpen(false);
-          }, 800);
-        }
-        
         return next;
       });
       setUploadModalTravelers((prev) =>
@@ -720,7 +940,7 @@ const ApplicationSummaryPage = () => {
     }
   };
 
-  const handleSaveUploadDocuments = async () => {
+  const persistUploadDocumentsState = async () => {
     const sharedLink = String(uploadModalDriveLink || "").trim();
     try {
       const { appId } = await ensureApplicationDraft();
@@ -730,11 +950,15 @@ const ApplicationSummaryPage = () => {
           setApplication(data.application);
         }
       }
-      setUploadDocumentsModalOpen(false);
       showToast("Upload details saved.", "success");
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Could not save upload details.", "error");
     }
+  };
+
+  const closeUploadDocumentsModal = async () => {
+    await persistUploadDocumentsState();
+    setUploadDocumentsModalOpen(false);
   };
 
   const handleDriveLinkBlurSave = async () => {
@@ -746,9 +970,6 @@ const ApplicationSummaryPage = () => {
       if (data?.success && data.application) {
         setApplication(data.application);
         showToast("Google Drive link saved.", "success");
-        setTimeout(() => {
-          setUploadDocumentsModalOpen(false);
-        }, 800);
       }
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Could not save Drive link.", "error");
@@ -779,6 +1000,13 @@ const ApplicationSummaryPage = () => {
       });
     }
 
+    const travelDetailsPassportDetails = {
+      ...(summaryData?.uploadedDocDetails && typeof summaryData.uploadedDocDetails === "object"
+        ? summaryData.uploadedDocDetails
+        : {}),
+      ...buildTravelerPassportDetailsMap(application, travelerCount),
+    };
+
     const restoreTravelDetails = {
       travelDateFrom: formatDateToYmd(summaryData?.travelDateFrom ?? application?.travelDate),
       travelDateTo: formatDateToYmd(summaryData?.travelDateTo ?? application?.returnDate),
@@ -786,6 +1014,8 @@ const ApplicationSummaryPage = () => {
       sharedDriveLink: String(summaryData?.sharedDriveLink || application?.gdriveLink || "").trim(),
       applicationDraftId: id || applicationIdForUploads || null,
       passportSuccesses: travelDetailsPassportSuccesses,
+      passportDetails: travelDetailsPassportDetails,
+      hiddenPassportTravelerNos: hiddenUploadedPassportNos,
       travelers: Array.isArray(summaryData?.travelers) && summaryData.travelers.length
         ? summaryData.travelers.map((traveler) => ({
             ...traveler,
@@ -851,7 +1081,8 @@ const ApplicationSummaryPage = () => {
             sharedDriveLink: restoreTravelDetails.sharedDriveLink,
             travelers: restoreTravelDetails.travelers,
             passportSuccesses: travelDetailsPassportSuccesses,
-            passportDetails: summaryData?.uploadedDocDetails || {},
+            passportDetails: travelDetailsPassportDetails,
+            hiddenPassportTravelerNos: hiddenUploadedPassportNos,
             showTravelDetails: true,
           });
         }
@@ -890,7 +1121,8 @@ const ApplicationSummaryPage = () => {
             sharedDriveLink: restoreTravelDetails.sharedDriveLink,
             travelers: restoreTravelDetails.travelers,
             passportSuccesses: travelDetailsPassportSuccesses,
-            passportDetails: summaryData?.uploadedDocDetails || {},
+            passportDetails: travelDetailsPassportDetails,
+            hiddenPassportTravelerNos: hiddenUploadedPassportNos,
             showTravelDetails: true,
           });
         }
@@ -1039,15 +1271,15 @@ const ApplicationSummaryPage = () => {
         {!docsUploaded || !Boolean(String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim()) ? (
           <>
             <div className="rounded-2xl border border-border bg-surface p-5">
-              <Button
-                variant="secondary"
-                size="md"
-                fullWidth
-                onClick={openUploadDocumentsModal}
-              >
-                Upload your documents now
-              </Button>
-            </div>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onClick={openUploadDocumentsModal}
+          >
+            {docsUploaded ? "Review Uploaded documents" : "Upload Doc Now"}
+          </Button>
+        </div>
 
             <div className="rounded-2xl border border-cyan/30 bg-cyan/5 p-4">
               <div className="flex items-start gap-3">
@@ -1064,9 +1296,57 @@ const ApplicationSummaryPage = () => {
             </div>
           </>
         ) : (
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-2 text-emerald-600 font-medium text-sm justify-center">
-            <CheckCircle size={18} />
-            All documents submitted
+          <>
+            <div className="rounded-2xl border border-border bg-surface p-5">
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={openUploadDocumentsModal}
+              >
+                {docsUploaded ? "Review Uploaded documents" : "Upload Doc Now"}
+              </Button>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-2 text-emerald-600 font-medium text-sm justify-center">
+              <CheckCircle size={18} />
+              All documents submitted
+            </div>
+          </>
+        )}
+
+        {docsUploaded && (
+          <div className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+            <h4 className="text-sm font-semibold text-text-primary">Uploaded Passport Documents</h4>
+            <div className="space-y-3">
+              {Array.from({ length: travelerCount }).map((_, index) => {
+                const travelerNo = index + 1;
+                const detail = getTravelerPassportDetail(application, travelerNo);
+                if (!detail?.url) return null;
+                return (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/60 hover:border-cyan/30 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-cyan/10 flex items-center justify-center text-cyan shrink-0">
+                        <FileText size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-text-primary truncate">
+                          {travelerNames[index] || `Traveler ${travelerNo}`}
+                        </p>
+                        <p className="text-[10px] text-text-secondary truncate max-w-[180px] mt-0.5">
+                          {detail.fileName} • {formatFileSize(detail.fileSize)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openPassportPreview(travelerNo)}
+                      className="text-xs font-medium text-cyan hover:text-cyan-dark px-2.5 py-1.5 rounded-lg bg-cyan/5 hover:bg-cyan/10 transition-colors shrink-0"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1173,15 +1453,18 @@ const ApplicationSummaryPage = () => {
 
       <Modal
         isOpen={uploadDocumentsModalOpen}
-        onClose={() => { handleSaveUploadDocuments(); }}
+        onClose={closeUploadDocumentsModal}
         title="Upload Documents"
         size="xl"
+        closeOnBackdropClick={false}
         footer={
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button variant="secondary" size="md" onClick={() => { handleSaveUploadDocuments(); }}>
-              Skip, I'll upload later
-            </Button>
-          </div>
+          docsUploaded ? null : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button variant="secondary" size="md" onClick={closeUploadDocumentsModal}>
+                Skip, I'll upload later
+              </Button>
+            </div>
+          )
         }
       >
         <div className="space-y-6">
@@ -1252,27 +1535,31 @@ const ApplicationSummaryPage = () => {
                         uploading={Boolean(uploadModalUploading[index])}
                         optimizing={Boolean(uploadModalOptimizing[index])}
                         saved={Boolean(traveler.passportUploaded && !traveler.passportFile)}
+                        previewEnabled={Boolean(getTravelerPassportDetail(application, traveler.id)?.url)}
                         accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                         helperText={
                           traveler.passportFile
                             ? traveler.passportFile.name
+                            : getTravelerPassportDetail(application, traveler.id)?.fileName
+                              ? `${getTravelerPassportDetail(application, traveler.id).fileName} - ${formatFileSize(getTravelerPassportDetail(application, traveler.id).fileSize)}`
                             : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
                         }
                         fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}
                         savedText="Passport uploaded"
                         reuploadLabel="Replace File"
+                        removeLabel="Remove"
                         onChange={(file) => handleUploadModalPassportChange(index, file)}
+                        onPreview={() => openPassportPreview(traveler.id)}
+                        onRemove={() => removeUploadedPassport(traveler.id, index)}
                         onReupload={() => {
-                          setUploadModalTravelers((prev) =>
-                            prev.map((item, itemIndex) => (
-                              itemIndex === index
-                                ? { ...item, passportFile: null, passportUploaded: false }
-                                : item
-                            ))
-                          );
                           setUploadModalErrors((prev) => {
                             const next = { ...prev };
                             delete next[index];
+                            return next;
+                          });
+                          setHiddenUploadedPassportNos((prev) => {
+                            const next = { ...prev };
+                            delete next[traveler.id];
                             return next;
                           });
                         }}
@@ -1291,6 +1578,64 @@ const ApplicationSummaryPage = () => {
             showSkipHint={application?.paymentStatus !== "completed"}
             savedLink={application?.gdriveLink || ""}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(passportPreview)}
+        onClose={closePassportPreview}
+        title={passportPreview?.fileName || "Passport Preview"}
+        size="xl"
+        zIndexClass="z-[70]"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-text-primary">
+                {passportPreview?.fileName || "Uploaded file"}
+              </p>
+              <p className="text-xs text-text-muted">
+                Review the uploaded passport file.
+              </p>
+            </div>
+            {passportPreview?.url ? (
+              <a
+                href={passportPreview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-lg bg-cyan/15 px-3 py-2 text-xs font-semibold text-cyan transition-colors hover:bg-cyan/25"
+              >
+                Open in new tab
+              </a>
+            ) : null}
+          </div>
+
+          {passportPreviewIsImage ? (
+            <div className="overflow-hidden rounded-2xl border border-border bg-black/5">
+              <img
+                src={passportPreview.url}
+                alt={passportPreview.fileName || "Uploaded passport"}
+                className="max-h-[70vh] w-full object-contain bg-slate-950/5"
+              />
+            </div>
+          ) : passportPreviewIsPdf ? (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface-2">
+              <iframe
+                src={passportPreview.url}
+                title={passportPreview.fileName || "Passport preview"}
+                className="h-[70vh] w-full bg-white"
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-surface-2 px-4 py-10 text-center">
+              <p className="text-sm font-medium text-text-primary">
+                This file type cannot be previewed here.
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Use "Open in new tab" to inspect the uploaded document.
+              </p>
+            </div>
+          )}
         </div>
       </Modal>
 

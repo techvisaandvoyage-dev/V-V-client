@@ -36,10 +36,11 @@ import {
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import Button from "../components/ui/Button";
+import Modal from "../components/ui/Modal";
 import ImageWithShimmer from "../components/ui/ImageWithShimmer";
 import DateRangePicker from "../components/ui/DateRangePicker";
 import { useDataStore } from "../store/dataStore";
-import { useAuthStore, api } from "../store/authStore";
+import { useAuthStore, api, SERVER_URL } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
 import { useCountries, useMergedCountry } from "../hooks/useCountries";
 import {
@@ -139,6 +140,17 @@ const formatFileSize = (size = 0) => {
   if (!size) return "0 KB";
   if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getApplicationDocSuccessStorageKey = (applicationId) =>
+  applicationId ? `application-doc-successes:${applicationId}` : "";
+
+const resolveDocumentPreviewUrl = (value) => {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${SERVER_URL}${url}`;
+  return `${SERVER_URL}/${url}`;
 };
 
 const getTravelerPassportDetail = (application, travelerNo) => {
@@ -409,6 +421,8 @@ const CountryDetails = () => {
   const [passportErrors, setPassportErrors] = useState({});
   const [passportSuccesses, setPassportSuccesses] = useState({});
   const [passportDetails, setPassportDetails] = useState({});
+  const [hiddenPassportTravelerNos, setHiddenPassportTravelerNos] = useState({});
+  const [passportPreview, setPassportPreview] = useState(null);
   const travelerNameInputRefs = useRef({});
   const sharedDriveLinkInputRef = useRef(null);
   const startApplicationCardRef = useRef(null);
@@ -971,8 +985,11 @@ const CountryDetails = () => {
     if (draft.passportDetails && typeof draft.passportDetails === "object") {
       setPassportDetails(draft.passportDetails);
     }
+    if (draft.hiddenPassportTravelerNos && typeof draft.hiddenPassportTravelerNos === "object") {
+      setHiddenPassportTravelerNos(draft.hiddenPassportTravelerNos);
+    }
     if (draft.showTravelDetails) {
-      setShowTravelDetails(true);
+      // setShowTravelDetails(true);
       window.setTimeout(() => {
         const node = document.getElementById("travel-details");
         if (!node) return;
@@ -1003,6 +1020,9 @@ const CountryDetails = () => {
       if (restore.passportDetails && typeof restore.passportDetails === "object") {
         setPassportDetails(restore.passportDetails);
       }
+      if (restore.hiddenPassportTravelerNos && typeof restore.hiddenPassportTravelerNos === "object") {
+        setHiddenPassportTravelerNos(restore.hiddenPassportTravelerNos);
+      }
       if (location.state?.applicationDraftId || restore.applicationDraftId) {
         setCurrentApplicationId(String(location.state?.applicationDraftId || restore.applicationDraftId));
       }
@@ -1032,14 +1052,20 @@ const CountryDetails = () => {
         const count = Math.max(1, Number(data.application?.travellerCount || travelers.length || 1));
         for (let index = 0; index < count; index += 1) {
           const travelerNo = index + 1;
+          if (hiddenPassportTravelerNos?.[travelerNo]) continue;
           const detail = getTravelerPassportDetail(data.application, travelerNo);
           if (!detail) continue;
           nextSuccesses[travelerNo] = true;
           nextDetails[travelerNo] = detail;
         }
 
+        const nextSharedDriveLink = String(data.application?.gdriveLink || "").trim();
         setPassportSuccesses((prev) => ({ ...prev, ...nextSuccesses }));
         setPassportDetails((prev) => ({ ...prev, ...nextDetails }));
+        if (nextSharedDriveLink) {
+          setSharedDriveLink(nextSharedDriveLink);
+          setSharedDriveLinkVerified(true);
+        }
       } catch {
         /* Restoring upload status should not block the travel form. */
       }
@@ -1049,7 +1075,78 @@ const CountryDetails = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentApplicationId, travelers.length]);
+  }, [currentApplicationId, travelers.length, hiddenPassportTravelerNos]);
+
+  useEffect(() => {
+    if (!currentApplicationId || !localStorage.getItem("token")) return;
+    let cancelled = false;
+
+    const refreshTravelDetailsState = async () => {
+      try {
+        const { data } = await api.get(`/users/applications/${currentApplicationId}`);
+        if (cancelled || !data?.success || !data.application) return;
+
+        const nextSuccesses = {};
+        const nextDetails = {};
+        const count = Math.max(1, Number(data.application?.travellerCount || travelers.length || 1));
+        for (let index = 0; index < count; index += 1) {
+          const travelerNo = index + 1;
+          if (hiddenPassportTravelerNos?.[travelerNo]) continue;
+          const detail = getTravelerPassportDetail(data.application, travelerNo);
+          if (!detail) continue;
+          nextSuccesses[travelerNo] = true;
+          nextDetails[travelerNo] = detail;
+        }
+
+        const nextSharedDriveLink = String(data.application?.gdriveLink || "").trim();
+        setPassportSuccesses((prev) => ({ ...prev, ...nextSuccesses }));
+        setPassportDetails((prev) => ({ ...prev, ...nextDetails }));
+        setSharedDriveLink(nextSharedDriveLink);
+        setSharedDriveLinkVerified(Boolean(nextSharedDriveLink));
+
+        saveTravelDraft(countryId, {
+          applicationId: data.application?._id || currentApplicationId,
+          travelDateFrom,
+          travelDateTo,
+          visaOption,
+          sharedDriveLink: nextSharedDriveLink,
+          travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+          passportSuccesses: { ...passportSuccesses, ...nextSuccesses },
+          passportDetails: { ...passportDetails, ...nextDetails },
+          hiddenPassportTravelerNos,
+          showTravelDetails: true,
+        });
+      } catch {
+        /* non-blocking background refresh */
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshTravelDetailsState();
+      }
+    };
+
+    window.addEventListener("focus", refreshTravelDetailsState);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshTravelDetailsState);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    countryId,
+    currentApplicationId,
+    hiddenPassportTravelerNos,
+    passportDetails,
+    passportSuccesses,
+    travelDateFrom,
+    travelDateTo,
+    travelers,
+    travelers.length,
+    visaOption,
+  ]);
 
   useEffect(() => {
     const raw = (location.hash || "").replace(/^#/, "");
@@ -1157,6 +1254,7 @@ const CountryDetails = () => {
         travelers: travelers.map((t) => ({ name: String(t.name || "") })),
         passportSuccesses,
         passportDetails,
+        hiddenPassportTravelerNos,
         showTravelDetails: false,
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1193,6 +1291,11 @@ const CountryDetails = () => {
       return next;
     });
     setPassportDetails((prev) => {
+      const next = { ...prev };
+      delete next[indexToRemove + 1];
+      return next;
+    });
+    setHiddenPassportTravelerNos((prev) => {
       const next = { ...prev };
       delete next[indexToRemove + 1];
       return next;
@@ -1262,6 +1365,11 @@ const CountryDetails = () => {
       return;
     }
     updateTravelerPassportFile(index, optimizedFile);
+    setHiddenPassportTravelerNos((prev) => {
+      const next = { ...prev };
+      delete next[travelerNo];
+      return next;
+    });
     setPassportErrors((prev) => {
       const next = { ...prev };
       delete next[travelerNo];
@@ -1314,6 +1422,10 @@ const CountryDetails = () => {
         travelers: travelers.map((t) => ({ name: String(t.name || "") })),
         passportSuccesses: nextPassportSuccesses,
         passportDetails: nextPassportDetails,
+        hiddenPassportTravelerNos: {
+          ...hiddenPassportTravelerNos,
+          [travelerNo]: false,
+        },
         showTravelDetails: true,
       });
       // Sync to application doc successes local storage key used by summary page
@@ -1363,14 +1475,36 @@ const CountryDetails = () => {
     }
 
     const trimmed = String(value || "").trim();
-    if (!trimmed) return;
-
     driveLinkSaveTimerRef.current = window.setTimeout(() => {
-      const normalized = normalizeDriveLink(trimmed);
-      setSharedDriveLink(normalized);
-      setSharedDriveLinkVerified(true);
-      showToast("Google Drive link saved.", "success");
-      driveLinkSaveTimerRef.current = null;
+      const persist = async () => {
+        const normalized = trimmed ? normalizeDriveLink(trimmed) : "";
+        setSharedDriveLink(normalized);
+        if (!localStorage.getItem("token")) {
+          setSharedDriveLinkVerified(Boolean(normalized));
+          return;
+        }
+
+        try {
+          const appId = await createCheckoutDraftAndSetId();
+          if (appId) {
+            const { data } = await api.put(`/users/applications/${appId}`, {
+              gdriveLink: normalized,
+            });
+            if (data?.success && data.application) {
+              setCurrentApplicationId(data.application._id || appId);
+              await fetchUserApplications();
+            }
+          }
+          setSharedDriveLinkVerified(Boolean(normalized));
+          showToast("Google Drive link saved.", "success");
+        } catch (err) {
+          showToast(err?.response?.data?.message || "Could not save Google Drive link.", "error");
+        } finally {
+          driveLinkSaveTimerRef.current = null;
+        }
+      };
+
+      persist();
     }, 1000);
   };
 
@@ -1576,6 +1710,7 @@ const CountryDetails = () => {
       travelers: travelers.map((t) => ({ name: String(t.name || "") })),
       passportSuccesses,
       passportDetails,
+      hiddenPassportTravelerNos,
       showTravelDetails: true,
     });
     localStorage.setItem("lastActiveCountryId", countryId);
@@ -1602,7 +1737,8 @@ const CountryDetails = () => {
     sharedDriveLink,
     travelers,
     passportSuccesses,
-    passportDetails
+    passportDetails,
+    hiddenPassportTravelerNos
   ]);
 
   /** Build the `redirect=` value used when a guest needs to log in mid-flow. */
@@ -1688,6 +1824,11 @@ const CountryDetails = () => {
             gstEnabled: effectiveGstEnabled,
             travelerNames,
             docsUploaded: false,
+            uploadedDocSuccesses: Object.fromEntries(
+              Object.entries(passportSuccesses || {}).map(([travelerNo, success]) => [`${travelerNo}-passport`, success])
+            ),
+            uploadedDocDetails: passportDetails,
+            hiddenPassportTravelerNos,
             travelDateFrom: travelDateFrom || null,
             travelDateTo: travelDateTo || null,
             sharedDriveLink: sharedDriveLink || "",
@@ -1701,6 +1842,7 @@ const CountryDetails = () => {
                 visaOption: visaOption || country.visaType || "e-Visa",
                 sharedDriveLink: sharedDriveLink || "",
                 travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+                hiddenPassportTravelerNos,
               },
             },
           },
@@ -1721,6 +1863,109 @@ const CountryDetails = () => {
     setPaymentSummaryOpen(false);
     setVisaTermsAccepted(false);
   };
+
+  const openPassportPreview = (travelerNo) => {
+    const detail = passportDetails?.[travelerNo];
+    const previewUrl = resolveDocumentPreviewUrl(detail?.url);
+    if (!detail || !previewUrl) {
+      showToast("Preview is not available for this file yet.", "error");
+      return;
+    }
+    setPassportPreview({
+      url: previewUrl,
+      fileName: detail.fileName || `Traveler ${travelerNo} Passport`,
+      mimeType: String(detail.mimeType || "").toLowerCase(),
+    });
+  };
+
+  const closePassportPreview = () => {
+    setPassportPreview(null);
+  };
+
+  const hideTravelerPassportLocally = (travelerNo, index) => {
+    const removePassport = async () => {
+      try {
+        const appId = await createCheckoutDraftAndSetId();
+        if (!appId) throw new Error("Application draft not found.");
+
+        const { data } = await api.put(`/users/applications/${appId}`, {
+          travelerUpdate: {
+            travelerNo: String(travelerNo),
+            removeDocumentTypes: ["passport"],
+          },
+        });
+        if (!data?.success || !data.application) {
+          throw new Error(data?.message || "Could not remove passport.");
+        }
+
+        updateTravelerPassportFile(index, null);
+        setCurrentApplicationId(data.application._id || appId);
+        setPassportSuccesses((prev) => {
+          const next = { ...prev };
+          delete next[travelerNo];
+          return next;
+        });
+        setPassportDetails((prev) => {
+          const next = { ...prev };
+          delete next[travelerNo];
+          return next;
+        });
+        setPassportErrors((prev) => {
+          const next = { ...prev };
+          delete next[travelerNo];
+          return next;
+        });
+        setHiddenPassportTravelerNos((prev) => {
+          const next = { ...prev };
+          delete next[travelerNo];
+          return next;
+        });
+        try {
+          const key = getApplicationDocSuccessStorageKey(appId);
+          const raw = localStorage.getItem(key);
+          const parsed = raw ? JSON.parse(raw) : {};
+          if (parsed && typeof parsed === "object") {
+            delete parsed[`${travelerNo}-passport`];
+            localStorage.setItem(key, JSON.stringify(parsed));
+          }
+        } catch {
+          /* ignore storage errors */
+        }
+        saveTravelDraft(countryId, {
+          applicationId: appId,
+          travelDateFrom,
+          travelDateTo,
+          visaOption,
+          sharedDriveLink,
+          travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+          passportSuccesses: Object.fromEntries(
+            Object.entries(passportSuccesses || {}).filter(([key]) => Number(key) !== Number(travelerNo))
+          ),
+          passportDetails: Object.fromEntries(
+            Object.entries(passportDetails || {}).filter(([key]) => Number(key) !== Number(travelerNo))
+          ),
+          hiddenPassportTravelerNos: Object.fromEntries(
+            Object.entries(hiddenPassportTravelerNos || {}).filter(([key]) => Number(key) !== Number(travelerNo))
+          ),
+          showTravelDetails: true,
+        });
+        if (passportPreview) {
+          closePassportPreview();
+        }
+        await fetchUserApplications();
+        showToast("Passport removed successfully.", "success");
+      } catch (err) {
+        showToast(err?.response?.data?.message || err?.message || "Could not remove passport.", "error");
+      }
+    };
+
+    void removePassport();
+  };
+
+  const passportPreviewIsPdf = passportPreview?.mimeType.includes("pdf")
+    || /\.pdf($|\?)/i.test(String(passportPreview?.url || ""));
+  const passportPreviewIsImage = /^image\//i.test(String(passportPreview?.mimeType || ""))
+    || /\.(png|jpe?g|gif|webp|bmp|svg)($|\?)/i.test(String(passportPreview?.url || ""));
 
   const getTravelerNames = () => travelers.map((t) => String(t.name || "").trim());
 
@@ -2668,6 +2913,7 @@ const CountryDetails = () => {
                         uploading={Boolean(passportUploading[index + 1])}
                         optimizing={Boolean(passportOptimizing[index + 1])}
                         saved={Boolean(passportSuccesses[index + 1] && !traveler.passportFile)}
+                        previewEnabled={Boolean(passportDetails[index + 1]?.url)}
                         accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                         helperText={
                           traveler.passportFile
@@ -2678,20 +2924,17 @@ const CountryDetails = () => {
                         }
                         savedText="Passport uploaded"
                         reuploadLabel="Replace File"
+                        removeLabel="Remove"
                         onChange={(file) => handleTravelerPassportFile(index, file)}
+                        onPreview={() => openPassportPreview(index + 1)}
+                        onRemove={() => hideTravelerPassportLocally(index + 1, index)}
                         onReupload={() => {
-                          updateTravelerPassportFile(index, null);
-                          setPassportSuccesses((prev) => {
-                            const next = { ...prev };
-                            delete next[index + 1];
-                            return next;
-                          });
-                          setPassportDetails((prev) => {
-                            const next = { ...prev };
-                            delete next[index + 1];
-                            return next;
-                          });
                           setPassportErrors((prev) => {
+                            const next = { ...prev };
+                            delete next[index + 1];
+                            return next;
+                          });
+                          setHiddenPassportTravelerNos((prev) => {
                             const next = { ...prev };
                             delete next[index + 1];
                             return next;
@@ -3145,6 +3388,63 @@ const CountryDetails = () => {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(passportPreview)}
+        onClose={closePassportPreview}
+        title={passportPreview?.fileName || "Passport Preview"}
+        size="xl"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-text-primary">
+                {passportPreview?.fileName || "Uploaded file"}
+              </p>
+              <p className="text-xs text-text-muted">
+                Review the uploaded passport file before continuing.
+              </p>
+            </div>
+            {passportPreview?.url ? (
+              <a
+                href={passportPreview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-lg bg-cyan/15 px-3 py-2 text-xs font-semibold text-cyan transition-colors hover:bg-cyan/25"
+              >
+                Open in new tab
+              </a>
+            ) : null}
+          </div>
+
+          {passportPreviewIsImage ? (
+            <div className="overflow-hidden rounded-2xl border border-border bg-black/5">
+              <img
+                src={passportPreview.url}
+                alt={passportPreview.fileName || "Uploaded passport"}
+                className="max-h-[70vh] w-full object-contain bg-slate-950/5"
+              />
+            </div>
+          ) : passportPreviewIsPdf ? (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface-2">
+              <iframe
+                src={passportPreview.url}
+                title={passportPreview.fileName || "Passport preview"}
+                className="h-[70vh] w-full bg-white"
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-surface-2 px-4 py-10 text-center">
+              <p className="text-sm font-medium text-text-primary">
+                This file type cannot be previewed here.
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Use "Open in new tab" to inspect the uploaded document.
+              </p>
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <ContactVerificationModal
         isOpen={contactModalOpen}

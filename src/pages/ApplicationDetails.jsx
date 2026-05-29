@@ -57,6 +57,13 @@ import { getFileValidationRules } from "../utils/fileValidation";
 import { openRazorpayForApplication, validateRazorpayCheckoutReadiness } from "../utils/razorpayCheckout";
 import SharedGoogleDriveLinkSection from "../components/application/SharedGoogleDriveLinkSection";
 
+const resolveDocumentPreviewUrl = (value) => {
+  if (!value || typeof value !== "string") return null;
+  if (value.startsWith("http")) return value;
+  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, "") || "http://localhost:5000";
+  return `${baseUrl}${value.startsWith("/") ? "" : "/"}${value}`;
+};
+
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
 const OPTIMIZE_ERROR = "Could not prepare this file for upload.";
@@ -111,7 +118,17 @@ const DOCUMENT_META = {
 };
 
 const buildDocFields = (documentKeys = ["passport"]) => {
-  const keys = Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"];
+  const keys = (Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"])
+    .map((k) => {
+      if (!k) return "";
+      if (typeof k === "string") return k.trim();
+      if (typeof k === "object") {
+        return String(k.key || k.name || k.id || "").trim();
+      }
+      return String(k).trim();
+    })
+    .filter((k) => k && k !== "[object Object]");
+
   const seen = new Set();
 
   const fields = keys.reduce((acc, key) => {
@@ -135,6 +152,17 @@ const buildDocFields = (documentKeys = ["passport"]) => {
 };
 
 const buildDisplayDocFields = (documentKeys = ["passport"], catalog = []) => {
+  const keys = (Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"])
+    .map((k) => {
+      if (!k) return "";
+      if (typeof k === "string") return k.trim();
+      if (typeof k === "object") {
+        return String(k.key || k.name || k.id || "").trim();
+      }
+      return String(k).trim();
+    })
+    .filter((k) => k && k !== "[object Object]");
+
   const catalogByKey = new Map(
     (Array.isArray(catalog) ? catalog : [])
       .map((item) => ({
@@ -143,11 +171,11 @@ const buildDisplayDocFields = (documentKeys = ["passport"], catalog = []) => {
         description: String(item?.description ?? "").trim(),
         iconClass: String(item?.icon ?? "").trim(),
       }))
-      .filter((item) => item.key)
+      .filter((item) => item.key && item.key !== "[object Object]")
       .map((item) => [item.key, item])
   );
 
-  return buildDocFields(documentKeys).map((field) => {
+  return buildDocFields(keys).map((field) => {
     const meta = catalogByKey.get(field.key);
     return {
       ...field,
@@ -558,21 +586,21 @@ const ApplicationDetails = () => {
     if (!booking?.countryId) return;
 
     const loadCountryDocuments = async () => {
-      const bookingRequiredDocuments = Array.isArray(booking?.requiredDocuments) && booking.requiredDocuments.length
-        ? booking.requiredDocuments
-        : [];
-      if (bookingRequiredDocuments.length) {
-        setDocFields(buildDocFields(bookingRequiredDocuments));
-        return;
-      }
-
       try {
         const { data } = await api.get(`/countries/${booking.countryId}`);
         const keys = data?.country?.requiredDocuments;
-        setDocFields(buildDocFields(keys));
-      } catch {
-        setDocFields(buildDocFields());
+        if (Array.isArray(keys) && keys.length > 0) {
+          setDocFields(buildDocFields(keys));
+          return;
+        }
+      } catch (err) {
+        // Fall back to cached booking documents if live fetch fails
       }
+
+      const bookingRequiredDocuments = Array.isArray(booking?.requiredDocuments) && booking.requiredDocuments.length
+        ? booking.requiredDocuments
+        : [];
+      setDocFields(buildDocFields(bookingRequiredDocuments));
     };
 
     loadCountryDocuments();
@@ -640,6 +668,26 @@ const ApplicationDetails = () => {
       : {};
   };
 
+  const getTravelerDocInputKey = (travelerNo, docKey) => `${travelerNo}-${docKey}`;
+
+  const hasEffectiveTravelerDocument = (travelerNo, docKey, savedDocuments = getSavedTravelerDocuments(travelerNo)) => {
+    const inputKey = getTravelerDocInputKey(travelerNo, docKey);
+    if (uploadedDocSuccesses[inputKey]) return true;
+    if (unlockedDocs[inputKey]) return false;
+    const savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    return Boolean(savedValue);
+  };
+
+  const getEffectiveSavedTravelerDocumentValue = (
+    travelerNo,
+    docKey,
+    savedDocuments = getSavedTravelerDocuments(travelerNo)
+  ) => {
+    const inputKey = getTravelerDocInputKey(travelerNo, docKey);
+    if (unlockedDocs[inputKey]) return "";
+    return getStoredDocumentValue(savedDocuments, docKey);
+  };
+
   const getSavedTravelerOtherDocuments = (travelerNo) => {
     const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
     const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
@@ -671,25 +719,31 @@ const ApplicationDetails = () => {
       if (val instanceof File) return true;
       if (Array.isArray(val) && val.some(Boolean)) return true;
     }
+
+    for (const [key, isUnlocked] of Object.entries(unlockedDocs)) {
+      if (key.startsWith(`${travelerNoStr}-`) && isUnlocked) {
+        return true;
+      }
+    }
+
     return false;
   };
 
   const travelers = Array.from({ length: travelerCount }, (_, idx) => {
     const travelerNo = idx + 1;
-    const travelerNoStr = String(travelerNo);
     const uploadedTraveler = (Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : []).find(
       (entry) => Number(entry?.travelerNo) === travelerNo
     );
     const savedDocuments = getSavedTravelerDocuments(travelerNo);
     const travelerName = getSavedTravelerName(travelerNo) || `Traveler ${travelerNo}`;
     const submittedDocFields = docFields.filter((field) => {
-      const savedValue = getStoredDocumentValue(savedDocuments, field.key);
-      const localSuccess = uploadedDocSuccesses[`${travelerNoStr}-${field.key}`];
-      return Boolean(savedValue || localSuccess);
+      return hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments);
     });
     const uploadedDocumentsCount = submittedDocFields.length;
-    const missingInfo = progress.missingByTraveler.find((item) => item.travelerNo === travelerNo);
-    const done = travelerServerComplete(travelerNo);
+    const effectiveMissingLabels = docFields
+      .filter((field) => !hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments))
+      .map((field) => (field.label || field.key).replace(" Upload", ""));
+    const done = effectiveMissingLabels.length === 0 && !travelerHasUnsavedChanges(travelerNo);
 
     return {
       travelerNo,
@@ -700,7 +754,7 @@ const ApplicationDetails = () => {
       submittedDocFields,
       uploadedOtherDocumentsCount: Array.isArray(uploadedTraveler?.otherDocuments) ? uploadedTraveler.otherDocuments.length : 0,
       isComplete: done,
-      missingLabels: done ? [] : (missingInfo?.missingLabels || []),
+      missingLabels: done ? [] : effectiveMissingLabels,
     };
   });
 
@@ -904,10 +958,13 @@ const ApplicationDetails = () => {
     const selectedOtherDocs = selectedDocs[`${travelerNoStr}-otherDocuments`];
     const otherDocs = Array.isArray(selectedOtherDocs) ? selectedOtherDocs : [];
 
-    const serverComplete = travelerServerComplete(travelerNo);
     const savedDocuments = getSavedTravelerDocuments(travelerNo);
     const passportInputKey = `${travelerNoStr}-passport`;
-    const savedPassportUrl = getStoredDocumentValue(savedDocuments, "passport");
+    const savedPassportUrl = getEffectiveSavedTravelerDocumentValue(
+      travelerNo,
+      "passport",
+      savedDocuments
+    );
     const passportFile = selectedDocs[passportInputKey];
     const hasPassport = Boolean(savedPassportUrl || (passportFile instanceof File));
 
@@ -1339,6 +1396,13 @@ const ApplicationDetails = () => {
           });
           return next;
         });
+        setUnlockedDocs((prev) => {
+          const next = { ...prev };
+          requiredFiles.forEach(({ field }) => {
+            delete next[`${travelerNoStr}-${field.key}`];
+          });
+          return next;
+        });
         setSelectedDocs((prev) => {
           const next = { ...prev };
           docFieldsSnapshot.forEach((field) => {
@@ -1719,12 +1783,21 @@ const ApplicationDetails = () => {
                   helperText={
                     selectedFile
                       ? selectedFile.name
-                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType("passport").label}`
+                      : "JPG, JPEG, PNG - max 300 KB"
                   }
                   fileSizeText={selectedFile ? formatFileSize(selectedFile.size) : ""}
                   savedText="Passport uploaded"
                   onChange={(file) => handleDocFieldChange(travelerNo, "passport", file)}
                   onReupload={canUploadDocuments ? resetPassportUploadState : undefined}
+                  onRemove={() => {
+                    if (selectedFile) handleDocFieldChange(travelerNo, "passport", null);
+                    else if (hasSuccessfulUpload && canUploadDocuments) resetPassportUploadState();
+                  }}
+                  onPreview={(selectedFile || getStoredDocumentValue(getSavedTravelerDocuments(travelerNo), "passport")) ? () => {
+                    const savedUrl = getStoredDocumentValue(getSavedTravelerDocuments(travelerNo), "passport");
+                    if (selectedFile) window.open(URL.createObjectURL(selectedFile), "_blank");
+                    else if (savedUrl) window.open(resolveDocumentPreviewUrl(savedUrl), "_blank");
+                  } : undefined}
                 />
               );
               return (
@@ -1777,17 +1850,18 @@ const ApplicationDetails = () => {
                             const savedDocuments = getSavedTravelerDocuments(travelerNo);
                             const passportInputKey = `${travelerNoStr}-passport`;
                             const passportSelectedFile = selectedDocs[passportInputKey];
-                            const passportSavedDocUrl = unlockedDocs[passportInputKey]
-                              ? ""
-                              : getStoredDocumentValue(savedDocuments, "passport");
+                            const passportSavedDocUrl = getEffectiveSavedTravelerDocumentValue(
+                              travelerNo,
+                              "passport",
+                              savedDocuments
+                            );
                             const passportHasSuccessfulUpload = !passportSelectedFile
-                              && (Boolean(passportSavedDocUrl) || Boolean(uploadedDocSuccesses[passportInputKey]));
+                              && hasEffectiveTravelerDocument(travelerNo, "passport", savedDocuments);
                             const savedOtherDocuments = getSavedTravelerOtherDocuments(travelerNo);
                             const totalOtherDocumentsCount = savedOtherDocuments.length + otherList.length;
-                            const submittedRequiredFields = docFields.filter((field) => {
-                              const savedValue = getStoredDocumentValue(savedDocuments, field.key);
-                              return Boolean(savedValue || uploadedDocSuccesses[`${travelerNoStr}-${field.key}`]);
-                            });
+                            const submittedRequiredFields = docFields.filter((field) =>
+                              hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments)
+                            );
                             const derivedMissingLabels = docFields
                               .filter((field) => !submittedRequiredFields.some((submitted) => submitted.key === field.key))
                               .map((field) => (field.label || field.key).replace(" Upload", ""));
@@ -1832,7 +1906,7 @@ const ApplicationDetails = () => {
                                   helperText={
                                     passportSelectedFile
                                       ? passportSelectedFile.name
-                                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType("passport").label}`
+                                      : "JPG, JPEG, PNG - max 300 KB"
                                   }
                                   fileSizeText={passportSelectedFile ? formatFileSize(passportSelectedFile.size) : ""}
                                   savedText="Passport uploaded"
@@ -1845,6 +1919,22 @@ const ApplicationDetails = () => {
                                       return next;
                                     });
                                   }}
+                                  onRemove={() => {
+                                    if (passportSelectedFile) {
+                                      handleDocFieldChange(travelerNo, "passport", null);
+                                    } else if (passportHasSuccessfulUpload) {
+                                      setUnlockedDocs((prev) => ({ ...prev, [passportInputKey]: true }));
+                                      setUploadedDocSuccesses((prev) => {
+                                        const next = { ...prev };
+                                        delete next[passportInputKey];
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onPreview={(passportSelectedFile || passportSavedDocUrl) ? () => {
+                                    if (passportSelectedFile) window.open(URL.createObjectURL(passportSelectedFile), "_blank");
+                                    else if (passportSavedDocUrl) window.open(resolveDocumentPreviewUrl(passportSavedDocUrl), "_blank");
+                                  } : undefined}
                                 />
                                 {uploadSettings.enableFileUpload && (
                                   <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
@@ -1984,7 +2074,7 @@ const ApplicationDetails = () => {
                   <ShieldCheck size={24} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-xl font-semibold text-text-primary">Required Documents</h3>
+                  <h3 className="text-xl font-semibold text-text-primary">Documents Required</h3>
                   <p className="text-sm text-text-muted">
                     These are the country documents required for this application.
                   </p>
@@ -1994,10 +2084,7 @@ const ApplicationDetails = () => {
               <div className="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 sm:py-6 xl:grid-cols-3">
                 {visibleRequiredDocFields.map((field) => {
                   const Icon = field.Icon;
-                  const helperCopy =
-                    field.description
-                    || DOCUMENT_HELPER_COPY[field.key]
-                    || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType(field.key).label}`;
+                  const helperCopy = field.description || DOCUMENT_HELPER_COPY[field.key] || "";
 
                   return (
                     <div
@@ -2046,10 +2133,7 @@ const ApplicationDetails = () => {
                     const inputKey = `${resolvedActiveOtherDocsTravelerNo}-${field.key}`;
                     const hasError = Boolean(docErrors[inputKey]);
                     const Icon = field.Icon;
-                    const helperCopy =
-                      field.description
-                      || DOCUMENT_HELPER_COPY[field.key]
-                      || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max ${getUploadLimitForDocType(field.key).label}`;
+                    const helperCopy = field.description || DOCUMENT_HELPER_COPY[field.key] || "";
                     return (
                       <div
                         key={`other-doc-option-${inputKey}`}
@@ -2556,50 +2640,52 @@ const ApplicationDetails = () => {
                     {docFields.map((field) => {
                       const inputKey = `${travelerNoStr}-${field.key}`;
                       const selectedFile = selectedDocs[inputKey];
-                      const compressionMeta = selectedFile?.__compressionMeta;
-                      const Icon = field.Icon;
+                      const savedDocuments = getSavedTravelerDocuments(travelerNo);
+                      const savedUrl = getEffectiveSavedTravelerDocumentValue(travelerNo, field.key, savedDocuments);
+                      const isEffectivelySaved = hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments);
+
                       return (
-                        <div key={inputKey} className="space-y-1">
-                          <div
-                            className={`flex items-center gap-2 rounded-2xl border bg-slate-50 px-2.5 py-2.5 transition-colors ${
-                              docErrors[inputKey] ? "border-red-300" : "border-slate-200"
-                            }`}
-                          >
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan/10 text-cyan">
-                              <Icon size={14} strokeWidth={2} />
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold text-slate-900 truncate">{field.label}</p>
-                              <p className="text-[10px] text-slate-500 truncate">
-                                {selectedFile
-                                  ? `${selectedFile.name} · ${formatFileSize(selectedFile.size)}`
-                                  : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} · max ${getUploadLimitForDocType(field.key).label}`}
-                              </p>
-                            </div>
-                            <label
-                              htmlFor={`file-${inputKey}`}
-                              className="shrink-0 cursor-pointer rounded-md bg-cyan/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan hover:bg-cyan/25 transition-colors"
-                            >
-                              {selectedFile ? "Replace" : "Upload"}
-                            </label>
-                            <input
-                              id={`file-${inputKey}`}
-                              type="file"
-                              accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                              className="sr-only"
-                              disabled={docUploading || submissionLocked || Boolean(getSavedTravelerDocuments(travelerNo)[field.key])}
-                              onChange={(e) => {
-                                handleDocFieldChange(travelerNo, field.key, e.target.files?.[0] ?? null);
-                                e.target.value = "";
-                              }}
-                            />
-                          </div>
-                          {docErrors[inputKey] && (
-                            <p className="text-xs text-red-600 font-medium flex items-center gap-1 px-0.5">
-                              <AlertCircle size={12} /> {docErrors[inputKey]}
-                            </p>
-                          )}
-                        </div>
+                        <PassportUploadRow
+                          key={inputKey}
+                          inputId={`file-${inputKey}`}
+                          label={field.label}
+                          file={selectedFile}
+                          error={docErrors[inputKey]}
+                          uploading={docUploading || submissionLocked}
+                          saved={isEffectivelySaved}
+                          disabled={docUploading || submissionLocked}
+                          helperText={
+                            selectedFile
+                              ? selectedFile.name
+                              : `JPG, JPEG, PNG - max 300 KB`
+                          }
+                          fileSizeText={selectedFile ? formatFileSize(selectedFile.size) : ""}
+                          savedText="Document uploaded"
+                          onChange={(file) => handleDocFieldChange(travelerNo, field.key, file)}
+                          onReupload={canUploadDocuments ? () => {
+                            setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
+                            setUploadedDocSuccesses((prev) => {
+                              const next = { ...prev };
+                              delete next[inputKey];
+                              return next;
+                            });
+                          } : undefined}
+                          onRemove={() => {
+                            if (selectedFile) handleDocFieldChange(travelerNo, field.key, null);
+                            else if (isEffectivelySaved) {
+                              setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
+                              setUploadedDocSuccesses((prev) => {
+                                const next = { ...prev };
+                                delete next[inputKey];
+                                return next;
+                              });
+                            }
+                          }}
+                          onPreview={(selectedFile || savedUrl) ? () => {
+                            if (selectedFile) window.open(URL.createObjectURL(selectedFile), "_blank");
+                            else window.open(resolveDocumentPreviewUrl(savedUrl), "_blank");
+                          } : undefined}
+                        />
                       );
                     })}
                   </div>

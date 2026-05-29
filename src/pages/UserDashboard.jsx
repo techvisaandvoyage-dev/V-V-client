@@ -205,17 +205,43 @@ const UserDashboard = () => {
     };
   }, [bookings, requiredDocsByCountry]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshApplications = async () => {
+      try {
+        await fetchUserApplications();
+      } catch {
+        /* background refresh only */
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshApplications();
+      }
+    };
+
+    window.addEventListener("focus", refreshApplications);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refreshApplications);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchUserApplications, user]);
+
   const safeBookings = Array.isArray(bookings)
     ? bookings.filter((booking) => booking && typeof booking === "object")
     : [];
 
   const getBookingRequiredDocuments = (booking) => {
-    if (Array.isArray(booking?.requiredDocuments) && booking.requiredDocuments.length) {
-      return booking.requiredDocuments;
-    }
     const countryId = String(booking?.countryId || "").trim();
     if (countryId && Array.isArray(requiredDocsByCountry[countryId]) && requiredDocsByCountry[countryId].length) {
       return requiredDocsByCountry[countryId];
+    }
+    if (Array.isArray(booking?.requiredDocuments) && booking.requiredDocuments.length) {
+      return booking.requiredDocuments;
     }
     return undefined;
   };
