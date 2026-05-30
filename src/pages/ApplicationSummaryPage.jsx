@@ -582,9 +582,9 @@ const ApplicationSummaryPage = () => {
       governmentFeeTotal: governmentFee,
       totalAmount:
         Number.isFinite(fromServer) && fromServer > 0
-          ? fromServer + governmentFee
+          ? fromServer
           : Number.isFinite(fromState) && fromState > 0
-            ? fromState + governmentFee
+            ? fromState
             : governmentFee + service + gst,
     };
   }, [
@@ -601,8 +601,6 @@ const ApplicationSummaryPage = () => {
   ]);
 
   /**
-   * Compute the "documents uploaded" status for the status tile + step pill.
-   *
    * IMPORTANT: `application.travellerDocuments` is created with one entry per
    * traveler by the upload flow even when the user uploads no files (the form
    * still calls `PUT /users/applications/:id` to save the traveler name /
