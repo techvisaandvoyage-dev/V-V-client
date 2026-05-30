@@ -986,14 +986,7 @@ const CountryDetails = () => {
       setHiddenPassportTravelerNos(draft.hiddenPassportTravelerNos);
     }
     if (draft.showTravelDetails) {
-      // setShowTravelDetails(true);
-      window.setTimeout(() => {
-        const node = document.getElementById("travel-details");
-        if (!node) return;
-        const stickyOffset = 150;
-        const targetTop = window.scrollY + node.getBoundingClientRect().top - stickyOffset;
-        window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
-      }, 180);
+      setShowTravelDetails(true);
     }
   }, [countryId]);
 
