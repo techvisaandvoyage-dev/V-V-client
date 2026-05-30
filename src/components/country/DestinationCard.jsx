@@ -28,7 +28,22 @@ function getGovernmentFeeValue(country) {
   return Number.isFinite(Number(match)) ? Number(match) : 0;
 }
 
-function buildCountryTiles(country, display) {
+function getServiceFeeValue(country) {
+  return Number.isFinite(Number(country?.basePrice)) && Number(country.basePrice) >= 0
+    ? Number(country.basePrice)
+    : 0;
+}
+
+function getCountryTotalFeeValue(country) {
+  const serviceFee = getServiceFeeValue(country);
+  const governmentFee = getGovernmentFeeValue(country);
+  const gstEnabled = country?.gstEnabled !== false;
+  const gstRate = Number.isFinite(Number(country?.gstRate)) ? Number(country.gstRate) : 18;
+  const gstAmount = gstEnabled ? Math.round(serviceFee * (gstRate / 100)) : 0;
+  return governmentFee + serviceFee + gstAmount;
+}
+
+function buildCountryTiles(country, display, showTotalFee = false) {
   const tiles = [];
   if (display?.showVisaType !== false) {
     tiles.push({ key: "visaType", label: "VISA TYPE", value: getCardVisaTypeLabel(country.visaType) });
@@ -44,6 +59,29 @@ function buildCountryTiles(country, display) {
     });
   }
   tiles.push({ key: "fees", label: "GOVT FEE", value: `₹${getGovernmentFeeValue(country)}` });
+  return tiles;
+}
+
+function buildCountryTilesResolved(country, display, showTotalFee = false) {
+  const tiles = [];
+  if (display?.showVisaType !== false) {
+    tiles.push({ key: "visaType", label: "VISA TYPE", value: getCardVisaTypeLabel(country.visaType) });
+  }
+  if (display?.showValidity !== false) {
+    tiles.push({ key: "validity", label: "VALIDITY", value: country.validity || "-" });
+  }
+  if (display?.showProcessingDays !== false && tiles.length + 1 < 3) {
+    tiles.push({
+      key: "processingDays",
+      label: "PROCESSING",
+      value: getProcessingDaysLabel(country.processingDays),
+    });
+  }
+  tiles.push({
+    key: "fees",
+    label: showTotalFee ? "TOTAL FEE" : "GOVT FEE",
+    value: `₹${showTotalFee ? getCountryTotalFeeValue(country) : getGovernmentFeeValue(country)}`,
+  });
   return tiles;
 }
 
@@ -134,6 +172,7 @@ const DestinationCard = ({
   display,
   documentCatalog = [],
   showVisaRequirements = true,
+  showTotalFee = false,
   onClick,
   cardRef,
   id,
@@ -206,7 +245,7 @@ const DestinationCard = ({
             </div>
 
             {(() => {
-              const tiles = buildCountryTiles(country, display);
+              const tiles = buildCountryTilesResolved(country, display, showTotalFee);
               const cols = GRID_COLS_BY_COUNT[tiles.length] || "grid-cols-3";
               return (
                 <div className={`grid ${cols} gap-2 text-center`}>

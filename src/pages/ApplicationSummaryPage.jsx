@@ -16,6 +16,8 @@ import { optimizeUploadFile } from "../utils/optimizeUploadFile";
 import { formatOrdinalDate } from "../utils/dateUtils";
 import { saveTravelDraft } from "../utils/travelDraftStorage";
 import { getFileValidationRules } from "../utils/fileValidation";
+import FilePreviewModal from "../components/ui/FilePreviewModal";
+import { getFileUrl } from "../utils/fileUrl";
 
 const SUMMARY_UPLOAD_MAX_BYTES = 300 * 1024;
 const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
@@ -56,13 +58,7 @@ const formatSummaryDate = (value) => {
   return formatOrdinalDate(parsed);
 };
 
-const resolveDocumentPreviewUrl = (value) => {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/")) return `${SERVER_URL}${url}`;
-  return `${SERVER_URL}/${url}`;
-};
+
 
 const getTravelerPassportDetail = (application, travelerNo) => {
   const traveler = Array.isArray(application?.travellerDocuments)
@@ -751,7 +747,7 @@ const ApplicationSummaryPage = () => {
 
   const openPassportPreview = (travelerNo) => {
     const detail = getTravelerPassportDetail(application, travelerNo);
-    const previewUrl = resolveDocumentPreviewUrl(detail?.url);
+    const previewUrl = getFileUrl(detail?.url);
     if (!detail || !previewUrl) {
       showToast("Preview is not available for this file yet.", "error");
       return;

@@ -42,6 +42,7 @@ const LandingCountriesGrid = memo(
               display={display}
               documentCatalog={documentCatalog}
               showVisaRequirements={showVisaRequirements}
+              showTotalFee
               onClick={() => onNavigateDestination(country)}
             />
           ))}

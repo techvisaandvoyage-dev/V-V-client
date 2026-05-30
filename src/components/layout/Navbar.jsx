@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { User, LayoutDashboard, LogOut, Menu, X, Plane, BookOpen, Globe } from "lucide-react";
+import { User, LayoutDashboard, LogOut, Menu, X, Plane, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
@@ -109,18 +109,6 @@ const Navbar = () => {
             {/* ── Right side: public links + profile icon ── */}
             <div className="hidden md:flex items-center gap-2">
               <Link
-                to="/destinations"
-                replace={isTransientPage}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  location.pathname.startsWith("/destination")
-                    ? "text-black"
-                    : "text-black hover:text-black/80"
-                }`}
-              >
-                <Globe size={15} />
-                Destinations
-              </Link>
-              <Link
                 to="/blog"
                 replace={isTransientPage}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -166,14 +154,6 @@ const Navbar = () => {
               className="md:hidden border-t border-border bg-surface overflow-hidden"
             >
               <div className="px-4 py-4 space-y-1">
-                <Link
-                  to="/destinations"
-                  replace={isTransientPage}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-3 rounded-lg transition-colors"
-                >
-                  <Globe size={15} />
-                  Destinations
-                </Link>
                 <Link
                   to="/blog"
                   replace={isTransientPage}

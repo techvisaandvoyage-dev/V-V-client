@@ -56,13 +56,8 @@ import {
 import { getFileValidationRules } from "../utils/fileValidation";
 import { openRazorpayForApplication, validateRazorpayCheckoutReadiness } from "../utils/razorpayCheckout";
 import SharedGoogleDriveLinkSection from "../components/application/SharedGoogleDriveLinkSection";
-
-const resolveDocumentPreviewUrl = (value) => {
-  if (!value || typeof value !== "string") return null;
-  if (value.startsWith("http")) return value;
-  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, "") || "http://localhost:5000";
-  return `${baseUrl}${value.startsWith("/") ? "" : "/"}${value}`;
-};
+import FilePreviewModal from "../components/ui/FilePreviewModal";
+import { getFileUrl } from "../utils/fileUrl";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -338,6 +333,7 @@ const ApplicationDetails = () => {
   const [paying, setPaying] = useState(false);
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayMessage, setRazorpayMessage] = useState("");
+  const [documentPreview, setDocumentPreview] = useState(null);
   const autoUploadTimersRef = useRef({});
   const bookingRef = useRef(null);
   const docFieldsRef = useRef([]);
@@ -674,7 +670,12 @@ const ApplicationDetails = () => {
     const inputKey = getTravelerDocInputKey(travelerNo, docKey);
     if (uploadedDocSuccesses[inputKey]) return true;
     if (unlockedDocs[inputKey]) return false;
-    const savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    let savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    if (!savedValue && docKey === "passport") {
+      const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
+      const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
+      savedValue = uploadedTraveler?.passportUrl || uploadedTraveler?.passportFile;
+    }
     return Boolean(savedValue);
   };
 
@@ -685,7 +686,13 @@ const ApplicationDetails = () => {
   ) => {
     const inputKey = getTravelerDocInputKey(travelerNo, docKey);
     if (unlockedDocs[inputKey]) return "";
-    return getStoredDocumentValue(savedDocuments, docKey);
+    let savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    if (!savedValue && docKey === "passport") {
+      const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
+      const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
+      savedValue = uploadedTraveler?.passportUrl || uploadedTraveler?.passportFile;
+    }
+    return savedValue || "";
   };
 
   const getSavedTravelerOtherDocuments = (travelerNo) => {
@@ -1749,7 +1756,7 @@ const ApplicationDetails = () => {
               const passportInputKey = `${travelerNoStr}-passport`;
               const savedPassportUrl = unlockedDocs[passportInputKey]
                 ? ""
-                : getStoredDocumentValue(savedDocuments, "passport");
+                : (getStoredDocumentValue(savedDocuments, "passport") || traveler.passportUrl || traveler.passportFile);
               const localSuccess = uploadedDocSuccesses[passportInputKey];
               const selectedFile = selectedDocs[passportInputKey];
               const isPassportUploading =
@@ -1793,10 +1800,13 @@ const ApplicationDetails = () => {
                     if (selectedFile) handleDocFieldChange(travelerNo, "passport", null);
                     else if (hasSuccessfulUpload && canUploadDocuments) resetPassportUploadState();
                   }}
-                  onPreview={(selectedFile || getStoredDocumentValue(getSavedTravelerDocuments(travelerNo), "passport")) ? () => {
-                    const savedUrl = getStoredDocumentValue(getSavedTravelerDocuments(travelerNo), "passport");
-                    if (selectedFile) window.open(URL.createObjectURL(selectedFile), "_blank");
-                    else if (savedUrl) window.open(resolveDocumentPreviewUrl(savedUrl), "_blank");
+                  onPreview={(selectedFile || savedPassportUrl) ? () => {
+                    const savedUrl = savedPassportUrl;
+                    if (selectedFile) {
+                      setDocumentPreview({ url: URL.createObjectURL(selectedFile), fileName: selectedFile.name, mimeType: selectedFile.type });
+                    } else if (savedUrl) {
+                      setDocumentPreview({ url: getFileUrl(savedUrl), fileName: "Passport Document", type: "application/pdf" });
+                    }
                   } : undefined}
                 />
               );
@@ -1854,7 +1864,7 @@ const ApplicationDetails = () => {
                               travelerNo,
                               "passport",
                               savedDocuments
-                            );
+                            ) || traveler.passportUrl || traveler.passportFile;
                             const passportHasSuccessfulUpload = !passportSelectedFile
                               && hasEffectiveTravelerDocument(travelerNo, "passport", savedDocuments);
                             const savedOtherDocuments = getSavedTravelerOtherDocuments(travelerNo);
@@ -1932,8 +1942,11 @@ const ApplicationDetails = () => {
                                     }
                                   }}
                                   onPreview={(passportSelectedFile || passportSavedDocUrl) ? () => {
-                                    if (passportSelectedFile) window.open(URL.createObjectURL(passportSelectedFile), "_blank");
-                                    else if (passportSavedDocUrl) window.open(resolveDocumentPreviewUrl(passportSavedDocUrl), "_blank");
+                                    if (passportSelectedFile) {
+                                      setDocumentPreview({ url: URL.createObjectURL(passportSelectedFile), fileName: passportSelectedFile.name, mimeType: passportSelectedFile.type });
+                                    } else if (passportSavedDocUrl) {
+                                      setDocumentPreview({ url: getFileUrl(passportSavedDocUrl), fileName: "Passport Document", type: "application/pdf" });
+                                    }
                                   } : undefined}
                                 />
                                 {uploadSettings.enableFileUpload && (
@@ -2487,7 +2500,7 @@ const ApplicationDetails = () => {
               variant="secondary"
               size="sm"
               leftIcon={<Download size={14} />}
-              onClick={() => window.open(`${SERVER_URL}${booking.visaFilePath}`, "_blank")}
+              onClick={() => setDocumentPreview({ url: getFileUrl(booking.visaFilePath), fileName: "Visa File", type: "application/pdf" })}
             >
               Open Visa File
             </Button>
@@ -2682,8 +2695,11 @@ const ApplicationDetails = () => {
                             }
                           }}
                           onPreview={(selectedFile || savedUrl) ? () => {
-                            if (selectedFile) window.open(URL.createObjectURL(selectedFile), "_blank");
-                            else window.open(resolveDocumentPreviewUrl(savedUrl), "_blank");
+                            if (selectedFile) {
+                              setDocumentPreview({ url: URL.createObjectURL(selectedFile), fileName: selectedFile.name, mimeType: selectedFile.type });
+                            } else if (savedUrl) {
+                              setDocumentPreview({ url: getFileUrl(savedUrl), fileName: `${field.label} Document`, type: "application/pdf" });
+                            }
                           } : undefined}
                         />
                       );
@@ -2839,6 +2855,16 @@ const ApplicationDetails = () => {
           )}
         </div>
       </Modal>
+
+      <FilePreviewModal
+        isOpen={Boolean(documentPreview)}
+        onClose={() => setDocumentPreview(null)}
+        previewFile={documentPreview ? {
+          url: documentPreview.url,
+          name: documentPreview.fileName,
+          type: documentPreview.type || documentPreview.mimeType
+        } : null}
+      />
     </div>
   );
 };

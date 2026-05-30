@@ -18,7 +18,8 @@ import { getApplicationProgress, getDerivedApplicationProgress, resolveApplicati
 import ContactVerificationModal from "../components/account/ContactVerificationModal";
 import { needsPhoneContactGate, needsEmailContactGate } from "../utils/contactVerificationGate";
 import { formatOrdinalDate } from "../utils/dateUtils";
-
+import FilePreviewModal from "../components/ui/FilePreviewModal";
+import { getFileUrl } from "../utils/fileUrl";
 /**
  * Map every built-in doc key → its lucide icon component. Used to render the
  * tiny "missing documents" icon chips on each booking card. Unknown keys
@@ -87,6 +88,7 @@ const UserDashboard = () => {
   const [travelerForm, setTravelerForm] = useState({ ...travelerFormDefaults });
   const [travelerSubmitting, setTravelerSubmitting] = useState(false);
   const [travelerDeletingId, setTravelerDeletingId] = useState("");
+  const [documentPreview, setDocumentPreview] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -642,7 +644,7 @@ const UserDashboard = () => {
                           variant="secondary"
                           size="sm"
                           leftIcon={<Download size={14} />}
-                          onClick={() => window.open(`${SERVER_URL}${booking.visaFilePath}`, "_blank")}
+                          onClick={() => setDocumentPreview({ url: getFileUrl(booking.visaFilePath), fileName: "Visa File", type: "application/pdf" })}
                         >
                           Open File
                         </Button>
@@ -1036,6 +1038,12 @@ const UserDashboard = () => {
           </label>
         </div>
       </Modal>
+
+      <FilePreviewModal
+        isOpen={Boolean(documentPreview)}
+        onClose={() => setDocumentPreview(null)}
+        previewFile={documentPreview}
+      />
     </div>
   );
 };

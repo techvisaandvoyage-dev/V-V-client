@@ -66,6 +66,9 @@ import { getLocalDateYmd } from "../utils/dateInput";
 import { matchesCountryRouteId, getCountryRouteId } from "../utils/countryRouting";
 import { formatOrdinalDate } from "../utils/dateUtils";
 
+import FilePreviewModal from "../components/ui/FilePreviewModal";
+import { getFileUrl } from "../utils/fileUrl";
+
 const ease = [0.16, 1, 0.3, 1];
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -145,13 +148,7 @@ const formatFileSize = (size = 0) => {
 const getApplicationDocSuccessStorageKey = (applicationId) =>
   applicationId ? `application-doc-successes:${applicationId}` : "";
 
-const resolveDocumentPreviewUrl = (value) => {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/")) return `${SERVER_URL}${url}`;
-  return `${SERVER_URL}/${url}`;
-};
+
 
 const getTravelerPassportDetail = (application, travelerNo) => {
   const traveler = Array.isArray(application?.travellerDocuments)
@@ -1866,7 +1863,7 @@ const CountryDetails = () => {
 
   const openPassportPreview = (travelerNo) => {
     const detail = passportDetails?.[travelerNo];
-    const previewUrl = resolveDocumentPreviewUrl(detail?.url);
+    const previewUrl = getFileUrl(detail?.url);
     if (!detail || !previewUrl) {
       showToast("Preview is not available for this file yet.", "error");
       return;
@@ -2695,12 +2692,14 @@ const CountryDetails = () => {
               <motion.section
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0, transition: { duration: 0.5, ease } }}
-                className="order-1 w-full lg:col-span-8 lg:pl-4 xl:pl-6"
+                className="order-1 w-full lg:col-span-8 lg:self-stretch lg:pl-4 xl:pl-6"
               >
-                <VisaInformationSection
-                  visaInformation={country?.visaInformation}
-                  display={countryDisplay}
-                />
+                <div className="lg:sticky lg:top-24">
+                  <VisaInformationSection
+                    visaInformation={country?.visaInformation}
+                    display={countryDisplay}
+                  />
+                </div>
               </motion.section>
             )}
 
@@ -3389,62 +3388,15 @@ const CountryDetails = () => {
         </div>
       )}
 
-      <Modal
+      <FilePreviewModal
         isOpen={Boolean(passportPreview)}
         onClose={closePassportPreview}
-        title={passportPreview?.fileName || "Passport Preview"}
-        size="xl"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-text-primary">
-                {passportPreview?.fileName || "Uploaded file"}
-              </p>
-              <p className="text-xs text-text-muted">
-                Review the uploaded passport file before continuing.
-              </p>
-            </div>
-            {passportPreview?.url ? (
-              <a
-                href={passportPreview.url}
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 rounded-lg bg-cyan/15 px-3 py-2 text-xs font-semibold text-cyan transition-colors hover:bg-cyan/25"
-              >
-                Open in new tab
-              </a>
-            ) : null}
-          </div>
-
-          {passportPreviewIsImage ? (
-            <div className="overflow-hidden rounded-2xl border border-border bg-black/5">
-              <img
-                src={passportPreview.url}
-                alt={passportPreview.fileName || "Uploaded passport"}
-                className="max-h-[70vh] w-full object-contain bg-slate-950/5"
-              />
-            </div>
-          ) : passportPreviewIsPdf ? (
-            <div className="overflow-hidden rounded-2xl border border-border bg-surface-2">
-              <iframe
-                src={passportPreview.url}
-                title={passportPreview.fileName || "Passport preview"}
-                className="h-[70vh] w-full bg-white"
-              />
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-surface-2 px-4 py-10 text-center">
-              <p className="text-sm font-medium text-text-primary">
-                This file type cannot be previewed here.
-              </p>
-              <p className="mt-1 text-xs text-text-muted">
-                Use "Open in new tab" to inspect the uploaded document.
-              </p>
-            </div>
-          )}
-        </div>
-      </Modal>
+        previewFile={passportPreview ? {
+          url: passportPreview.url,
+          name: passportPreview.fileName,
+          type: passportPreview.type || passportPreview.mimeType
+        } : null}
+      />
 
       <ContactVerificationModal
         isOpen={contactModalOpen}

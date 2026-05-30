@@ -14,9 +14,14 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Search, MapPin,
+  Search, MapPin, CheckCircle, Clock, Globe, Users, CreditCard, Plane, HeartHandshake, Smile,
   ArrowRight, ShieldCheck, FileText, Lock, Zap,
 } from "lucide-react";
+
+const AVAILABLE_ICONS = {
+  Zap, ShieldCheck, FileText, Lock, CheckCircle, Clock,
+  Globe, Users, CreditCard, MapPin, Plane, HeartHandshake, Smile, Search
+};
 import { motion } from "framer-motion";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
@@ -120,11 +125,15 @@ const LandingPage = () => {
           }
           if (Array.isArray(data.config?.landingHeroHighlights) && data.config.landingHeroHighlights.length) {
             setHeroHighlights(
-              DEFAULT_HERO_HIGHLIGHTS.map((fallback, index) => ({
-                ...fallback,
-                title: String(data.config.landingHeroHighlights[index]?.title ?? "").trim() || fallback.title,
-                body: String(data.config.landingHeroHighlights[index]?.body ?? "").trim() || fallback.body,
-              }))
+              DEFAULT_HERO_HIGHLIGHTS.map((fallback, index) => {
+                const iconName = data.config.landingHeroHighlights[index]?.icon;
+                return {
+                  ...fallback,
+                  icon: AVAILABLE_ICONS[iconName] || fallback.icon,
+                  title: String(data.config.landingHeroHighlights[index]?.title ?? "").trim() || fallback.title,
+                  body: String(data.config.landingHeroHighlights[index]?.body ?? "").trim() || fallback.body,
+                };
+              })
             );
           }
         }
@@ -476,7 +485,7 @@ const LandingPage = () => {
                       ref={searchInputRef}
                       type="text"
                       autoComplete="off"
-                      placeholder="Search country, city, or state..."
+                      placeholder="Search country..."
                       value={searchDestination}
                       onChange={(e) => setSearchDestination(e.target.value)}
                       onFocus={() => setIsSearchFocused(true)}
