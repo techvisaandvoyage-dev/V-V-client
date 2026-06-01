@@ -297,7 +297,7 @@ const DestinationCard = ({
                 hover: { y: 0 },
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="absolute bottom-0 left-0 right-0 z-20 flex flex-col p-6 backdrop-blur-2xl"
+              className="absolute bottom-0 left-0 right-0 z-20 flex flex-col p-6"
               style={{
                 height: panelHeight,
                 willChange: "transform",
