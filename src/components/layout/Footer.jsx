@@ -195,13 +195,17 @@ const Footer = () => {
   return (
     <footer className="bg-surface border-t border-border" id="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
-          <div className="lg:col-span-1">
-            <Link to="/" replace className="mb-4 flex items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12 mb-12">
+          <div className="lg:col-span-2 lg:pr-12">
+            <Link to="/" replace className="mb-0 flex items-center">
               <img
-                src={BRAND_LOGO_SRC}
+                src="/images/visa-voyage-logo.webp"
                 alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
-                className="block h-12 max-h-12 w-auto object-contain"
+                width="240"
+                height="80"
+                loading="lazy"
+                decoding="async"
+                className="block h-20 w-auto object-contain scale-[2.2] sm:scale-[2.6] origin-left -translate-x-6 sm:-translate-x-12 lg:-translate-x-16 translate-y-2 sm:translate-y-4"
               />
             </Link>
             <p className="text-sm text-text-secondary leading-relaxed mb-6">

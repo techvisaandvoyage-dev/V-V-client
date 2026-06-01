@@ -1,3 +1,5 @@
+// remixicon CSS — loaded here (not globally) since it is only used on this page
+import "remixicon/fonts/remixicon.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";

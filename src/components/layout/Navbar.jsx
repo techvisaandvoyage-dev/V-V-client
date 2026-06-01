@@ -103,9 +103,14 @@ const Navbar = () => {
               aria-label="VISAANDVOYAGE Home"
             >
               <img
-                src={BRAND_LOGO_SRC}
-                alt="Visa & Voyage"
-                className="block h-10 max-h-10 w-auto object-contain sm:h-11 sm:max-h-11"
+                src="/images/visa-voyage-logo.webp"
+                alt="Visa &amp; Voyage"
+                width="240"
+                height="64"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="block h-16 w-auto object-contain scale-[2.2] sm:scale-[2.8] origin-left"
               />
             </Link>
 

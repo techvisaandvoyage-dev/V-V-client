@@ -2,14 +2,23 @@
 //  App.jsx — Root Entry
 //  Sets up React Router and Providers
 // ============================================================
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Toast from "./components/ui/Toast";
 import ClientErrorBoundary from "./components/ClientErrorBoundary";
-import FirebaseGoogleRedirectHandler from "./components/auth/FirebaseGoogleRedirectHandler";
-import ExitIntentBanner from "./components/common/ExitIntentBanner";
 import AppRoutes from "./routes/AppRoutes";
+
+// Lazy-loaded: these components render null and run side-effects only.
+// Lazy loading removes their parse cost from the critical startup path.
+// FirebaseGoogleRedirectHandler: Google OAuth redirect is preserved because
+// the component still mounts immediately — Suspense only defers the JS parse.
+const FirebaseGoogleRedirectHandler = lazy(() =>
+  import("./components/auth/FirebaseGoogleRedirectHandler")
+);
+const ExitIntentBanner = lazy(() =>
+  import("./components/common/ExitIntentBanner")
+);
 
 /** Outside Suspense so lazy routes still reset scroll on SPA navigation. */
 const ScrollToTop = () => {
@@ -37,8 +46,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ScrollToTop />
-        <FirebaseGoogleRedirectHandler />
-        <ExitIntentBanner />
+        {/* Both components render null — Suspense fallback is null so no flash */}
+        <Suspense fallback={null}>
+          <FirebaseGoogleRedirectHandler />
+          <ExitIntentBanner />
+        </Suspense>
         {/* Global toast notification */}
         <Toast />
         <ClientErrorBoundary>

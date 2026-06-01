@@ -6,7 +6,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import "remixicon/fonts/remixicon.css";
+// remixicon CSS is lazy-loaded only in CountryDetails.jsx where it is used
 import App from "./App.jsx";
 
 /**

@@ -23,7 +23,7 @@ const StaticPage          = lazy(() => import("../pages/StaticPage"));
 const BlogListingPage     = lazy(() => import("../pages/BlogListingPage"));
 const BlogDetailsPage     = lazy(() => import("../pages/BlogDetailsPage"));
 const MaintenancePage     = lazy(() => import("../pages/MaintenancePage"));
-import SupportChatWidget from "../components/common/SupportChatWidget";
+const SupportChatWidget = lazy(() => import("../components/common/SupportChatWidget"));
 
 // ── Fallback Loader ────────────────────────────────────────
 const PageLoader = () => (
@@ -125,7 +125,8 @@ const AppRoutes = () => {
           }
           className="w-full"
         >
-          <Routes location={location}>
+          <main id="main-content">
+            <Routes location={location}>
         {/* ── Public routes ── */}
         <Route path="/" element={<LandingPage />} />
       <Route path="/destinations" element={<AllDestinationsPage />} />
@@ -222,7 +223,8 @@ const AppRoutes = () => {
       <Route path="/admin/*" element={<AdminAppRedirect />} />
 
       <Route path="*" element={<NotFound />} />
-          </Routes>
+            </Routes>
+          </main>
         </motion.div>
       </AnimatePresence>
       {shouldShowChat && <SupportChatWidget />}

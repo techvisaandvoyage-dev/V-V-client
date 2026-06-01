@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import ImageWithShimmer from "../ui/ImageWithShimmer";
@@ -199,7 +199,11 @@ const DestinationCard = ({
   id,
 }) => {
   const allDocs = getCountryDocuments(country).slice(0, 4);
-  const panelHeight = 110 + Math.ceil(allDocs.length / 2) * 32;
+  // Memoized so height is not recalculated on every parent re-render
+  const panelHeight = useMemo(
+    () => 110 + Math.ceil(allDocs.length / 2) * 32,
+    [allDocs.length]
+  );
 
   return (
     <motion.div
@@ -229,14 +233,27 @@ const DestinationCard = ({
           height={400}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 transition-opacity duration-500" />
+          {/* Dark gradient for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-500" />
+          
+          {/* Initial state: Blur that fades out from bottom to top */}
+          <div 
+            className="absolute inset-0 backdrop-blur-[8px] transition-opacity duration-500 group-hover:opacity-0" 
+            style={{ maskImage: 'linear-gradient(to top, black 0%, transparent 50%)', WebkitMaskImage: 'linear-gradient(to top, black 0%, transparent 50%)' }}
+          />
+
+          {/* Hover state: Blur that covers the raised panel & text, but keeps the top image clear */}
+          <div 
+            className="absolute inset-0 bg-black/30 backdrop-blur-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            style={{ maskImage: 'linear-gradient(to top, black 0%, black 55%, transparent 85%)', WebkitMaskImage: 'linear-gradient(to top, black 0%, black 55%, transparent 85%)' }}
+          />
 
           <div
-            className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-xl text-white drop-shadow-md"
+            className="absolute left-4 top-4 z-30 text-3xl drop-shadow-md"
             role="img"
             aria-label={`${country.name} flag`}
           >
-            <CountryFlagIcon country={country} className="h-4 w-4 rounded-full object-cover" />
+            <CountryFlagIcon country={country} className="h-8 w-8 rounded-full object-cover shadow-sm" />
           </div>
 
           {!country.imageUrl ? (

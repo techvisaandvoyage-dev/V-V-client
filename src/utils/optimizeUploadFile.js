@@ -1,9 +1,8 @@
 import imageCompression from "browser-image-compression";
-import { PDFDocument } from "pdf-lib";
-import * as pdfjs from "pdfjs-dist";
 
-// Set worker source for pdfjs using a reliable CDN
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// NOTE: pdf-lib and pdfjs-dist are NOT imported here at module level.
+// They are dynamically imported inside functions only when a PDF is uploaded.
+// This removes ~1.1 MB from the initial bundle while keeping all functionality.
 
 export const RAW_UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
 export const FINAL_UPLOAD_TARGET_BYTES = 300 * 1024;
@@ -42,40 +41,45 @@ const createFileFromBlob = (sourceFile, blob, fallbackType) =>
   );
 
 /**
- * Aggressively compresses a PDF by rendering each page to a compressed JPEG 
+ * Aggressively compresses a PDF by rendering each page to a compressed JPEG
  * and rebuilding a new PDF from those images.
+ * pdfjs-dist and pdf-lib are dynamically imported here on first PDF upload.
  */
 const aggressiveCompressPdf = async (file, targetBytes = FINAL_UPLOAD_TARGET_BYTES) => {
-  console.log("Starting aggressive PDF compression for:", file.name, "Size:", file.size);
   try {
+    const [{ PDFDocument }, pdfjs] = await Promise.all([
+      import("pdf-lib"),
+      import("pdfjs-dist"),
+    ]);
+    // Set worker source only after dynamic import
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
-    console.log("PDF loaded, pages:", pdf.numPages);
-    
+
     const newPdfDoc = await PDFDocument.create();
 
     for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Processing page ${i}/${pdf.numPages}...`);
       const page = await pdf.getPage(i);
       const targetScale = targetBytes <= 300 * 1024 ? 1.0 : 1.2;
       const viewport = page.getViewport({ scale: targetScale });
-      
+
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
       await page.render({ canvasContext: context, viewport }).promise;
-      
+
       // Convert canvas to compressed JPEG
       const jpegQuality = targetBytes <= 300 * 1024 ? 0.45 : 0.6;
       const imageData = canvas.toDataURL("image/jpeg", jpegQuality);
       const base64 = imageData.split(",")[1];
       const imageBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      
+
       const image = await newPdfDoc.embedJpg(imageBytes);
-      
+
       const newPage = newPdfDoc.addPage([image.width, image.height]);
       newPage.drawImage(image, {
         x: 0,
@@ -86,13 +90,10 @@ const aggressiveCompressPdf = async (file, targetBytes = FINAL_UPLOAD_TARGET_BYT
     }
 
     const compressedPdfBytes = await newPdfDoc.save();
-    const compressedFile = new File([compressedPdfBytes], file.name, {
+    return new File([compressedPdfBytes], file.name, {
       type: "application/pdf",
       lastModified: Date.now(),
     });
-    
-    console.log("Aggressive compression finished. New size:", compressedFile.size);
-    return compressedFile;
   } catch (err) {
     console.error("Aggressive PDF compression failed:", err);
     return file;
@@ -100,33 +101,30 @@ const aggressiveCompressPdf = async (file, targetBytes = FINAL_UPLOAD_TARGET_BYT
 };
 
 const optimizePdf = async (file, targetBytes = FINAL_UPLOAD_TARGET_BYTES) => {
-  console.log("Attempting standard PDF optimization...");
   try {
+    const { PDFDocument } = await import("pdf-lib");
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer, {
       ignoreEncryption: true,
       updateMetadata: false,
     });
-    
+
     const optimizedPdfBytes = await pdfDoc.save({
       useObjectStreams: true,
       objectsPerTick: 50,
       updateFieldAppearances: false,
     });
-    
+
     let optimizedFile = new File([optimizedPdfBytes], file.name, {
       type: "application/pdf",
       lastModified: Date.now(),
     });
 
-    console.log("Standard optimization finished. Size:", optimizedFile.size);
-
-    // If still over limit and > 500KB, use aggressive compression
+    // If still over limit, use aggressive compression
     if (optimizedFile.size > targetBytes) {
-      console.log("File still over limit, switching to aggressive compression...");
       optimizedFile = await aggressiveCompressPdf(file, targetBytes);
     }
-    
+
     return optimizedFile;
   } catch (err) {
     console.error("PDF optimization error:", err);
@@ -188,12 +186,9 @@ export const optimizeUploadFile = async (file, options = {}) => {
     return { error: "File must be below 20 MB." };
   }
 
-  // Handle PDF Optimization
+  // Handle PDF Optimization (dynamically loads pdf-lib + pdfjs-dist)
   if (file.type === "application/pdf") {
     const optimizedFile = await optimizePdf(file, targetBytes);
-    console.log(`[PDF Optimization] Original Size: ${(originalSize / 1024).toFixed(2)} KB`);
-    console.log(`[PDF Optimization] Compressed Size: ${(optimizedFile.size / 1024).toFixed(2)} KB`);
-    console.log(`[PDF Optimization] Compression Ratio: ${((1 - (optimizedFile.size / originalSize)) * 100).toFixed(2)}%`);
     return {
       file: optimizedFile,
       originalSize,

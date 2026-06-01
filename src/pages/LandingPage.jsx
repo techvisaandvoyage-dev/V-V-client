@@ -470,25 +470,41 @@ const LandingPage = () => {
 
   useEffect(() => {
     let triggerTop = 0;
+    let rafId = null;
+    let resizeTimer = null;
 
     const measureSearchPosition = () => {
       const anchor = searchAnchorRef.current;
       if (!anchor) return;
+      // getBoundingClientRect is batched here — called at most once per resize
       triggerTop = anchor.getBoundingClientRect().top + window.scrollY;
     };
 
+    // rAF-throttled scroll: browser batches layout reads, no forced reflow per scroll px
     const handleScroll = () => {
-      if (!triggerTop) measureSearchPosition();
-      setIsSearchPinned(window.scrollY >= triggerTop);
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (!triggerTop) measureSearchPosition();
+        setIsSearchPinned(window.scrollY >= triggerTop);
+      });
+    };
+
+    // Debounced resize: only re-measure after user stops resizing (150ms)
+    const handleResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(measureSearchPosition, 150);
     };
 
     measureSearchPosition();
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", measureSearchPosition);
+    window.addEventListener("resize", handleResize, { passive: true });
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      clearTimeout(resizeTimer);
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", measureSearchPosition);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 

@@ -53,9 +53,13 @@ const Sidebar = () => {
         <div className="flex items-center h-16 px-4 border-b border-border flex-shrink-0">
           <Link to="/" replace className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer group" title="Back to Home">
             <img
-              src={BRAND_LOGO_SRC}
-              alt="Visa & Voyage"
-              className={sidebarOpen ? "block h-10 max-h-10 w-auto object-contain" : "block h-8 max-h-8 w-8 object-contain object-left"}
+              src="/images/visa-voyage-logo.webp"
+              alt="Visa &amp; Voyage"
+              width="160"
+              height="64"
+              loading="lazy"
+              decoding="async"
+              className={sidebarOpen ? "block h-16 w-auto object-contain scale-[2.2] origin-left" : "block h-10 w-10 object-contain object-left scale-[2] origin-left"}
             />
           </Link>
 
