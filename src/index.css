@@ -81,10 +81,10 @@
 /* ── CSS Custom Properties ───────────────────────────────── */
 :root {
   /* Color tokens mirrored from tailwind.config.js for use in CSS */
-  --color-background:  #f0f4f8;
+  --color-background:  #ffffff;
   --color-surface:     #ffffff;
-  --color-surface-2:   #f8f9fa;
-  --color-surface-3:   #e9ecf1;
+  --color-surface-2:   #ffffff;
+  --color-surface-3:   #f5f5f5;
   --color-cyan:        #0284c7;
   --color-cyan-dim:    #0369a1;
   --color-gold:        #d97706;
@@ -223,10 +223,7 @@ select:-webkit-autofill:focus {
 
 /* ── Hero Gradient Background ────────────────────────────── */
 .hero-gradient {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(2, 132, 199, 0.1), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(217, 119, 6, 0.05), transparent),
-    #f0f4f8;
+  background: #ffffff;
 }
 
 /* ── Grid dot pattern overlay ────────────────────────────– */

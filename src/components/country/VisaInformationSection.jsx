@@ -3,10 +3,7 @@ import {
   CalendarDays,
   Clock3,
   DoorOpen,
-  Globe2,
   Info,
-  MapPin,
-  Plane,
   ShieldCheck,
   SquarePen,
 } from "lucide-react";
@@ -81,14 +78,7 @@ const VisaInformationSection = ({ visaInformation, display }) => {
   const titleParts = splitTitle(section.title);
 
   return (
-    <section className="relative mr-auto max-w-[47.5rem] overflow-hidden rounded-[1.7rem] border border-[#dbe8ff] bg-white px-4 py-7 shadow-[0_20px_60px_rgba(37,99,235,0.08)] sm:px-6 sm:py-8 lg:max-w-[49.5rem] lg:px-7 lg:py-10 xl:max-w-[51rem]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.09),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(147,197,253,0.12),transparent_30%)]" />
-      <div className="pointer-events-none absolute -left-10 top-16 h-40 w-40 rounded-full bg-blue-50 blur-3xl" />
-      <div className="pointer-events-none absolute -right-12 top-10 hidden h-56 w-56 rounded-full bg-sky-50 blur-3xl md:block" />
-      <Globe2 className="pointer-events-none absolute right-6 top-14 hidden h-40 w-40 text-blue-100 md:block" strokeWidth={1.2} />
-      <Plane className="pointer-events-none absolute right-8 top-10 h-8 w-8 text-blue-500" strokeWidth={2} />
-      <div className="pointer-events-none absolute right-20 top-20 hidden h-28 w-56 rounded-full border border-dashed border-blue-200 md:block" style={{ borderLeftColor: "transparent", borderBottomColor: "transparent" }} />
-      <MapPin className="pointer-events-none absolute right-[18rem] top-36 hidden h-5 w-5 text-blue-400 md:block" strokeWidth={2} />
+    <section className="relative mr-auto max-w-[47.5rem] overflow-hidden rounded-[1.7rem] bg-white px-4 py-7 sm:px-6 sm:py-8 lg:max-w-[49.5rem] lg:px-7 lg:py-10 xl:max-w-[51rem]">
 
       <div className="relative">
         <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-600 ring-1 ring-blue-100">

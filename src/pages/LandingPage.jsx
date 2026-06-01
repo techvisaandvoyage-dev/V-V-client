@@ -15,7 +15,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search, MapPin, CheckCircle, Clock, Globe, Users, CreditCard, Plane, HeartHandshake, Smile,
-  ArrowRight, ShieldCheck, FileText, Lock, Zap,
+  ShieldCheck, FileText, Lock, Zap,
 } from "lucide-react";
 
 const AVAILABLE_ICONS = {
@@ -25,9 +25,8 @@ const AVAILABLE_ICONS = {
 import { motion } from "framer-motion";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import Button from "../components/ui/Button";
 import LandingCountriesGrid from "../components/landing/LandingCountriesGrid";
-import { useCountries } from "../hooks/useCountries";
+import { normalizeCountryFromApi, useCountries } from "../hooks/useCountries";
 import { api } from "../store/authStore";
 import { getCountryFlagEmoji, getCountrySearchHint, matchesCountrySearch } from "../utils/countrySearch";
 import { getCountryRouteId } from "../utils/countryRouting";
@@ -35,6 +34,7 @@ import heroImage from "../assets/landing-hero-travel.png";
 
   const GEOCODE_DEBOUNCE_MS = 680;
   const GEOCODE_MIN_CHARS = 3;
+  const POPULAR_COUNTRY_TAG_FALLBACK_COUNT = 5;
 
 const DEFAULT_HERO_HIGHLIGHTS = [
   {
@@ -60,6 +60,41 @@ const DEFAULT_HERO_HIGHLIGHTS = [
 ];
 
 // ── Animation variants ─────────────────────────────────────
+const POPULAR_COUNTRIES_CACHE_KEY = "vb_popular_countries_home_v1";
+const POPULAR_COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const loadPopularCountriesCache = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(POPULAR_COUNTRIES_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!parsed?.savedAt || Date.now() - Number(parsed.savedAt) > POPULAR_COUNTRIES_CACHE_TTL_MS) {
+      return [];
+    }
+    return Array.isArray(parsed.countries)
+      ? parsed.countries.map((country) => normalizeCountryFromApi(country)).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const savePopularCountriesCache = (countries) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      POPULAR_COUNTRIES_CACHE_KEY,
+      JSON.stringify({
+        countries,
+        savedAt: Date.now(),
+      })
+    );
+  } catch {
+    /* ignore storage failures */
+  }
+};
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,8 +110,29 @@ const LandingPage = () => {
   const [globalRequirements, setGlobalRequirements] = useState([]);
   const [showVisaRequirements, setShowVisaRequirements] = useState(true);
   const [heroHighlights, setHeroHighlights] = useState(DEFAULT_HERO_HIGHLIGHTS);
-  const [popularCountries, setPopularCountries] = useState(["USA", "UK", "EU Schengen", "Dubai", "Japan"]);
+  const [popularCountries, setPopularCountries] = useState([]);
   const [showPopularCountries, setShowPopularCountries] = useState(true);
+  const [popularCountryCards, setPopularCountryCards] = useState(() => loadPopularCountriesCache());
+  const [popularCountriesLoading, setPopularCountriesLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(12);
+
+  // Preload hero image for LCP optimization
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const existing = document.head.querySelector(`link[href="${heroImage}"]`);
+      if (!existing) {
+        const link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.href = heroImage;
+        document.head.appendChild(link);
+        return () => {
+          if (document.head.contains(link)) document.head.removeChild(link);
+        };
+      }
+    }
+  }, []);
+
 
   useEffect(() => {
     if (homeExitGuardRef.current) return undefined;
@@ -120,9 +176,6 @@ const LandingPage = () => {
           if (data.config?.visaRequirements) setGlobalRequirements(data.config.visaRequirements);
           if (data.config?.showVisaRequirements !== undefined) setShowVisaRequirements(data.config.showVisaRequirements);
           if (data.config?.showPopularCountries !== undefined) setShowPopularCountries(data.config.showPopularCountries);
-          if (Array.isArray(data.config?.popularCountries) && data.config.popularCountries.length) {
-            setPopularCountries(data.config.popularCountries);
-          }
           if (Array.isArray(data.config?.landingHeroHighlights) && data.config.landingHeroHighlights.length) {
             setHeroHighlights(
               DEFAULT_HERO_HIGHLIGHTS.map((fallback, index) => {
@@ -144,6 +197,46 @@ const LandingPage = () => {
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    const fallbackCountries = (source = []) => source;
+
+    (async () => {
+      setPopularCountriesLoading(true);
+      try {
+        const { data } = await api.get("/countries/popular", { params: { limit: 250 } });
+        if (!alive) return;
+
+        const normalized = Array.isArray(data?.countries)
+          ? data.countries.map((country) => normalizeCountryFromApi(country)).filter(Boolean)
+          : [];
+
+        if (normalized.length > 0) {
+          setPopularCountryCards(normalized);
+          setPopularCountries(normalized.slice(0, POPULAR_COUNTRY_TAG_FALLBACK_COUNT).map((country) => country.name));
+          savePopularCountriesCache(data.countries);
+        } else {
+          const fallback = fallbackCountries(allCountries.length ? allCountries : trendingCountries);
+          setPopularCountryCards(fallback);
+          setPopularCountries(fallback.slice(0, POPULAR_COUNTRY_TAG_FALLBACK_COUNT).map((country) => country.name));
+        }
+      } catch (err) {
+        console.error("Failed to fetch popular countries:", err);
+        if (!alive) return;
+        const fallback = fallbackCountries(allCountries.length ? allCountries : trendingCountries);
+        setPopularCountryCards(fallback);
+        setPopularCountries(fallback.slice(0, POPULAR_COUNTRY_TAG_FALLBACK_COUNT).map((country) => country.name));
+      } finally {
+        if (alive) setPopularCountriesLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [allCountries, trendingCountries]);
+
   // Search bar state
   const [searchDestination, setSearchDestination] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -151,6 +244,11 @@ const LandingPage = () => {
   const [geocodePlaces, setGeocodePlaces] = useState([]);
 
   const searchTerm = searchDestination.trim().toLowerCase();
+
+  // Reset visible count when search changes
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [searchDestination]);
 
   useEffect(() => {
     const resetHomeSearch = () => {
@@ -261,7 +359,11 @@ const LandingPage = () => {
 
   const filteredCountries = useMemo(() => {
     const term = searchDestination.trim();
-    if (!term) return trendingCountries;
+    if (!term) {
+      if (popularCountryCards.length > 0) return popularCountryCards;
+      if (popularCountriesLoading) return [];
+      return allCountries.length > 0 ? allCountries : trendingCountries;
+    }
     const local = allCountries.filter((country) => matchesCountrySearch(country, term));
     const byId = new Map(local.map((c) => [getCountryRouteId(c), c]));
     for (const p of geocodePlaces) {
@@ -272,12 +374,21 @@ const LandingPage = () => {
       if (country && !byId.has(routeId)) byId.set(routeId, country);
     }
     return Array.from(byId.values());
-  }, [searchDestination, trendingCountries, allCountries, geocodePlaces]);
+  }, [searchDestination, popularCountryCards, trendingCountries, allCountries, geocodePlaces]);
+
+  const shouldShowPopularCountriesLoading =
+    !searchDestination.trim() &&
+    popularCountriesLoading &&
+    popularCountryCards.length === 0;
 
   /** Stable key so the memoized grid skips re-rendering when unrelated parent state ticks. */
+  const displayedCountries = useMemo(() => {
+    return filteredCountries.slice(0, visibleCount);
+  }, [filteredCountries, visibleCount]);
+
   const countryIdsKey = useMemo(
-    () => filteredCountries.map((c) => getCountryRouteId(c)).join("|"),
-    [filteredCountries]
+    () => displayedCountries.map((c) => getCountryRouteId(c)).join("|"),
+    [displayedCountries]
   );
 
   const scrollToCountry = useCallback((countryId) => {
@@ -347,8 +458,6 @@ const LandingPage = () => {
     [navigate]
   );
 
-  const handleNavigateAll = useCallback(() => navigate("/destinations"), [navigate]);
-
   useEffect(() => {
     const handleGlobalTyping = (event) => {
       const input = searchInputRef.current;
@@ -400,7 +509,7 @@ const LandingPage = () => {
           className="absolute inset-0 hidden sm:block"
           style={{
             background:
-              "linear-gradient(90deg, rgba(248,251,255,0.98) 0%, rgba(248,251,255,0.94) 28%, rgba(248,251,255,0.72) 52%, rgba(248,251,255,0.18) 72%, rgba(248,251,255,0.04) 100%)",
+              "linear-gradient(90deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.94) 28%, rgba(255,255,255,0.72) 52%, rgba(255,255,255,0.18) 72%, rgba(255,255,255,0.04) 100%)",
           }}
           aria-hidden="true"
         />
@@ -408,7 +517,7 @@ const LandingPage = () => {
           className="absolute inset-0 sm:hidden"
           style={{
             background:
-              "linear-gradient(180deg, rgba(248,251,255,0.78) 0%, rgba(248,251,255,0.60) 26%, rgba(248,251,255,0.28) 52%, rgba(248,251,255,0.78) 100%)",
+              "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.60) 26%, rgba(255,255,255,0.28) 52%, rgba(255,255,255,0.78) 100%)",
           }}
           aria-hidden="true"
         />
@@ -441,18 +550,6 @@ const LandingPage = () => {
                   From documentation to approval updates, everything stays in one place.
                 </p>
 
-                <div className="mt-8 flex flex-wrap items-center gap-4">
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={() => navigate("/destinations")}
-                    rightIcon={<ArrowRight size={18} />}
-                    className="rounded-2xl px-7 shadow-[0_18px_40px_rgba(14,116,217,0.28)]"
-                    id="hero-explore-destinations-btn"
-                  >
-                    Explore Destinations
-                  </Button>
-                </div>
               </motion.div>
 
               <motion.div
@@ -599,14 +696,17 @@ const LandingPage = () => {
 
       <LandingCountriesGrid
         countryIdsKey={countryIdsKey}
-        filteredCountries={filteredCountries}
+        filteredCountries={displayedCountries}
         countryCardRefs={countryCardRefs}
         display={countryDisplay}
         documentCatalog={documentCatalog}
+        heading=""
+        loading={shouldShowPopularCountriesLoading}
         globalRequirements={globalRequirements}
         showVisaRequirements={countryDisplay?.showRequiredDocuments !== false}
         onNavigateDestination={handleNavigateDestination}
-        onNavigateAll={handleNavigateAll}
+        hasMore={visibleCount < filteredCountries.length}
+        onLoadMore={() => setVisibleCount((v) => v + 12)}
       />
 
       <Footer />

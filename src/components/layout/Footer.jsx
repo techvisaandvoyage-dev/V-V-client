@@ -4,7 +4,7 @@
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Plane, Mail, Shield, Lock, Globe } from "lucide-react";
+import { Plane, Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
 import { api } from "../../store/authStore";
 
 const FOOTER_SECTIONS = [
@@ -13,6 +13,13 @@ const FOOTER_SECTIONS = [
   { key: "support", title: "Support" },
   { key: "legal", title: "Legal" },
 ];
+
+const FOOTER_CONTENT_FALLBACK = {
+  brandPrimaryText: "Visa &",
+  brandAccentText: "Voyage",
+  description:
+    "Your trusted partner for seamless visa applications worldwide. Fast, secure, and professionally managed.",
+};
 
 const InstagramIcon = ({ size = 16, className = "" }) => (
   <svg
@@ -59,6 +66,45 @@ const TwitterIcon = ({ size = 16, className = "" }) => (
   </svg>
 );
 
+const YoutubeIcon = ({ size = 16, className = "" }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+    width={size}
+    height={size}
+    aria-hidden="true"
+  >
+    <path d="M21.6 7.2a2.9 2.9 0 0 0-2.04-2.05C17.74 4.67 12 4.67 12 4.67s-5.74 0-7.56.48A2.9 2.9 0 0 0 2.4 7.2C1.92 9.03 1.92 12 1.92 12s0 2.97.48 4.8a2.9 2.9 0 0 0 2.04 2.05c1.82.48 7.56.48 7.56.48s5.74 0 7.56-.48a2.9 2.9 0 0 0 2.04-2.05c.48-1.83.48-4.8.48-4.8s0-2.97-.48-4.8ZM10.08 15.03V8.97L15.36 12l-5.28 3.03Z" />
+  </svg>
+);
+
+const LinkedinIcon = ({ size = 16, className = "" }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+    width={size}
+    height={size}
+    aria-hidden="true"
+  >
+    <path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3A2.02 2.02 0 1 0 5.3 7.04 2.02 2.02 0 0 0 5.25 3ZM20.44 12.4c0-3.44-1.83-5.04-4.27-5.04-1.97 0-2.85 1.08-3.34 1.84V8.5H9.46c.05 1.15 0 11.5 0 11.5h3.38v-6.42c0-.34.02-.68.13-.92.27-.68.9-1.38 1.95-1.38 1.38 0 1.93 1.04 1.93 2.56V20h3.38v-7.6Z" />
+  </svg>
+);
+
+const FOOTER_SOCIAL_ICON_COMPONENTS = {
+  instagram: InstagramIcon,
+  facebook: FacebookIcon,
+  twitter: TwitterIcon,
+  youtube: YoutubeIcon,
+  linkedin: LinkedinIcon,
+  whatsapp: MessageCircle,
+  telegram: Send,
+  email: Mail,
+  website: Globe,
+  custom: LinkIcon,
+};
+
 const Footer = () => {
   const location = useLocation();
   const isTransientPage =
@@ -68,22 +114,57 @@ const Footer = () => {
     location.pathname.endsWith("/summary");
   const currentYear = new Date().getFullYear();
   const [pages, setPages] = useState([]);
+  const [socialIcons, setSocialIcons] = useState([]);
+  const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
 
   useEffect(() => {
     let active = true;
 
-    const loadFooterPages = async () => {
+    const loadFooterData = async () => {
       try {
-        const { data } = await api.get("/pages");
-        if (active && data.success) {
-          setPages(Array.isArray(data.items) ? data.items : []);
+        const [pagesRes, iconsRes, footerConfigRes] = await Promise.all([
+          api.get("/pages"),
+          api.get("/footer-social-icons"),
+          api.get("/config/footer"),
+        ]);
+
+        if (!active) return;
+
+        if (pagesRes?.data?.success) {
+          setPages(Array.isArray(pagesRes.data.items) ? pagesRes.data.items : []);
+        } else {
+          setPages([]);
+        }
+
+        if (iconsRes?.data?.success) {
+          setSocialIcons(Array.isArray(iconsRes.data.icons) ? iconsRes.data.icons : []);
+        } else {
+          setSocialIcons([]);
+        }
+
+        if (footerConfigRes?.data?.success && footerConfigRes?.data?.config) {
+          const config = footerConfigRes.data.config;
+          setFooterContent({
+            brandPrimaryText:
+              String(config.brandPrimaryText || "").trim() || FOOTER_CONTENT_FALLBACK.brandPrimaryText,
+            brandAccentText:
+              String(config.brandAccentText || "").trim() || FOOTER_CONTENT_FALLBACK.brandAccentText,
+            description:
+              String(config.description || "").trim() || FOOTER_CONTENT_FALLBACK.description,
+          });
+        } else {
+          setFooterContent(FOOTER_CONTENT_FALLBACK);
         }
       } catch {
-        if (active) setPages([]);
+        if (active) {
+          setPages([]);
+          setSocialIcons([]);
+          setFooterContent(FOOTER_CONTENT_FALLBACK);
+        }
       }
     };
 
-    loadFooterPages();
+    loadFooterData();
     return () => {
       active = false;
     };
@@ -119,30 +200,30 @@ const Footer = () => {
                 <Plane size={16} className="text-background" strokeWidth={2.5} />
               </div>
               <span className="font-bold text-xl">
-                Visa & <span className="text-gradient-cyan">Voyage</span>
+                {footerContent.brandPrimaryText} <span className="text-gradient-cyan">{footerContent.brandAccentText}</span>
               </span>
             </Link>
             <p className="text-sm text-text-secondary leading-relaxed mb-6">
-              Your trusted partner for seamless visa applications worldwide.
-              Fast, secure, and professionally managed.
+              {footerContent.description}
             </p>
 
             <div className="flex items-center gap-3">
-              {[
-                { icon: InstagramIcon, href: "#", label: "Instagram" },
-                { icon: FacebookIcon, href: "#", label: "Facebook" },
-                { icon: Mail, href: "mailto:", label: "Email" },
-                { icon: TwitterIcon, href: "#", label: "Twitter" },
-              ].map(({ icon: Icon, href, label }) => (
+              {socialIcons.map(({ _id, label, type, url }) => {
+                const Icon = FOOTER_SOCIAL_ICON_COMPONENTS[type] || LinkIcon;
+                return (
                 <a
-                  key={label}
-                  href={href}
+                  key={_id || `${type}-${label}`}
+                  href={url}
                   aria-label={label}
+                  title={label}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-9 h-9 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-cyan hover:border-cyan/30 transition-all duration-200"
                 >
                   <Icon size={16} />
                 </a>
-              ))}
+                );
+              })}
             </div>
           </div>
 

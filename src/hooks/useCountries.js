@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { COUNTRIES, TRENDING_COUNTRIES, getCountryById } from "../data/countries";
+import { COUNTRIES, getCountryById } from "../data/countries";
 import { api, SERVER_URL } from "../store/authStore";
 import { getCountryFlagEmoji } from "../utils/countrySearch";
 import { getCountryRegionLabel } from "../utils/continentDisplay";
@@ -300,6 +300,8 @@ export function normalizeCountryFromApi(c) {
       : [],
     trending: Boolean(c.trending),
     successRate: c.successRate || 80,
+    visitCount: Number.isFinite(Number(c.visitCount)) ? Number(c.visitCount) : 0,
+    lastVisitedAt: c.lastVisitedAt || null,
     whyBookNow: Array.isArray(c.whyBookNow)
       ? c.whyBookNow.map((s) => String(s ?? "").trim()).filter(Boolean)
       : [],
@@ -410,14 +412,12 @@ function buildInitialCountriesState() {
     );
     return {
       countries: withResolved.filter((c) => c.isActive !== false),
-      trendingCountries: withResolved.filter((c) => c.isActive !== false).filter((c) => c.trending),
       display: cached.display,
       documentCatalog: cached.documentCatalog,
     };
   }
   return {
     countries: COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))).filter((c) => c.isActive !== false),
-    trendingCountries: TRENDING_COUNTRIES.map((c) => withRegionLabel(withBlankImageUrl(c))).filter((c) => c.isActive !== false),
     display: { ...DEFAULT_DISPLAY },
     documentCatalog: [],
   };
@@ -426,7 +426,6 @@ function buildInitialCountriesState() {
 export function useCountries() {
   const initial = buildInitialCountriesState();
   const [countries, setCountries] = useState(() => initial.countries);
-  const [trendingCountries, setTrendingCountries] = useState(() => initial.trendingCountries);
   const [display, setDisplay] = useState(() => initial.display);
   const [documentCatalog, setDocumentCatalog] = useState(() => initial.documentCatalog);
   const [loading, setLoading] = useState(true);
@@ -445,18 +444,15 @@ export function useCountries() {
 
           saveCountriesCache(normalised, nextDisplay, nextCatalog);
           setCountries(normalised.filter((c) => c.isActive !== false));
-          setTrendingCountries(normalised.filter((c) => c.isActive !== false).filter((c) => c.trending));
           setDisplay(nextDisplay);
           setDocumentCatalog(nextCatalog);
         } else if (!cancelled) {
           setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))).filter((c) => c.isActive !== false));
-          setTrendingCountries(TRENDING_COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))).filter((c) => c.isActive !== false));
         }
         // If DB returns empty (very first boot before seed finishes) keep static
       } catch {
         if (!cancelled) {
           setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))));
-          setTrendingCountries(TRENDING_COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))));
         }
         // Server unreachable — keep static data as fallback
       } finally {
@@ -468,5 +464,5 @@ export function useCountries() {
     return () => { cancelled = true; };
   }, []);
 
-  return { countries, trendingCountries, display, documentCatalog, loading };
+  return { countries, trendingCountries: countries, display, documentCatalog, loading };
 }

@@ -91,6 +91,28 @@ const getTravelerPassportDetail = (application, travelerNo) => {
   };
 };
 
+const getTravelerPassportDetailFromSummaryData = (summaryData, travelerNo) => {
+  const details =
+    summaryData?.uploadedDocDetails && typeof summaryData.uploadedDocDetails === "object"
+      ? summaryData.uploadedDocDetails
+      : null;
+  if (!details) return null;
+
+  const detail = details[travelerNo] || details[String(travelerNo)];
+  if (!detail?.url) return null;
+
+  return {
+    url: detail.url,
+    fileName: detail.fileName || String(detail.url).split("/").pop() || "Passport",
+    fileSize: Number(detail?.fileSize || 0),
+    mimeType: detail?.mimeType || "",
+  };
+};
+
+const getTravelerPassportDetailForSummary = (application, summaryData, travelerNo) =>
+  getTravelerPassportDetail(application, travelerNo) ||
+  getTravelerPassportDetailFromSummaryData(summaryData, travelerNo);
+
 const hasUploadedPassport = (entry) => {
   const docs = entry?.documents;
   if (!docs) return false;
@@ -744,7 +766,7 @@ const ApplicationSummaryPage = () => {
   };
 
   const openPassportPreview = (travelerNo) => {
-    const detail = getTravelerPassportDetail(application, travelerNo);
+    const detail = getTravelerPassportDetailForSummary(application, summaryData, travelerNo);
     const previewUrl = getFileUrl(detail?.url);
     if (!detail || !previewUrl) {
       showToast("Preview is not available for this file yet.", "error");
@@ -1314,7 +1336,7 @@ const ApplicationSummaryPage = () => {
             <div className="space-y-3">
               {Array.from({ length: travelerCount }).map((_, index) => {
                 const travelerNo = index + 1;
-                const detail = getTravelerPassportDetail(application, travelerNo);
+                const detail = getTravelerPassportDetailForSummary(application, summaryData, travelerNo);
                 if (!detail?.url) return null;
                 return (
                   <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/60 hover:border-cyan/30 transition-colors">
@@ -1529,13 +1551,13 @@ const ApplicationSummaryPage = () => {
                         uploading={Boolean(uploadModalUploading[index])}
                         optimizing={Boolean(uploadModalOptimizing[index])}
                         saved={Boolean(traveler.passportUploaded && !traveler.passportFile)}
-                        previewEnabled={Boolean(getTravelerPassportDetail(application, traveler.id)?.url)}
+                        previewEnabled={Boolean(getTravelerPassportDetailForSummary(application, summaryData, traveler.id)?.url)}
                         accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                         helperText={
                           traveler.passportFile
                             ? traveler.passportFile.name
-                            : getTravelerPassportDetail(application, traveler.id)?.fileName
-                              ? `${getTravelerPassportDetail(application, traveler.id).fileName} - ${formatFileSize(getTravelerPassportDetail(application, traveler.id).fileSize)}`
+                            : getTravelerPassportDetailForSummary(application, summaryData, traveler.id)?.fileName
+                              ? `${getTravelerPassportDetailForSummary(application, summaryData, traveler.id).fileName} - ${formatFileSize(getTravelerPassportDetailForSummary(application, summaryData, traveler.id).fileSize)}`
                             : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
                         }
                         fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}

@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import ImageWithShimmer from "../ui/ImageWithShimmer";
-import { getCountryFlagEmoji, getCountryCardCodeBadge } from "../../utils/countrySearch";
+import { getCountryFlagEmoji, getIsoAlpha2FromCountryName } from "../../utils/countrySearch";
 
 function getCardVisaTypeLabel(visaTypeValue) {
   const value = String(visaTypeValue || "").trim();
@@ -166,6 +167,26 @@ function getDocumentLabel(key, documentCatalog) {
     .trim();
 }
 
+function CountryFlagIcon({ country, className = "h-6 w-6 text-xl" }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const iso = getIsoAlpha2FromCountryName(country?.name);
+  const emoji = getCountryFlagEmoji(country?.name, country?.flagEmoji);
+
+  if (iso && !imgFailed) {
+    return (
+      <img
+        src={`https://flagcdn.com/${iso.toLowerCase()}.svg`}
+        alt={`${country?.name} flag`}
+        className={className}
+        loading="lazy"
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  return <span aria-hidden>{emoji}</span>;
+}
+
 const DestinationCard = ({
   country,
   index = 0,
@@ -209,8 +230,12 @@ const DestinationCard = ({
         >
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 transition-opacity duration-500" />
 
-          <div className="absolute left-3 top-3 z-30 rounded-md bg-black/50 px-2 py-1 text-[10px] font-semibold text-white drop-shadow-md">
-            {getCountryCardCodeBadge(country)}
+          <div
+            className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-xl text-white drop-shadow-md"
+            role="img"
+            aria-label={`${country.name} flag`}
+          >
+            <CountryFlagIcon country={country} className="h-4 w-4 rounded-full object-cover" />
           </div>
 
           {!country.imageUrl ? (
@@ -219,7 +244,7 @@ const DestinationCard = ({
               role="img"
               aria-label={country.name}
             >
-              {getCountryFlagEmoji(country.name, country.flagEmoji)}
+              <CountryFlagIcon country={country} className="h-8 w-8 rounded-full object-cover" />
             </div>
           ) : null}
 

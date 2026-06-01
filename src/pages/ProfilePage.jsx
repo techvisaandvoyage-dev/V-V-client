@@ -313,7 +313,7 @@ const ProfilePage = () => {
   const memberSince = formatMemberSince(user.createdAt);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#EAF3FF_0%,#F6F9FF_26%,#FBFCFF_52%,#F7F9FD_100%)] pb-16">
+    <div className="min-h-screen bg-white pb-16">
       <Navbar />
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-7 px-4 py-7 sm:px-6 lg:px-10">

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle,
+  CircleCheck,
   Upload,
   CreditCard,
   Loader2,
@@ -2081,43 +2082,43 @@ const ApplicationDetails = () => {
           )}
 
           {visibleRequiredDocFields.length > 0 && (
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-border bg-surface">
-              <div className="flex items-start gap-4 border-b border-border px-5 py-5 sm:px-6">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan/10 text-cyan">
-                  <ShieldCheck size={24} strokeWidth={2} />
+            <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+              <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+                <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+                  <ShieldCheck size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-xl font-semibold text-text-primary">Documents Required</h3>
-                  <p className="text-sm text-text-muted">
+                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Documents Required</h3>
+                  <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
                     These are the country documents required for this application.
                   </p>
                 </div>
               </div>
 
-              <div className="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 sm:py-6 xl:grid-cols-3">
+              <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
                 {visibleRequiredDocFields.map((field) => {
                   const Icon = field.Icon;
-                  const helperCopy = field.description || DOCUMENT_HELPER_COPY[field.key] || "";
 
                   return (
                     <div
                       key={`required-doc-${field.key}`}
-                      className="flex items-start gap-3 rounded-[18px] border border-border bg-background px-3.5 py-2.5"
+                      className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan/10 text-cyan">
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
                         {field.iconClass ? (
-                          <i className={`${field.iconClass} text-[19px] leading-none`} aria-hidden="true" />
+                          <i className={`${field.iconClass} text-lg leading-none`} aria-hidden="true" />
                         ) : (
-                          <Icon size={19} strokeWidth={2} />
+                          <Icon size={16} strokeWidth={2.1} />
                         )}
                       </span>
-                      <div className="min-w-0 flex-1 pt-0.5 leading-none">
-                        <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-text-primary">
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="text-sm font-normal leading-tight text-text-primary">
                           {getDocumentDisplayName(field.label)}
                         </p>
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-text-muted">
-                          {helperCopy}
-                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
+                        <CircleCheck size={16} strokeWidth={2.4} />
+                        <span>Required</span>
                       </div>
                     </div>
                   );
@@ -2127,53 +2128,51 @@ const ApplicationDetails = () => {
           )}
 
           {visibleOtherDocFields.length > 0 && (
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-border bg-surface">
-              <div className="flex items-start gap-4 border-b border-border px-5 py-5 sm:px-6">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan/10 text-cyan">
-                  <FileText size={24} strokeWidth={2} />
+            <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+              <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+                <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+                  <FileText size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-xl font-semibold text-text-primary">Other Documents</h3>
-                  <p className="text-sm text-text-muted">
+                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Other Documents</h3>
+                  <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
                     You can also attach other documents in the same Drive link.
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+              <div className="px-5 pb-6 sm:px-7 sm:pb-7">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {visibleOtherDocFields.map((field) => {
                     const inputKey = `${resolvedActiveOtherDocsTravelerNo}-${field.key}`;
                     const hasError = Boolean(docErrors[inputKey]);
                     const Icon = field.Icon;
-                    const helperCopy = field.description || DOCUMENT_HELPER_COPY[field.key] || "";
                     return (
                       <div
                         key={`other-doc-option-${inputKey}`}
-                        className={`flex w-full items-start gap-3 rounded-[18px] border px-3.5 py-2.5 ${
-                          hasError
-                            ? "border-red-500/35 bg-red-500/5"
-                            : "border-border bg-background"
-                        }`}
+                        className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
                       >
-                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                          hasError ? "bg-red-500/10 text-red-400" : "bg-cyan/10 text-cyan"
+                        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
+                          hasError
+                            ? "bg-red-50 text-red-400"
+                            : "bg-cyan/8 text-cyan"
                         }`}>
                           {field.iconClass ? (
-                            <i className={`${field.iconClass} text-[19px] leading-none`} aria-hidden="true" />
+                            <i className={`${field.iconClass} text-lg leading-none`} aria-hidden="true" />
                           ) : (
-                            <Icon size={19} strokeWidth={2} />
+                            <Icon size={16} strokeWidth={2.1} />
                           )}
                         </span>
-                        <div className="min-w-0 flex-1 pt-0.5 leading-none">
-                          <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-text-primary">
+                        <div className="min-w-0 flex-1 text-left">
+                          <p className="text-sm font-normal leading-tight text-text-primary">
                             {getDocumentDisplayName(field.label)}
                           </p>
-                          <p className={`mt-1 line-clamp-2 text-[11px] leading-4 ${
-                            hasError ? "text-red-500" : "text-text-muted"
-                          }`}>
-                            {hasError ? docErrors[inputKey] : helperCopy}
-                          </p>
+                        </div>
+                        <div className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-normal ${
+                          hasError ? "bg-red-50 text-red-500" : "bg-cyan/8 text-cyan"
+                        }`}>
+                          <CircleCheck size={16} strokeWidth={2.4} />
+                          <span>{hasError ? "Review" : "Optional"}</span>
                         </div>
                       </div>
                     );

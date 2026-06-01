@@ -7,12 +7,13 @@ const loadedImageCache = new Set();
  * Unsplash supports w/h/q/fm/auto/fit query params — using them shrinks 1MB+ JPEG photos
  * to ~30–80 KB WebPs on the typical card.
  */
-function optimizeImageUrl(url, { width, quality = 70 } = {}) {
+function optimizeImageUrl(url, { width, height, quality = 64 } = {}) {
   if (!url) return url;
   if (!url.includes('images.unsplash.com')) return url;
   try {
     const u = new URL(url);
     if (width) u.searchParams.set('w', String(width));
+    if (height) u.searchParams.set('h', String(height));
     u.searchParams.set('q', String(quality));
     u.searchParams.set('auto', 'format');
     u.searchParams.set('fit', 'crop');
@@ -23,11 +24,11 @@ function optimizeImageUrl(url, { width, quality = 70 } = {}) {
   }
 }
 
-function buildSrcSet(url, width) {
+function buildSrcSet(url, width, height) {
   if (!url || !width) return undefined;
   if (!url.includes('images.unsplash.com')) return undefined;
   return [width, Math.round(width * 1.5), width * 2]
-    .map((w) => `${optimizeImageUrl(url, { width: w })} ${w}w`)
+    .map((w) => `${optimizeImageUrl(url, { width: w, height })} ${w}w`)
     .join(', ');
 }
 
@@ -38,6 +39,7 @@ function buildSrcSet(url, width) {
  * @param {string} [props.className]
  * @param {boolean} [props.priority] - true for above-the-fold images (hero / first row of cards).
  * @param {number} [props.width] - target rendered width in CSS pixels; used for Unsplash resize + srcSet.
+ * @param {number} [props.height] - target rendered height in CSS pixels; used for Unsplash resize.
  * @param {string} [props.sizes] - <img sizes> hint for responsive selection (defaults to width).
  * @param {boolean} [props.interactiveOverlay] - lets clickable children receive pointer events.
  */
@@ -49,13 +51,14 @@ const ImageWithShimmer = ({
   interactiveOverlay = false,
   priority = false,
   width = 600,
+  height,
   sizes,
 }) => {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
-  const optimizedSrc = useMemo(() => optimizeImageUrl(src, { width }), [src, width]);
-  const srcSet = useMemo(() => buildSrcSet(src, width), [src, width]);
+  const optimizedSrc = useMemo(() => optimizeImageUrl(src, { width, height }), [src, width, height]);
+  const srcSet = useMemo(() => buildSrcSet(src, width, height), [src, width, height]);
   const showFallbackState = !optimizedSrc || error;
   const showContent = loaded || showFallbackState;
 
@@ -63,6 +66,31 @@ const ImageWithShimmer = ({
     setLoaded(Boolean(optimizedSrc) && loadedImageCache.has(optimizedSrc));
     setError(false);
   }, [optimizedSrc]);
+
+  useEffect(() => {
+    if (!priority || !optimizedSrc || loadedImageCache.has(optimizedSrc)) return undefined;
+
+    const img = new window.Image();
+    if (srcSet) {
+      img.srcset = srcSet;
+      if (sizes || width) img.sizes = sizes || `${width}px`;
+    }
+    img.decoding = 'async';
+    img.src = optimizedSrc;
+    img.onload = () => {
+      loadedImageCache.add(optimizedSrc);
+      setLoaded(true);
+    };
+    img.onerror = () => {
+      setError(true);
+      setLoaded(false);
+    };
+
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [optimizedSrc, priority, sizes, srcSet, width]);
 
   return (
     <div className={`relative overflow-hidden bg-slate-200 ${className}`}>

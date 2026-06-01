@@ -64,6 +64,7 @@ import {
 import { loadTravelDraft, saveTravelDraft } from "../utils/travelDraftStorage";
 import { getLocalDateYmd } from "../utils/dateInput";
 import { matchesCountryRouteId, getCountryRouteId } from "../utils/countryRouting";
+import { getCountryFlagEmoji, getIsoAlpha2FromCountryName } from "../utils/countrySearch";
 import { formatOrdinalDate } from "../utils/dateUtils";
 
 import FilePreviewModal from "../components/ui/FilePreviewModal";
@@ -74,6 +75,30 @@ const fadeUp = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
 };
+
+function CountryHeroFlag({ country, sizeClass = "h-9 w-9" }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const iso = getIsoAlpha2FromCountryName(country?.name);
+  const emoji = getCountryFlagEmoji(country?.name, country?.flagEmoji);
+
+  if (iso && !imgFailed) {
+    return (
+      <img
+        src={`https://flagcdn.com/${iso.toLowerCase()}.svg`}
+        alt={`${country?.name} flag`}
+        className={`${sizeClass} rounded-full object-cover shadow-lg`}
+        loading="lazy"
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <span className="text-3xl" role="img" aria-label={`${country?.name} flag`}>
+      {emoji}
+    </span>
+  );
+}
 
 const getCountryVisibilityIdCandidates = (country) =>
   [
@@ -106,6 +131,8 @@ const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
 const INVALID_PASSPORT_TYPE_ERROR = "Only JPG, JPEG and PNG files are allowed.";
 const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
 const PAYMENT_CONFIG_CACHE_KEY = "vb_payment_config_v1";
+const COUNTRY_VISIT_STORAGE_PREFIX = "visited_country_";
+const COUNTRY_VISIT_TTL_MS = 24 * 60 * 60 * 1000;
 const isReusableUnpaidApplication = (application) => {
   const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
   return ["pending_payment", "failed", "cancelled"].includes(paymentStatus);
@@ -318,6 +345,73 @@ const DOCUMENT_DESCRIPTIONS = {
   companyRegistration: "Company registration proof for business documentation.",
 };
 
+const getDocumentDisplayName = (label = "") =>
+  String(label || "").replace(/\s*Upload\s*$/i, "").trim();
+
+const DOCUMENT_HELPER_COPY = {
+  passport: "Mandatory",
+  oldPassport: "If available",
+  photo: "Recent white background",
+  bankStatement: "Last 6 months",
+  idCard: "Aadhaar Card",
+  panCard: "Optional",
+  taxReturn: "Last 1 year",
+  itinerary: "Optional",
+  salarySlip: "Optional",
+  hotelBooking: "Optional",
+  flightTicket: "Optional",
+  marriageCertificate: "If applicable",
+  birthCertificate: "Required for minors",
+  employmentLetter: "Letter from employer",
+  offerLetter: "If newly employed",
+  bankCertificate: "Optional",
+  propertyDocuments: "Optional",
+  sponsorLetter: "If sponsored",
+  invitationLetter: "If invited",
+  travelInsurance: "Recommended",
+  healthInsurance: "If required",
+  policeClearance: "If applicable",
+  noObjectionCertificate: "If employed",
+  educationCertificate: "If student",
+  businessLicense: "For business owners",
+  companyRegistration: "For company-sponsored travel",
+};
+
+const OTHER_DOCUMENT_LIBRARY_KEYS = [
+  "oldPassport",
+  "photo",
+  "idCard",
+  "panCard",
+  "drivingLicense",
+  "birthCertificate",
+  "dobCertificate",
+  "marriageCertificate",
+  "educationCertificate",
+  "employmentLetter",
+  "offerLetter",
+  "salarySlip",
+  "form16",
+  "taxReturn",
+  "bankStatement",
+  "bankCertificate",
+  "propertyDocuments",
+  "travelInsurance",
+  "healthInsurance",
+  "flightTicket",
+  "hotelBooking",
+  "itinerary",
+  "coverLetter",
+  "invitationLetter",
+  "sponsorLetter",
+  "policeClearance",
+  "noObjectionCertificate",
+  "yellowFever",
+  "covidVaccination",
+  "visaApplicationForm",
+  "businessLicense",
+  "companyRegistration",
+];
+
 
 
 
@@ -395,6 +489,45 @@ const CountryDetails = () => {
       }
     }).catch(err => console.error("Failed to fetch visa types", err));
     return () => { mounted = false; };
+  }, [country?._id, country?.slug, country?.id]);
+
+  useEffect(() => {
+    const visitId = String(country?._id || country?.slug || country?.id || "").trim();
+    if (!visitId || typeof window === "undefined") return undefined;
+
+    const storageKey = `${COUNTRY_VISIT_STORAGE_PREFIX}${visitId}`;
+    try {
+      const lastVisitedRaw = window.localStorage.getItem(storageKey);
+      if (lastVisitedRaw) {
+        const lastVisitedAt = Number(lastVisitedRaw);
+        if (Number.isFinite(lastVisitedAt) && Date.now() - lastVisitedAt < COUNTRY_VISIT_TTL_MS) {
+          return undefined;
+        }
+      }
+    } catch {
+      /* ignore storage issues and continue tracking */
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.post(`/countries/${encodeURIComponent(visitId)}/visit`);
+        if (cancelled) return;
+        try {
+          window.localStorage.setItem(storageKey, String(Date.now()));
+        } catch {
+          /* ignore storage issues */
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to track country visit", err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [country?._id, country?.slug, country?.id]);
 
   const [travelDateFrom, setTravelDateFrom] = useState("");
@@ -1220,8 +1353,18 @@ const CountryDetails = () => {
 
   const minDepartureYmd = getLocalDateYmd();
 
-  const requiredDocumentKeys = Array.isArray(country.requiredDocuments) && country.requiredDocuments.length
+  const countryRequiredDocumentKeys = Array.isArray(country.requiredDocuments)
     ? country.requiredDocuments
+        .map((key) => {
+          if (!key) return "";
+          if (typeof key === "string") return key.trim();
+          if (typeof key === "object") return String(key.key || key.name || key.id || "").trim();
+          return String(key).trim();
+        })
+        .filter((key) => key && key !== "[object Object]")
+    : [];
+  const requiredDocumentKeys = countryRequiredDocumentKeys.length
+    ? countryRequiredDocumentKeys
     : ["passport"];
   const requiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
@@ -1231,6 +1374,33 @@ const CountryDetails = () => {
     Icon: getDocumentIcon(key),
     featured: false,
   }));
+  const travelDetailsRequiredDocumentFields = countryRequiredDocumentKeys.map((key) => ({
+    key,
+    label: getDocumentLabel(key),
+    description: getDocumentDescription(key),
+    iconClass: getDocumentCatalogIcon(key),
+    Icon: getDocumentIcon(key),
+  }));
+  const travelDetailsOtherDocumentFields = (() => {
+    const requiredKeys = new Set(requiredDocumentKeys);
+    const catalogKeys = Array.isArray(documentCatalog)
+      ? documentCatalog
+          .filter((d) => !d.deleted)
+          .map((item) => String(item?.key ?? "").trim())
+          .filter((key) => key && key !== "passport" && !requiredKeys.has(key))
+      : [];
+    const preferredKeys = (Array.isArray(documentCatalog) && documentCatalog.length > 0)
+      ? catalogKeys
+      : OTHER_DOCUMENT_LIBRARY_KEYS.filter((key) => !requiredKeys.has(key));
+
+    return preferredKeys.map((key) => ({
+      key,
+      label: getDocumentLabel(key),
+      description: getDocumentDescription(key),
+      iconClass: getDocumentCatalogIcon(key),
+      Icon: getDocumentIcon(key),
+    }));
+  })();
 
   const handleBack = () => {
     if (showTravelDetails) {
@@ -2117,7 +2287,7 @@ const CountryDetails = () => {
         initial="initial"
         animate="animate"
         variants={fadeUp}
-        className="rounded-[2rem] bg-gradient-to-b from-transparent via-surface/40 to-transparent p-4 sm:p-8"
+        className="rounded-[2rem] bg-white p-4 sm:p-8"
       >
         <div className="mb-6 flex items-center justify-center gap-2">
           <ListChecks size={18} className="text-cyan" />
@@ -2129,7 +2299,7 @@ const CountryDetails = () => {
               key={`${step.title}-${idx}`}
               whileHover={{ scale: 1.012, y: -3 }}
               transition={{ type: "tween", duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-              className="group flex items-start gap-4 rounded-[1.75rem] border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.12)] backdrop-blur-md transition-all duration-300 ease-out hover:border-cyan/25 hover:bg-cyan/[0.04] hover:shadow-[0_24px_55px_rgba(34,211,238,0.10)]"
+              className="group flex items-start gap-4 rounded-[1.75rem] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-all duration-300 ease-out hover:bg-[#f8fcff] hover:shadow-[0_24px_55px_rgba(34,211,238,0.08)]"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan/20 bg-cyan/10 text-cyan font-bold text-sm transition-transform duration-300 ease-out group-hover:scale-105">
                 {idx + 1}
@@ -2151,7 +2321,7 @@ const CountryDetails = () => {
           initial="initial"
           animate="animate"
           variants={fadeUp}
-          className="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-4 py-6 sm:px-8 sm:py-10"
+          className="overflow-hidden rounded-[2rem] bg-white px-4 py-6 sm:px-8 sm:py-10"
         >
           <div className="w-full lg:mx-auto lg:max-w-6xl">
             <div className="text-center">
@@ -2171,14 +2341,14 @@ const CountryDetails = () => {
               </p>
             </div>
 
-            <div className="mt-10 rounded-[1.75rem] bg-white/80 p-4 sm:p-6">
+            <div className="mt-10 rounded-[1.75rem] bg-white p-4 sm:p-6">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {parsedVisaRequirements.items.map((item, idx) => (
                   <motion.div
                     key={`${item.title}-${idx}`}
                     whileHover={{ y: -3, scale: 1.01 }}
                     transition={{ duration: 0.24, ease }}
-                    className="flex items-start gap-4 rounded-[1.4rem] border border-cyan/15 bg-white/85 p-4 sm:p-5"
+                    className="flex items-start gap-4 rounded-[1.4rem] bg-white p-4 sm:p-5 shadow-[0_14px_35px_rgba(15,23,42,0.05)]"
                   >
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan sm:h-20 sm:w-20">
                       <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan text-background shadow-[0_14px_28px_rgba(34,211,238,0.22)] sm:h-12 sm:w-12">
@@ -2229,9 +2399,9 @@ const CountryDetails = () => {
           initial="initial"
           animate="animate"
           variants={fadeUp}
-          className="overflow-hidden rounded-[2rem] border border-cyan/10 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-6 shadow-[0_24px_60px_rgba(2,132,199,0.08)] sm:px-6 sm:py-10 lg:px-8"
+          className="overflow-hidden rounded-[2rem] bg-white px-4 py-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)] sm:px-6 sm:py-10 lg:px-8"
         >
-          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-cyan/10 bg-[radial-gradient(circle_at_top,rgba(2,132,199,0.08),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-white px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
             <div
               className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-60"
               aria-hidden="true"
@@ -2276,7 +2446,7 @@ const CountryDetails = () => {
                   key={doc.key}
                   whileHover={{ y: -3, scale: 1.01 }}
                   transition={{ duration: 0.2, ease }}
-                  className="group relative flex items-center gap-3 rounded-[1.5rem] border border-cyan/15 bg-white/90 px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-4 sm:py-4"
+                  className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
                 >
 
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
@@ -2522,12 +2692,7 @@ const CountryDetails = () => {
   return (
     <div className="relative isolate min-h-screen bg-background flex flex-col font-sans">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
-          style={{ backgroundImage: "url('/images/country-details-bg.jpg')" }}
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.78)_0%,rgba(248,252,255,0.88)_38%,rgba(244,249,255,0.96)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.10),transparent_42%)]" />
+        <div className="absolute inset-0 bg-white" />
       </div>
       {/* Post-login resume splash — full-screen overlay shown when we're about
           to forward the user to /apply/:id or the summary page. Sits on top of
@@ -2567,12 +2732,16 @@ const CountryDetails = () => {
               alt={country.name}
               className="w-full h-[450px] sm:h-[520px] md:h-[79vh] object-cover"
               priority
-              width={1600}
+              width={1280}
+              height={900}
+              sizes="100vw"
               interactiveOverlay
             >
               <div className="absolute inset-0 bg-black/55" />
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center sm:p-8">
-                <p className="text-white/80 text-sm">{country.flagEmoji} {country.locatedIn ?? country.regionLabel ?? country.continent}</p>
+                <div className="mb-2 flex justify-center">
+                  <CountryHeroFlag country={country} sizeClass="h-10 w-10 sm:h-12 sm:w-12" />
+                </div>
                 <h1 className="mt-3 text-3xl sm:text-6xl font-bold text-white leading-tight">{country.name} Visa</h1>
 
                 <div className="mx-auto mt-8 grid w-full max-w-lg grid-cols-2 gap-3 sm:grid-cols-3">
@@ -2715,7 +2884,9 @@ const CountryDetails = () => {
                       >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-4 sm:p-8">
-                      <p className="text-white/80 text-sm">{country.flagEmoji} {country.locatedIn ?? country.regionLabel ?? country.continent}</p>
+                      <div className="mb-3">
+                        <CountryHeroFlag country={country} sizeClass="h-9 w-9 sm:h-10 sm:w-10" />
+                      </div>
                       <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight">{country.name} Visa</h1>
 
                       <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -3027,6 +3198,98 @@ const CountryDetails = () => {
                         }`}
                       />
                     </div>
+
+                    <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+                      <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+                        <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+                          <ShieldCheck size={20} strokeWidth={2} />
+                        </span>
+                        <div className="min-w-0">
+                          <h5 className="text-[24px] font-semibold tracking-tight text-slate-950 sm:text-[26px]">Documents Required</h5>
+                          <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+                            These are the country documents required for this application.
+                          </p>
+                        </div>
+                      </div>
+
+                      {travelDetailsRequiredDocumentFields.length ? (
+                        <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
+                          {travelDetailsRequiredDocumentFields.map((doc) => {
+                            const Icon = doc.Icon;
+                            return (
+                              <div
+                                key={`travel-doc-required-${doc.key}`}
+                                className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
+                              >
+                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                                  {doc.iconClass ? (
+                                    <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
+                                  ) : (
+                                    <Icon size={16} strokeWidth={2.1} />
+                                  )}
+                                </span>
+                                <div className="min-w-0 flex-1 text-left">
+                                  <p className="text-sm font-normal leading-tight text-text-primary">
+                                    {getDocumentDisplayName(doc.label)}
+                                  </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
+                                  <CircleCheck size={16} strokeWidth={2.4} />
+                                  <span>Required</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="px-5 pb-6 text-sm text-slate-500 sm:px-7 sm:pb-7">No document requirements added yet.</p>
+                      )}
+                    </div>
+
+                    {travelDetailsOtherDocumentFields.length > 0 ? (
+                      <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+                        <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+                          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+                            <FileText size={20} strokeWidth={2} />
+                          </span>
+                          <div className="min-w-0">
+                            <h5 className="text-[24px] font-semibold tracking-tight text-slate-950 sm:text-[26px]">Other Documents</h5>
+                            <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+                              You can also attach other documents in the same Drive link.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
+                          {travelDetailsOtherDocumentFields.map((doc) => {
+                            const Icon = doc.Icon;
+                            return (
+                              <div
+                                key={`travel-doc-other-${doc.key}`}
+                                className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
+                              >
+                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                                  {doc.iconClass ? (
+                                    <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
+                                  ) : (
+                                    <Icon size={16} strokeWidth={2.1} />
+                                  )}
+                                </span>
+                                <div className="min-w-0 flex-1 text-left">
+                                  <p className="text-sm font-normal leading-tight text-text-primary">
+                                    {getDocumentDisplayName(doc.label)}
+                                  </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
+                                  <CircleCheck size={16} strokeWidth={2.4} />
+                                  <span>Optional</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
 
                   </div>
 
