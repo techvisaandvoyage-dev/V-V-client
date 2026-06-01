@@ -1,13 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
 import NotificationBell from "./NotificationBell";
-
-const BRAND_LOGO_SRC = "/images/visa-voyage-logo.png";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -152,15 +149,8 @@ const Navbar = () => {
         </div>
 
         {/* ── Mobile menu drawer ── */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="md:hidden border-t border-border bg-white overflow-hidden"
-            >
+        {mobileMenuOpen && (
+            <div className="md:hidden border-t border-border bg-white overflow-hidden animate-mobile-menu-in">
               <div className="px-4 py-4 space-y-1">
                 <Link
                   to="/blog"
@@ -205,9 +195,8 @@ const Navbar = () => {
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
       </header>
 
       {/* Spacer so content doesn't hide behind fixed navbar */}

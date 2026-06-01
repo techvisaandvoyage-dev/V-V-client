@@ -4,7 +4,6 @@
 //  Reads from & clears the uiStore toast state.
 // ============================================================
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Info, X } from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
 
@@ -37,19 +36,16 @@ const Toast = () => {
   const cfg = config[toast?.type] || config.info;
 
   return (
-    <AnimatePresence>
-      {toast && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm pointer-events-none flex justify-center">
-          <motion.div
+    <>
+      {toast ? (
+        <div className="fixed top-8 left-1/2 z-[9999] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center pointer-events-none">
+          <div
             key="toast"
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className={`
               pointer-events-auto
               w-full flex items-center gap-3 px-5 py-4
               rounded-2xl border backdrop-blur-xl shadow-2xl
+              animate-toast-in
               ${cfg.class}
             `}
             role="alert"
@@ -64,10 +60,10 @@ const Toast = () => {
             >
               <X size={16} />
             </button>
-          </motion.div>
+          </div>
         </div>
-      )}
-    </AnimatePresence>
+      ) : null}
+    </>
   );
 };
 

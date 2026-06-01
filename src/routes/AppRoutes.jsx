@@ -1,12 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import ProtectedRoute from "./ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { getAdminAppUrl } from "../utils/adminAppUrl";
 import { api } from "../store/authStore";
-
-const routeMotionEase = [0.16, 1, 0.3, 1];
 
 // ── Lazy loaded Pages ───────────────────────────────────────────
 const LandingPage         = lazy(() => import("../pages/LandingPage"));
@@ -65,13 +62,10 @@ const NotFound = () => (
 // ── Routes Map ──────────────────────────────────────────────
 const AppRoutes = () => {
   const location = useLocation();
-  const reduceMotion = useReducedMotion();
-  const isHomepage = location.pathname === "/";
-  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
   const shouldShowChat = 
     location.pathname.startsWith("/destination/") ||
     location.pathname.startsWith("/dashboard/application/");
-  const [siteStateLoading, setSiteStateLoading] = useState(true);
+  const [siteStateLoading, setSiteStateLoading] = useState(false);
   const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
 
   useEffect(() => {
@@ -92,17 +86,14 @@ const AppRoutes = () => {
       }
     };
 
-    loadSiteState();
+    const timer = window.setTimeout(loadSiteState, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 
-  if (siteStateLoading) {
-    return <PageLoader />;
-  }
-
-  if (maintenanceModeEnabled && !location.pathname.startsWith("/admin")) {
+  if (!siteStateLoading && maintenanceModeEnabled && !location.pathname.startsWith("/admin")) {
     return (
       <Suspense fallback={<PageLoader />}>
         <MaintenancePage />
@@ -112,19 +103,7 @@ const AppRoutes = () => {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={location.pathname}
-          initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
-          transition={
-            reduceMotion
-              ? { duration: 0 }
-              : { duration: 0.28, ease: routeMotionEase }
-          }
-          className="w-full"
-        >
+        <div className="w-full">
           <main id="main-content">
             <Routes location={location}>
         {/* ── Public routes ── */}
@@ -225,8 +204,7 @@ const AppRoutes = () => {
       <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
-        </motion.div>
-      </AnimatePresence>
+        </div>
       {shouldShowChat && <SupportChatWidget />}
     </Suspense>
   );

@@ -1,6 +1,41 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import DestinationCard from "../country/DestinationCard";
 import { getCountryRouteId } from "../../utils/countryRouting";
+
+const LandingCountryCardItem = memo(function LandingCountryCardItem({
+  country,
+  index,
+  countryCardRefs,
+  display,
+  documentCatalog,
+  showVisaRequirements,
+  onNavigateDestination,
+}) {
+  const routeId = getCountryRouteId(country);
+  const setCardRef = useCallback(
+    (el) => {
+      countryCardRefs.current[routeId] = el;
+    },
+    [countryCardRefs, routeId]
+  );
+  const handleClick = useCallback(() => {
+    onNavigateDestination(country);
+  }, [country, onNavigateDestination]);
+
+  return (
+    <DestinationCard
+      id={`country-card-${routeId}`}
+      cardRef={setCardRef}
+      country={country}
+      index={index}
+      display={display}
+      documentCatalog={documentCatalog}
+      showVisaRequirements={showVisaRequirements}
+      showTotalFee
+      onClick={handleClick}
+    />
+  );
+});
 
 const LandingCountriesGrid = memo(
   function LandingCountriesGrid({
@@ -51,19 +86,15 @@ const LandingCountriesGrid = memo(
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredCountries.map((country, i) => (
-              <DestinationCard
+              <LandingCountryCardItem
                 key={getCountryRouteId(country)}
-                id={`country-card-${getCountryRouteId(country)}`}
-                cardRef={(el) => {
-                  countryCardRefs.current[getCountryRouteId(country)] = el;
-                }}
                 country={country}
                 index={i}
+                countryCardRefs={countryCardRefs}
                 display={display}
                 documentCatalog={documentCatalog}
                 showVisaRequirements={showVisaRequirements}
-                showTotalFee
-                onClick={() => onNavigateDestination(country)}
+                onNavigateDestination={onNavigateDestination}
               />
             ))}
           </div>

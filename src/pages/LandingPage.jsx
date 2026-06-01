@@ -6,6 +6,8 @@
 // ============================================================
 import {
   useEffect,
+  lazy,
+  Suspense,
   useState,
   useRef,
   useCallback,
@@ -22,17 +24,31 @@ const AVAILABLE_ICONS = {
   Zap, ShieldCheck, FileText, Lock, CheckCircle, Clock,
   Globe, Users, CreditCard, MapPin, Plane, HeartHandshake, Smile, Search
 };
-import { motion } from "framer-motion";
 import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
 import LandingCountriesGrid from "../components/landing/LandingCountriesGrid";
 import { normalizeCountryFromApi, useCountries } from "../hooks/useCountries";
 import { api } from "../store/authStore";
 import { getCountryFlagEmoji, getCountrySearchHint, matchesCountrySearch } from "../utils/countrySearch";
 import { getCountryRouteId } from "../utils/countryRouting";
 
-  const GEOCODE_DEBOUNCE_MS = 680;
-  const GEOCODE_MIN_CHARS = 3;
+const GEOCODE_DEBOUNCE_MS = 680;
+const GEOCODE_MIN_CHARS = 3;
+const INITIAL_COUNTRY_CARD_COUNT = 8;
+const Footer = lazy(() => import("../components/layout/Footer"));
+
+const scheduleAfterPaint = (callback) => {
+  if (typeof window === "undefined") return undefined;
+  const frame = window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(callback, { timeout: 1800 });
+      } else {
+        window.setTimeout(callback, 600);
+      }
+    });
+  });
+  return () => window.cancelAnimationFrame(frame);
+};
 
 const DEFAULT_HERO_HIGHLIGHTS = [
   {
@@ -101,6 +117,7 @@ const LandingPage = () => {
   const searchAnchorRef = useRef(null);
   const searchFormRef = useRef(null);
   const geocodeAbortRef = useRef(null);
+  const popularFetchStartedRef = useRef(false);
   const geocodeReqSeq = useRef(0);
   const homeExitGuardRef = useRef(false);
   const { countries: allCountries, trendingCountries, display: countryDisplay, documentCatalog } = useCountries();
@@ -110,9 +127,10 @@ const LandingPage = () => {
   const [showVisaRequirements, setShowVisaRequirements] = useState(true);
   const [heroHighlights, setHeroHighlights] = useState(DEFAULT_HERO_HIGHLIGHTS);
   const [popularCountryCards, setPopularCountryCards] = useState(() => loadPopularCountriesCache());
-  const [popularCountriesLoading, setPopularCountriesLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [popularCountriesLoading, setPopularCountriesLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNTRY_CARD_COUNT);
   const [isSearchPinned, setIsSearchPinned] = useState(false);
+  const [showDeferredFooter, setShowDeferredFooter] = useState(false);
 
 
   useEffect(() => {
@@ -150,7 +168,7 @@ const LandingPage = () => {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const cancelSchedule = scheduleAfterPaint(async () => {
       try {
         const { data } = await api.get("/config/destination-content");
         if (alive && data?.success) {
@@ -173,17 +191,24 @@ const LandingPage = () => {
       } catch (err) {
         console.error("Failed to fetch global requirements:", err);
       }
-    })();
-    return () => { alive = false; };
+    });
+    return () => {
+      alive = false;
+      cancelSchedule?.();
+    };
   }, []);
 
   useEffect(() => {
     let alive = true;
+    if (popularFetchStartedRef.current) return undefined;
+    popularFetchStartedRef.current = true;
 
     const fallbackCountries = (source = []) => source;
 
-    (async () => {
-      setPopularCountriesLoading(true);
+    const cancelSchedule = scheduleAfterPaint(async () => {
+      if (popularCountryCards.length === 0 && allCountries.length === 0 && trendingCountries.length === 0) {
+        setPopularCountriesLoading(true);
+      }
       try {
         const { data } = await api.get("/countries/popular", { params: { limit: 250 } });
         if (!alive) return;
@@ -207,12 +232,13 @@ const LandingPage = () => {
       } finally {
         if (alive) setPopularCountriesLoading(false);
       }
-    })();
+    });
 
     return () => {
       alive = false;
+      cancelSchedule?.();
     };
-  }, [allCountries, trendingCountries]);
+  }, [allCountries, trendingCountries, popularCountryCards.length]);
 
   // Search bar state
   const [searchDestination, setSearchDestination] = useState("");
@@ -224,7 +250,7 @@ const LandingPage = () => {
 
   // Reset visible count when search changes
   useEffect(() => {
-    setVisibleCount(12);
+    setVisibleCount(INITIAL_COUNTRY_CARD_COUNT);
   }, [searchDestination]);
 
   useEffect(() => {
@@ -469,6 +495,10 @@ const LandingPage = () => {
   }, []);
 
   useEffect(() => {
+    return scheduleAfterPaint(() => setShowDeferredFooter(true));
+  }, []);
+
+  useEffect(() => {
     let triggerTop = 0;
     let rafId = null;
     let resizeTimer = null;
@@ -518,14 +548,11 @@ const LandingPage = () => {
             ref={searchAnchorRef}
             className={isSearchPinned ? "h-16" : ""}
           >
-          <motion.div
-            initial={{ opacity: 0, y: 34 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55 }}
+          <div
             className={
               isSearchPinned
                 ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
-                : "relative z-20 mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3"
+                : "relative z-20 mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
             }
             >
               <div className={isSearchPinned ? "pointer-events-auto mx-auto w-full max-w-[34rem] md:max-w-[36rem] lg:max-w-[38rem]" : ""}>
@@ -616,14 +643,11 @@ const LandingPage = () => {
               )}
             </form>
             </div>
-          </motion.div>
+          </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08 }}
-            className="mx-auto mt-6 w-full max-w-5xl rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(2,132,199,0.06)] sm:mt-8 sm:px-6"
+          <div
+            className="mx-auto mt-6 w-full max-w-5xl rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(2,132,199,0.06)] sm:mt-8 sm:px-6 animate-home-enter [animation-delay:80ms]"
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-sky-100">
               {heroHighlights.map(({ icon: Icon, title, body }) => (
@@ -638,7 +662,7 @@ const LandingPage = () => {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         </div>
 
         <LandingCountriesGrid
@@ -657,7 +681,11 @@ const LandingPage = () => {
         />
       </section>
 
-      <Footer />
+      {showDeferredFooter ? (
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
+      ) : null}
     </div>
   );
 };

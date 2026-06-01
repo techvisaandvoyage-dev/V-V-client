@@ -424,7 +424,7 @@ function buildInitialCountriesState() {
 }
 
 export function useCountries() {
-  const initial = buildInitialCountriesState();
+  const [initial] = useState(buildInitialCountriesState);
   const [countries, setCountries] = useState(() => initial.countries);
   const [display, setDisplay] = useState(() => initial.display);
   const [documentCatalog, setDocumentCatalog] = useState(() => initial.documentCatalog);

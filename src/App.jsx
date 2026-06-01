@@ -2,7 +2,7 @@
 //  App.jsx — Root Entry
 //  Sets up React Router and Providers
 // ============================================================
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Toast from "./components/ui/Toast";
@@ -19,6 +19,20 @@ const FirebaseGoogleRedirectHandler = lazy(() =>
 const ExitIntentBanner = lazy(() =>
   import("./components/common/ExitIntentBanner")
 );
+
+const scheduleAfterPaint = (callback) => {
+  if (typeof window === "undefined") return undefined;
+  const frame = window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(callback, { timeout: 1600 });
+      } else {
+        window.setTimeout(callback, 800);
+      }
+    });
+  });
+  return () => window.cancelAnimationFrame(frame);
+};
 
 /** Outside Suspense so lazy routes still reset scroll on SPA navigation. */
 const ScrollToTop = () => {
@@ -42,15 +56,27 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  const [loadDeferredShell, setLoadDeferredShell] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(sessionStorage.getItem("VG_GOOGLE_OAUTH_AFTER"));
+  });
+
+  useEffect(() => {
+    if (loadDeferredShell) return undefined;
+    return scheduleAfterPaint(() => setLoadDeferredShell(true));
+  }, [loadDeferredShell]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ScrollToTop />
         {/* Both components render null — Suspense fallback is null so no flash */}
-        <Suspense fallback={null}>
-          <FirebaseGoogleRedirectHandler />
-          <ExitIntentBanner />
-        </Suspense>
+        {loadDeferredShell ? (
+          <Suspense fallback={null}>
+            <FirebaseGoogleRedirectHandler />
+            <ExitIntentBanner />
+          </Suspense>
+        ) : null}
         {/* Global toast notification */}
         <Toast />
         <ClientErrorBoundary>
@@ -62,4 +88,3 @@ function App() {
 }
 
 export default App;
-

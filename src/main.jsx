@@ -34,15 +34,23 @@ if (typeof window !== "undefined") {
    */
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl) {
-    try {
-      fetch(`${apiUrl.replace(/\/+$/, "")}/`, {
-        method: "GET",
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-      }).catch(() => {});
-    } catch {
-      /* warmup is best-effort */
+    const warmServer = () => {
+      try {
+        fetch(`${apiUrl.replace(/\/+$/, "")}/`, {
+          method: "GET",
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+        }).catch(() => {});
+      } catch {
+        /* warmup is best-effort */
+      }
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(warmServer, { timeout: 2500 });
+    } else {
+      window.setTimeout(warmServer, 1500);
     }
   }
 }

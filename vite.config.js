@@ -10,7 +10,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           // Core React runtime — rarely changes, gets long-lived cache
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'],
           // Animation library — large but stable
           'framer-motion': ['framer-motion'],
           // Firebase — only loaded on auth pages

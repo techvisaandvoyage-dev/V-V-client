@@ -200,7 +200,7 @@ const ExitIntentBanner = () => {
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-6 opacity-0"
         }`}
-        aria-hidden={!visible}
+        inert={visible ? undefined : ""}
       >
         <div className="overflow-hidden rounded-2xl border border-cyan/20 bg-white/90 shadow-[0_22px_60px_-30px_rgba(8,145,178,0.35)] backdrop-blur-xl">
           <div className="flex items-start gap-3 p-4 sm:p-5">
