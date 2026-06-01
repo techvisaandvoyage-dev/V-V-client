@@ -8,11 +8,12 @@ import { NavLink, useNavigate, Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText,
   LogOut, ChevronLeft, ChevronRight, Shield,
-  Plane,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
+
+const BRAND_LOGO_SRC = "/images/visa-voyage-logo.png";
 
 // ── Nav item groups per role ───────────────────────────────
 const USER_NAV = [
@@ -51,22 +52,11 @@ const Sidebar = () => {
         {/* Logo / Brand as Back Button & Collapse Toggle */}
         <div className="flex items-center h-16 px-4 border-b border-border flex-shrink-0">
           <Link to="/" replace className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer group" title="Back to Home">
-            <div className="w-8 h-8 rounded-lg bg-cyan flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Plane size={16} className="text-background" strokeWidth={2.5} />
-            </div>
-            <AnimatePresence>
-              {sidebarOpen && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="font-bold text-lg tracking-tight overflow-hidden whitespace-nowrap"
-                >
-                  <span className="text-gradient-cyan">VISAANDVOYAGE</span>
-                </motion.span>
-              )}
-            </AnimatePresence>
+            <img
+              src={BRAND_LOGO_SRC}
+              alt="Visa & Voyage"
+              className={sidebarOpen ? "block h-10 max-h-10 w-auto object-contain" : "block h-8 max-h-8 w-8 object-contain object-left"}
+            />
           </Link>
 
           {/* Collapse toggle button */}

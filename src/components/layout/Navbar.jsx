@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { User, LayoutDashboard, LogOut, Menu, X, Plane, BookOpen } from "lucide-react";
+import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
 import NotificationBell from "./NotificationBell";
+
+const BRAND_LOGO_SRC = "/images/visa-voyage-logo.png";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -82,9 +84,11 @@ const Navbar = () => {
       <header
         className={`
           fixed top-0 left-0 right-0 z-40 transition-all duration-300
-          ${scrolled || !isLanding
-            ? "bg-surface/95 backdrop-blur-md border-b border-border shadow-card"
-            : "bg-transparent"
+          ${!isLanding
+            ? "bg-white border-b border-border shadow-card"
+            : scrolled
+              ? "bg-white border-b border-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
+              : "bg-white"
           }
         `}
       >
@@ -95,15 +99,14 @@ const Navbar = () => {
               to="/"
               replace
               onClick={handleLogoClick}
-              className="flex items-center gap-2.5 group"
+              className="flex h-16 items-center"
               aria-label="VISAANDVOYAGE Home"
             >
-              <div className="w-8 h-8 rounded-lg bg-cyan flex items-center justify-center group-hover:shadow-cyan-glow transition-shadow duration-300">
-                <Plane size={16} className="text-background" strokeWidth={2.5} />
-              </div>
-              <span className="font-bold text-xl tracking-tight">
-                <span className="text-gradient-cyan">VISAANDVOYAGE</span>
-              </span>
+              <img
+                src={BRAND_LOGO_SRC}
+                alt="Visa & Voyage"
+                className="block h-10 max-h-10 w-auto object-contain sm:h-11 sm:max-h-11"
+              />
             </Link>
 
             {/* ── Right side: public links + profile icon ── */}
@@ -135,7 +138,7 @@ const Navbar = () => {
             <button
               id="mobile-menu-btn"
               onClick={toggleMobileMenu}
-              className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
+              className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white transition-colors"
               aria-label="Toggle mobile menu"
             >
               {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -151,13 +154,13 @@ const Navbar = () => {
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="md:hidden border-t border-border bg-surface overflow-hidden"
+              className="md:hidden border-t border-border bg-white overflow-hidden"
             >
               <div className="px-4 py-4 space-y-1">
                 <Link
                   to="/blog"
                   replace={isTransientPage}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-3 rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:bg-white rounded-lg transition-colors"
                 >
                   <BookOpen size={15} />
                   Blog

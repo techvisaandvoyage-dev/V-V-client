@@ -32,7 +32,7 @@ const LandingCountriesGrid = memo(
             {skeletonItems.map((item) => (
               <div
                 key={item}
-                className="min-h-[500px] rounded-3xl border border-border bg-white overflow-hidden animate-pulse"
+                className="min-h-[400px] rounded-3xl border border-border bg-white overflow-hidden animate-pulse"
               >
                 <div className="h-[58%] bg-slate-100" />
                 <div className="space-y-4 p-6">

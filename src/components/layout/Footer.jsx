@@ -4,8 +4,10 @@
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Plane, Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
+import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
 import { api } from "../../store/authStore";
+
+const BRAND_LOGO_SRC = "/images/visa-voyage-logo.png";
 
 const FOOTER_SECTIONS = [
   { key: "company", title: "Company" },
@@ -195,13 +197,12 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
           <div className="lg:col-span-1">
-            <Link to="/" replace className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-cyan flex items-center justify-center">
-                <Plane size={16} className="text-background" strokeWidth={2.5} />
-              </div>
-              <span className="font-bold text-xl">
-                {footerContent.brandPrimaryText} <span className="text-gradient-cyan">{footerContent.brandAccentText}</span>
-              </span>
+            <Link to="/" replace className="mb-4 flex items-center">
+              <img
+                src={BRAND_LOGO_SRC}
+                alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
+                className="block h-12 max-h-12 w-auto object-contain"
+              />
             </Link>
             <p className="text-sm text-text-secondary leading-relaxed mb-6">
               {footerContent.description}

@@ -219,13 +219,14 @@ const DestinationCard = ({
       onClick={onClick}
       style={{ willChange: "transform" }}
     >
-      <div className="relative isolate h-full min-h-[500px] overflow-hidden rounded-3xl border border-border bg-surface transition-all duration-300 hover:border-cyan/30 hover:shadow-cyan-glow">
+      <div className="relative isolate h-full min-h-[420px] overflow-hidden rounded-3xl border border-border bg-white transition-all duration-300 hover:border-cyan/30 hover:shadow-cyan-glow">
         <ImageWithShimmer
           src={country.imageUrl}
           alt={country.name}
-          className="h-full min-h-[500px]"
+          className="h-full min-h-[400px] [&>img]:contrast-125 [&>img]:saturate-125"
           priority={index < 4}
           width={500}
+          height={400}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
         >
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 transition-opacity duration-500" />
@@ -240,7 +241,7 @@ const DestinationCard = ({
 
           {!country.imageUrl ? (
             <div
-              className="absolute left-1/2 top-[40%] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/70 bg-white/92 text-3xl shadow-xl"
+              className="absolute left-1/2 top-[40%] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-white text-3xl shadow-xl"
               role="img"
               aria-label={country.name}
             >
