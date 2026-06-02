@@ -96,6 +96,7 @@ export const useAuthStore = create(
       sessionAuthMethod: null,
       isLoading: false,       // Loading state for login action
       error: null,            // Error message from login failure
+      pendingSignup: null,
 
       // ── Actions ────────────────────────────────────────
 
@@ -127,6 +128,10 @@ export const useAuthStore = create(
           const { data } = await api.post("/users/login", { identifier, email: identifier, password });
           
           if (data.success) {
+            if (!data.token) {
+              set({ isLoading: false });
+              return { success: true, verified: true, needsProfile: true };
+            }
             localStorage.setItem("token", data.token);
             const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "password" });
             if (!refreshed) {
@@ -153,7 +158,15 @@ export const useAuthStore = create(
       verifyOtp: async (identifier, otp) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/verify-otp", { identifier, otp });
+          const pending = get().pendingSignup;
+          const { data } = await api.post("/auth/verify-otp", {
+            identifier,
+            otp,
+            purpose: "auth",
+            ...(pending?.identifier === identifier
+              ? { name: pending.name, password: pending.password, completeSignup: true }
+              : {}),
+          });
           if (data.success) {
             localStorage.setItem("token", data.token);
             const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
@@ -163,7 +176,7 @@ export const useAuthStore = create(
                 set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "otp" });
               }
             }
-            set({ isLoading: false });
+            set({ isLoading: false, pendingSignup: null });
             return { success: true, role: "user" };
           }
           set({ isLoading: false });
@@ -183,11 +196,14 @@ export const useAuthStore = create(
       sendLoginOtp: async (identifier, opts = {}) => {
         set({ isLoading: true, error: null });
         try {
-          const otpLength = opts.otpLength === 4 ? 4 : 6;
-          const { data } = await api.post("/users/send-login-otp", { identifier, otpLength });
+          const { data } = await api.post("/auth/send-otp", {
+            identifier,
+            channel: opts.channel || "auto",
+            purpose: "auth",
+          });
           if (data.success) {
             set({ isLoading: false });
-            return { success: true, devOtp: data.devOtp };
+            return { success: true, devOtp: data.devOtp, channel: data.channel, otpLength: data.otpLength };
           }
           const failMsg = data.message || "Failed to send OTP";
           set({ error: failMsg, isLoading: false });
@@ -205,7 +221,7 @@ export const useAuthStore = create(
       verifyLoginOtp: async (identifier, otp) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/verify-login-otp", { identifier, otp });
+          const { data } = await api.post("/auth/verify-otp", { identifier, otp, purpose: "auth" });
           if (data.success) {
             localStorage.setItem("token", data.token);
             let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
@@ -370,12 +386,14 @@ export const useAuthStore = create(
       register: async (name, identifier, password) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/signup", { name, identifier, password });
+          const { data } = await api.post("/auth/send-otp", { identifier, purpose: "auth", channel: "auto" });
           if (data.success) {
-            set({ isLoading: false });
+            set({ isLoading: false, pendingSignup: { name, identifier, password } });
             return {
               success: true,
               devOtp: data.devOtp != null ? String(data.devOtp) : undefined,
+              channel: data.channel,
+              otpLength: data.otpLength,
             };
           }
           const message = data.message || "Registration failed";
@@ -481,12 +499,12 @@ export const useAuthStore = create(
       /**
        * Popup Auth Methods
        */
-      popupRequestOtp: async (phone) => {
+      popupRequestOtp: async (phone, channel = "auto") => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/popup/request-otp", { phone });
+          const { data } = await api.post("/auth/send-otp", { identifier: phone, purpose: "auth", channel });
           set({ isLoading: false });
-          return { success: true, devOtp: data.devOtp };
+          return { success: true, devOtp: data.devOtp, channel: data.channel, otpLength: data.otpLength };
         } catch (error) {
           const message = error.response?.data?.message || "Failed to send OTP";
           set({ error: message, isLoading: false });
@@ -497,7 +515,7 @@ export const useAuthStore = create(
       popupVerifyOtp: async (phone, otp) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/popup/verify-otp", { phone, otp });
+          const { data } = await api.post("/auth/verify-otp", { identifier: phone, otp, purpose: "auth" });
           if (data.success && data.userExists) {
             localStorage.setItem("token", data.token);
             let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
@@ -522,7 +540,15 @@ export const useAuthStore = create(
       popupCompleteSignup: async (phone, otp, firstName, lastName, email) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/popup/complete-signup", { phone, otp, firstName, lastName, email });
+          const { data } = await api.post("/auth/verify-otp", {
+            identifier: phone,
+            otp,
+            firstName,
+            lastName,
+            email,
+            completeSignup: true,
+            purpose: "auth",
+          });
           if (data.success) {
             localStorage.setItem("token", data.token);
             let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });

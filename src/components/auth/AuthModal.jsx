@@ -13,7 +13,7 @@ import {
   LockKeyhole,
   BadgeCheck,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
+import { api, useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
@@ -64,10 +64,34 @@ const SuccessArt = () => (
   </div>
 );
 
+const createEmptyOtp = (length = 6) => Array.from({ length: length === 4 ? 4 : 6 }, () => "");
+const otpChannelLabel = (channel) => {
+  if (channel === "sms") return "SMS";
+  if (channel === "email") return "Email";
+  return "WhatsApp";
+};
+
+const getConfiguredChannels = (config) => {
+  if (!config?.channels) return [];
+  const ordered = [
+    config?.priority?.primary,
+    config?.priority?.fallback1,
+    config?.priority?.fallback2,
+    "whatsapp",
+    "sms",
+  ].filter(Boolean);
+  return [...new Set(ordered)]
+    .filter((channel) => channel !== "none" && channel !== "email")
+    .filter((channel) => config.channels[channel]?.enabled && config.channels[channel]?.configured);
+};
+
 const AuthModal = ({ isOpen, onClose, onComplete }) => {
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otpLength, setOtpLength] = useState(6);
+  const [otpChannel, setOtpChannel] = useState("whatsapp");
+  const [otpConfig, setOtpConfig] = useState(null);
+  const [otp, setOtp] = useState(createEmptyOtp(6));
   const [otpSent, setOtpSent] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -100,6 +124,22 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
   }, []);
 
   useEffect(() => {
+    if (!isOpen) return undefined;
+    let active = true;
+    api
+      .get("/auth/otp-config")
+      .then(({ data }) => {
+        if (active && data?.success) setOtpConfig(data.config);
+      })
+      .catch(() => {
+        if (active) setOtpConfig(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     const handlePointerDown = (event) => {
       if (!countryCodeDropdownRef.current?.contains(event.target)) {
         setCountryCodeOpen(false);
@@ -127,7 +167,9 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
       if (!active) return;
       setStep(1);
       setPhone("");
-      setOtp(["", "", "", "", "", ""]);
+      setOtpLength(6);
+      setOtpChannel("whatsapp");
+      setOtp(createEmptyOtp(6));
       setOtpSent(false);
       setFirstName("");
       setLastName("");
@@ -146,7 +188,10 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
 
   if (!isOpen) return null;
 
-  const handlePhoneSubmit = async () => {
+  const configuredPhoneChannels = getConfiguredChannels(otpConfig);
+  const primaryPhoneChannel = "auto";
+
+  const handlePhoneSubmit = async (channel = primaryPhoneChannel) => {
     if (phone.length < 10) {
       setError("Please enter a valid 10-digit mobile number");
       return;
@@ -155,13 +200,18 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
     setLoading(true);
     // Combine country code and phone
     const fullPhone = phoneCountryCode + phone;
-    const res = await popupRequestOtp(fullPhone);
+    const res = await popupRequestOtp(fullPhone, channel);
     setLoading(false);
     
     if (res.success) {
+      const nextLength = res.otpLength === 4 ? 4 : 6;
+      setOtpLength(nextLength);
+      setOtpChannel(res.channel || "whatsapp");
       setOtpSent(true);
       if (res.devOtp) {
-        setOtp(res.devOtp.split(""));
+        setOtp(res.devOtp.split("").slice(0, nextLength));
+      } else {
+        setOtp(createEmptyOtp(nextLength));
       }
     } else {
       setError(res.message || "Failed to send OTP");
@@ -170,14 +220,14 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
 
   const handleEditPhone = () => {
     setOtpSent(false);
-    setOtp(["", "", "", "", "", ""]);
+    setOtp(createEmptyOtp(otpLength));
     setError("");
   };
 
   const handleVerifyOtp = async () => {
     const otpValue = otp.join("");
-    if (otpValue.length < 6) {
-      setError("Please enter a valid 6-digit OTP");
+    if (otpValue.length < otpLength) {
+      setError(`Please enter a valid ${otpLength}-digit OTP`);
       return;
     }
     setError("");
@@ -231,7 +281,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    if (value && index < 5) {
+    if (value && index < otpLength - 1) {
       inputRefs.current[index + 1].focus();
     }
   };
@@ -390,13 +440,26 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                 </div>
 
                 {!otpSent && (
-                  <button 
-                    onClick={handlePhoneSubmit}
-                    disabled={loading || phone.length < 10}
-                    className="mt-2 h-[54px] w-full rounded-lg bg-[#0757F9] text-[20px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {loading ? "Sending..." : "Continue"}
-                  </button>
+                  <div className="mt-2 space-y-2">
+                    <button
+                      onClick={() => handlePhoneSubmit(primaryPhoneChannel)}
+                      disabled={loading || phone.length < 10}
+                      className="h-[54px] w-full rounded-lg bg-[#0757F9] text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {loading ? "Sending..." : "Continue"}
+                    </button>
+                    {configuredPhoneChannels.map((channel) => (
+                      <button
+                        key={channel}
+                        type="button"
+                        onClick={() => handlePhoneSubmit(channel)}
+                        disabled={loading || phone.length < 10}
+                        className="h-11 w-full rounded-lg border border-[#d9e2f0] bg-white text-[14px] font-bold text-[#0757F9] transition-colors hover:bg-[#f6f9ff] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {channel === "sms" ? "Send SMS OTP instead" : `Use ${otpChannelLabel(channel)} OTP`}
+                      </button>
+                    ))}
+                  </div>
                 )}
 
                 <div className={`overflow-hidden transition-all duration-500 ease-in-out ${otpSent ? "mt-7 max-h-72 opacity-100" : "mt-0 max-h-0 opacity-0"}`}>
@@ -421,12 +484,12 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                       ))}
                     </div>
                     <p className="mb-8 flex items-center justify-center gap-1 text-[13px] font-medium text-[#4f5878]">
-                      OTP has been sent to your WhatsApp
+                      OTP has been sent via {otpChannelLabel(otpChannel)}
                     </p>
 
                     <button 
                       onClick={handleVerifyOtp}
-                      disabled={loading || otp.join("").length < 6}
+                      disabled={loading || otp.join("").length < otpLength}
                       className="h-[54px] w-full rounded-lg bg-[#0757F9] text-[20px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {loading ? "Verifying..." : "Verify OTP"}

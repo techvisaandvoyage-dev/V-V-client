@@ -4,17 +4,18 @@
 import { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 
-const OtpInput = ({ value = "", onChange, disabled = false }) => {
+const OtpInput = ({ value = "", onChange, disabled = false, length = 6 }) => {
   const inputsRef = useRef([]);
+  const otpLength = length === 4 ? 4 : 6;
   const digits = Array.isArray(value)
-    ? [...value, ...Array(6).fill("")].slice(0, 6)
-    : String(value).padEnd(6, "").split("").slice(0, 6);
+    ? [...value, ...Array(otpLength).fill("")].slice(0, otpLength)
+    : String(value).padEnd(otpLength, "").split("").slice(0, otpLength);
 
   // Focus the first empty box on mount
   useEffect(() => {
     const firstEmpty = digits.findIndex((d) => d === " " || d === "");
-    const idx = firstEmpty === -1 ? 5 : firstEmpty;
-    inputsRef.current[Math.min(idx, 5)]?.focus();
+    const idx = firstEmpty === -1 ? otpLength - 1 : firstEmpty;
+    inputsRef.current[Math.min(idx, otpLength - 1)]?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -27,7 +28,7 @@ const OtpInput = ({ value = "", onChange, disabled = false }) => {
     onChange(next);
 
     // Advance focus
-    if (index < 5) {
+    if (index < otpLength - 1) {
       e.target.nextSibling?.focus();
     }
   };
@@ -46,25 +47,25 @@ const OtpInput = ({ value = "", onChange, disabled = false }) => {
       }
     } else if (e.key === "ArrowLeft" && index > 0) {
       inputsRef.current[index - 1]?.focus();
-    } else if (e.key === "ArrowRight" && index < 5) {
+    } else if (e.key === "ArrowRight" && index < otpLength - 1) {
       inputsRef.current[index + 1]?.focus();
     }
   };
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, otpLength);
     if (pasted) {
-      const nextDigits = pasted.padEnd(6, "").split("").slice(0, 6);
+      const nextDigits = pasted.padEnd(otpLength, "").split("").slice(0, otpLength);
       onChange(nextDigits);
-      const nextFocus = Math.min(pasted.length, 5);
+      const nextFocus = Math.min(pasted.length, otpLength - 1);
       inputsRef.current[nextFocus]?.focus();
     }
   };
 
   return (
     <div className="flex gap-3 justify-center">
-      {Array.from({ length: 6 }).map((_, i) => {
+      {Array.from({ length: otpLength }).map((_, i) => {
         const char = digits[i] && digits[i] !== " " ? digits[i] : "";
         const isFilled = !!char;
         return (

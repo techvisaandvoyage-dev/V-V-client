@@ -88,6 +88,8 @@ const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
+  const [otpLength, setOtpLength] = useState(6);
+  const [otpChannel, setOtpChannel] = useState("");
   const [strength, setStrength] = useState(0); // 0–4
   const [signupDevOtp, setSignupDevOtp] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
@@ -175,8 +177,12 @@ const RegisterPage = () => {
       showToast("Passwords do not match.", "error");
       return;
     }
-    const { success, devOtp } = await register(nameTrim, contact, password);
+    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(nameTrim, contact, password);
     if (success) {
+      const nextLength = sentOtpLength === 4 ? 4 : 6;
+      setOtpLength(nextLength);
+      setOtpChannel(channel || "");
+      setOtpDigits(Array.from({ length: nextLength }, () => ""));
       setSignupDevOtp(devOtp && String(devOtp).length >= 4 ? String(devOtp) : "");
       startTimer();
       setStep(2);
@@ -197,8 +203,12 @@ const RegisterPage = () => {
     const parsed = parseAuthContactInput(identifier);
     if (!parsed) return;
     const contact = parsed.value;
-    const { success, devOtp } = await register(nameTrim, contact, password);
+    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(nameTrim, contact, password);
     if (success) {
+      const nextLength = sentOtpLength === 4 ? 4 : 6;
+      setOtpLength(nextLength);
+      setOtpChannel(channel || "");
+      setOtpDigits(Array.from({ length: nextLength }, () => ""));
       startTimer();
       if (devOtp && String(devOtp).length >= 4) setSignupDevOtp(String(devOtp));
       showToast(
@@ -224,7 +234,7 @@ const RegisterPage = () => {
   const goBack = () => {
     setStep(1);
     clearError();
-    setOtpDigits(["", "", "", "", "", ""]);
+    setOtpDigits(Array.from({ length: otpLength }, () => ""));
     setSignupDevOtp("");
     setConfirmPasswordError("");
   };
@@ -442,12 +452,12 @@ const RegisterPage = () => {
                 <p className="text-[15px] text-text-secondary">
                   {signupOtpIsSms ? (
                     <>
-                      We texted a 6-digit code to <br />
+                      We sent a {otpLength}-digit code{otpChannel ? ` via ${otpChannel}` : ""} to <br />
                       <span className="font-semibold text-text-primary">{otpDestinationLabel}</span>
                     </>
                   ) : (
                     <>
-                      We emailed a 6-digit code to <br />
+                      We emailed a {otpLength}-digit code to <br />
                       <span className="font-semibold text-text-primary">{otpDestinationLabel}</span>
                     </>
                   )}
@@ -463,7 +473,7 @@ const RegisterPage = () => {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setOtpDigits(signupDevOtp.split("").slice(0, 6))}
+                    onClick={() => setOtpDigits(signupDevOtp.split("").slice(0, otpLength))}
                     className="font-medium text-amber-700 underline-offset-2 hover:text-amber-900 hover:underline"
                   >
                     Fill OTP boxes
@@ -490,7 +500,7 @@ const RegisterPage = () => {
                   <label className="block text-center text-[13px] font-medium text-text-secondary">
                     Enter verification code
                   </label>
-                  <OtpInput value={otpDigits} onChange={setOtpDigits} disabled={isLoading} />
+                  <OtpInput value={otpDigits} onChange={setOtpDigits} disabled={isLoading} length={otpLength} />
                 </div>
 
                 <Button
@@ -498,7 +508,7 @@ const RegisterPage = () => {
                   variant="primary"
                   fullWidth
                   loading={isLoading}
-                  disabled={otpDigits.join("").length !== 6}
+                  disabled={otpDigits.join("").length !== otpLength}
                   className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium shadow-none border-none"
                 >
                   Verify &amp; Create Account

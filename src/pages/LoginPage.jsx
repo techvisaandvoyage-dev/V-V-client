@@ -92,6 +92,8 @@ const LoginPage = () => {
   const [otpIdentifier, setOtpIdentifier] = useState("");
   const [otpSentValue, setOtpSentValue] = useState("");
   const [otpSentKind, setOtpSentKind] = useState(null);
+  const [otpLength, setOtpLength] = useState(6);
+  const [otpChannel, setOtpChannel] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
@@ -233,10 +235,20 @@ const LoginPage = () => {
       kind = parsed.type;
     }
 
-    const { success, devOtp, message: otpSendMessage } = await sendLoginOtp(contact);
+    const {
+      success,
+      devOtp,
+      message: otpSendMessage,
+      otpLength: sentOtpLength,
+      channel,
+    } = await sendLoginOtp(contact);
     if (success) {
+      const nextLength = sentOtpLength === 4 ? 4 : 6;
       setOtpSentValue(contact);
       setOtpSentKind(kind);
+      setOtpLength(nextLength);
+      setOtpChannel(channel || "");
+      setOtpDigits(Array.from({ length: nextLength }, () => ""));
       if (otpStep === 1) setOtpIdentifier(contact);
       setLoginTestOtp(devOtp ? String(devOtp) : "");
       startTimer();
@@ -690,10 +702,11 @@ const LoginPage = () => {
                   onClick={() => {
                     setOtpStep(1);
                     clearError();
-                    setOtpDigits(["", "", "", "", "", ""]);
+                    setOtpDigits(Array.from({ length: otpLength }, () => ""));
                     setLoginTestOtp("");
                     setOtpSentValue("");
                     setOtpSentKind(null);
+                    setOtpChannel("");
                   }}
                   className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
                 >
@@ -709,12 +722,12 @@ const LoginPage = () => {
                 <p className="text-[15px] text-text-secondary">
                   {otpLoginIsEmail ? (
                     <>
-                      We emailed a 6-digit code to <br />
+                      We emailed a {otpLength}-digit code to <br />
                       <span className="font-semibold text-text-primary">{otpStep2Display}</span>
                     </>
                   ) : (
                     <>
-                      We texted a 6-digit code to <br />
+                      We sent a {otpLength}-digit {otpChannel ? `${otpChannel.toUpperCase()} ` : ""}code to <br />
                       <span className="font-semibold text-text-primary">{otpStep2Display}</span>
                     </>
                   )}
@@ -740,7 +753,7 @@ const LoginPage = () => {
                   <label className="block text-center text-[13px] font-medium text-text-secondary">
                     Enter verification code
                   </label>
-                  <OtpInput value={otpDigits} onChange={setOtpDigits} disabled={isLoading} />
+                  <OtpInput value={otpDigits} onChange={setOtpDigits} disabled={isLoading} length={otpLength} />
                 </div>
 
                 <Button
@@ -748,7 +761,7 @@ const LoginPage = () => {
                   variant="primary"
                   fullWidth
                   loading={isLoading}
-                  disabled={otpDigits.join("").length !== 6 || !otpSentValue}
+                  disabled={otpDigits.join("").length !== otpLength || !otpSentValue}
                   className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium shadow-none border-none"
                 >
                   Verify &amp; Log In

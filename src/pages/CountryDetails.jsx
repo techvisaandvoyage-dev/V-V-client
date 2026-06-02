@@ -1396,7 +1396,7 @@ const CountryDetails = () => {
     Icon: getDocumentIcon(key),
     featured: false,
   }));
-  const travelDetailsRequiredDocumentFields = countryRequiredDocumentKeys.map((key) => ({
+  const travelDetailsRequiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
     label: getDocumentLabel(key),
     description: getDocumentDescription(key),
@@ -1423,6 +1423,106 @@ const CountryDetails = () => {
       Icon: getDocumentIcon(key),
     }));
   })();
+
+  const renderTravelDetailsDocumentSections = () => (
+    <div className="space-y-6">
+      <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+        <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+            <ShieldCheck size={20} strokeWidth={2} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Documents Required</h3>
+            <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+              These are the country documents required for this application.
+            </p>
+          </div>
+        </div>
+
+        {travelDetailsRequiredDocumentFields.length ? (
+          <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
+            {travelDetailsRequiredDocumentFields.map((doc) => {
+              const Icon = doc.Icon;
+              return (
+                <div
+                  key={`travel-doc-required-${doc.key}`}
+                  className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                    {doc.iconClass ? (
+                      <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
+                    ) : (
+                      <Icon size={16} strokeWidth={2.1} />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="text-sm font-normal leading-tight text-text-primary">
+                      {getDocumentDisplayName(doc.label)}
+                    </p>
+                    {doc.description ? (
+                      <p className="mt-1 text-xs leading-snug text-text-muted">
+                        {doc.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="px-5 pb-6 text-sm text-slate-500 sm:px-7 sm:pb-7">No document requirements added yet.</p>
+        )}
+      </div>
+
+      {travelDetailsOtherDocumentFields.length > 0 ? (
+        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
+          <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
+            <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+              <FileText size={20} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Optional Documents</h3>
+              <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+                You can also attach other documents in the same Drive link.
+            </p>
+            </div>
+          </div>
+
+          <div className="px-5 pb-6 sm:px-7 sm:pb-7">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {travelDetailsOtherDocumentFields.map((doc) => {
+              const Icon = doc.Icon;
+              return (
+                <div
+                  key={`travel-doc-other-${doc.key}`}
+                  className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
+                    {doc.iconClass ? (
+                      <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
+                    ) : (
+                      <Icon size={16} strokeWidth={2.1} />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="text-sm font-normal leading-tight text-text-primary">
+                      {getDocumentDisplayName(doc.label)}
+                    </p>
+                    {doc.description ? (
+                      <p className="mt-1 text-xs leading-snug text-text-muted">
+                        {doc.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 
   const handleBack = () => {
     if (showTravelDetails) {
@@ -2491,12 +2591,13 @@ const CountryDetails = () => {
                     <h3 className="text-sm font-normal leading-tight text-text-primary sm:text-sm">
                       {doc.label}
                     </h3>
+                    {doc.description ? (
+                      <p className="mt-1 text-xs leading-snug text-text-muted">
+                        {doc.description}
+                      </p>
+                    ) : null}
                   </div>
 
-                  <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
-                    <CircleCheck size={16} strokeWidth={2.4} />
-                    <span>Required</span>
-                  </div>
                 </motion.div>
               );
             }) : (
@@ -3240,113 +3341,12 @@ const CountryDetails = () => {
                       />
                     </div>
 
-                    <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-                      <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-                        <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
-                          <ShieldCheck size={20} strokeWidth={2} />
-                        </span>
-                        <div className="min-w-0">
-                          <h5 className="text-[24px] font-semibold tracking-tight text-slate-950 sm:text-[26px]">Documents Required</h5>
-                          <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-                            These are the country documents required for this application.
-                          </p>
-                        </div>
-                      </div>
-
-                      {travelDetailsRequiredDocumentFields.length ? (
-                        <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
-                          {travelDetailsRequiredDocumentFields.map((doc) => {
-                            const Icon = doc.Icon;
-                            return (
-                              <div
-                                key={`travel-doc-required-${doc.key}`}
-                                className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
-                              >
-                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
-                                  {doc.iconClass ? (
-                                    <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
-                                  ) : (
-                                    <Icon size={16} strokeWidth={2.1} />
-                                  )}
-                                </span>
-                                <div className="min-w-0 flex-1 text-left">
-                                  <p className="text-sm font-normal leading-tight text-text-primary">
-                                    {getDocumentDisplayName(doc.label)}
-                                  </p>
-                                </div>
-                                <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
-                                  <CircleCheck size={16} strokeWidth={2.4} />
-                                  <span>Required</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="px-5 pb-6 text-sm text-slate-500 sm:px-7 sm:pb-7">No document requirements added yet.</p>
-                      )}
+                    <div className="mt-4">
+                      {renderTravelDetailsDocumentSections()}
                     </div>
-
-                    {travelDetailsOtherDocumentFields.length > 0 ? (
-                      <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-                        <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-                          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
-                            <FileText size={20} strokeWidth={2} />
-                          </span>
-                          <div className="min-w-0">
-                            <h5 className="text-[24px] font-semibold tracking-tight text-slate-950 sm:text-[26px]">Other Documents</h5>
-                            <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-                              You can also attach other documents in the same Drive link.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
-                          {travelDetailsOtherDocumentFields.map((doc) => {
-                            const Icon = doc.Icon;
-                            return (
-                              <div
-                                key={`travel-doc-other-${doc.key}`}
-                                className="group relative flex items-center gap-3 rounded-[1.5rem] bg-white px-3 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:px-4 sm:py-4"
-                              >
-                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan/8 text-cyan">
-                                  {doc.iconClass ? (
-                                    <i className={`${doc.iconClass} text-lg leading-none`} aria-hidden="true" />
-                                  ) : (
-                                    <Icon size={16} strokeWidth={2.1} />
-                                  )}
-                                </span>
-                                <div className="min-w-0 flex-1 text-left">
-                                  <p className="text-sm font-normal leading-tight text-text-primary">
-                                    {getDocumentDisplayName(doc.label)}
-                                  </p>
-                                </div>
-                                <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
-                                  <CircleCheck size={16} strokeWidth={2.4} />
-                                  <span>Optional</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
 
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm">
-                        <ShieldCheck size={18} />
-                      </span>
-                      <div>
-                        <p className="text-base font-semibold text-emerald-900">Secure &amp; Private</p>
-                        <p className="mt-0.5 text-sm text-emerald-800/80">
-                          Your documents are safe. We only access what&apos;s necessary to process your application.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <Button
