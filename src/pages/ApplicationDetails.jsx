@@ -1650,27 +1650,27 @@ const ApplicationDetails = () => {
               <h3 className="text-lg font-semibold text-text-primary">Application Summary</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Destination</p>
                 <p className="text-sm font-semibold text-text-primary">{booking.countryName}</p>
               </div>
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Visa Type</p>
                 <p className="text-sm font-semibold text-text-primary">{booking.visaType || "N/A"}</p>
               </div>
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Application ID</p>
                 <p className="text-sm font-semibold text-text-primary break-all">{booking.applicationId || booking._id || booking.id}</p>
               </div>
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Applied On</p>
                 <p className="text-sm font-semibold text-text-primary">{formatOrdinalDate(booking.createdAt)}</p>
               </div>
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Travel Date</p>
                 <p className="text-sm font-semibold text-text-primary">{booking.travelDate ? formatOrdinalDate(booking.travelDate) : "N/A"}</p>
               </div>
-              <div className="rounded-xl bg-surface-2 p-4">
+              <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Return Date</p>
                 <p className="text-sm font-semibold text-text-primary">{booking.returnDate ? formatOrdinalDate(booking.returnDate) : "Not specified"}</p>
               </div>
@@ -1816,7 +1816,7 @@ const ApplicationDetails = () => {
                 <div
                   key={`summary-traveler-${traveler.travelerNo}`}
                   id={`document-upload-section-${traveler.travelerNo}`}
-                  className="rounded-2xl border border-border bg-surface-2 p-4"
+                  className="rounded-2xl border border-border bg-white p-4"
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
@@ -1902,7 +1902,7 @@ const ApplicationDetails = () => {
                                     value={travelerNames[travelerNoStr] ?? getSavedTravelerName(travelerNo)}
                                     placeholder="Enter name"
                                     disabled={true}
-                                    className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </div>
 
@@ -1952,8 +1952,8 @@ const ApplicationDetails = () => {
                                   } : undefined}
                                 />
                                 {uploadSettings.enableFileUpload && (
-                                  <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
-                                    <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-2.5 py-2">
+                                  <div className="space-y-2 rounded-2xl border border-border bg-white p-4">
+                                    <div className="flex items-center gap-2 rounded-xl border border-border bg-white px-2.5 py-2">
                                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan/10 text-cyan">
                                         <FileText size={14} strokeWidth={2} />
                                       </span>

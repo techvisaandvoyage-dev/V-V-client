@@ -1261,7 +1261,7 @@ const ApplicationSummaryPage = () => {
         </div>
 
         {/* Travel Details */}
-        <div className="rounded-2xl border border-border bg-surface p-5 space-y-2">
+        <div className="rounded-2xl border border-border bg-white p-5 space-y-2">
           <h3 className="text-sm font-semibold text-text-primary mb-3">Travel Details</h3>
           <div className="flex items-center justify-between text-sm">
             <span className="text-text-secondary">Visa type</span>
@@ -1288,7 +1288,7 @@ const ApplicationSummaryPage = () => {
 
         {!docsUploaded || !Boolean(String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim()) ? (
           <>
-            <div className="rounded-2xl border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-white p-5">
           <Button
             variant="secondary"
             size="md"
@@ -1315,7 +1315,7 @@ const ApplicationSummaryPage = () => {
           </>
         ) : (
           <>
-            <div className="rounded-2xl border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-white p-5">
               <Button
                 variant="secondary"
                 size="md"
@@ -1333,7 +1333,7 @@ const ApplicationSummaryPage = () => {
         )}
 
         {docsUploaded && (
-          <div className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+          <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
             <h4 className="text-sm font-semibold text-text-primary">Uploaded Passport Documents</h4>
             <div className="space-y-3">
               {Array.from({ length: travelerCount }).map((_, index) => {
@@ -1341,7 +1341,7 @@ const ApplicationSummaryPage = () => {
                 const detail = getTravelerPassportDetailForSummary(application, summaryData, travelerNo);
                 if (!detail?.url) return null;
                 return (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border/60 hover:border-cyan/30 transition-colors">
+                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white border border-border/60 hover:border-cyan/30 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-lg bg-cyan/10 flex items-center justify-center text-cyan shrink-0">
                         <FileText size={18} />
@@ -1369,7 +1369,7 @@ const ApplicationSummaryPage = () => {
         )}
 
         {/* Billing */}
-        <div className="rounded-2xl border border-border bg-surface p-5 space-y-3">
+        <div className="rounded-2xl border border-border bg-white p-5 space-y-3">
           <h3 className="text-sm font-semibold text-text-primary mb-1">Billing</h3>
 
           <div className="flex justify-between text-sm">
@@ -1417,7 +1417,7 @@ const ApplicationSummaryPage = () => {
         </div>
 
         {/* T&C + Pay */}
-        <div className="rounded-2xl border border-border bg-surface p-5 space-y-4">
+        <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
           <label className="flex items-start gap-3 cursor-pointer select-none">
             <input
               type="checkbox"

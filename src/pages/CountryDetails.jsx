@@ -1877,7 +1877,7 @@ const CountryDetails = () => {
   };
 
   const handleStartApplication = () => {
-    requireAuth(() => gateContactOrRun(() => openTravelDetails()));
+    gateContactOrRun(() => openTravelDetails());
   };
 
   /**
@@ -2972,12 +2972,12 @@ const CountryDetails = () => {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-surface-2 p-4">
+                <div className="rounded-2xl border border-border bg-white p-4">
                   <label className="text-xs text-text-muted block mb-2">Type of Visa</label>
                   <select
                     value={visaOption}
                     onChange={(e) => setVisaOption(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
+                    className="w-full bg-white border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
                   >
                     {activeVisaTypes.length > 0 ? (
                       activeVisaTypes.map((vt) => (
@@ -2992,7 +2992,7 @@ const CountryDetails = () => {
                   </select>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-surface-2 p-4">
+                <div className="rounded-2xl border border-border bg-white p-4">
                   <div className="flex items-center gap-2 mb-3 text-sm font-medium text-text-primary">
                     <CalendarDays size={16} className="text-cyan" />
                     Select Travel Date
@@ -3028,7 +3028,7 @@ const CountryDetails = () => {
                   {travelers.map((traveler, index) => (
                     <div
                       key={traveler.id}
-                      className="rounded-2xl border border-border bg-surface-2 p-4 space-y-3"
+                      className="rounded-2xl border border-border bg-white p-4 space-y-3"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-text-primary">
@@ -3041,7 +3041,7 @@ const CountryDetails = () => {
                             onClick={() => removeTravelerAt(index)}
                             disabled={travelers.length <= 1}
                             aria-label={`Remove traveler ${index + 1}`}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-text-muted transition-colors hover:border-red-500/40 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-white text-text-muted transition-colors hover:border-red-500/40 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -3090,7 +3090,7 @@ const CountryDetails = () => {
                             }
                           }}
                           placeholder="Enter name"
-                          className={`w-full bg-background border rounded-xl px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-muted transition-colors ${
+                          className={`w-full bg-white border rounded-xl px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-muted transition-colors ${
                             travelValidationAttempted && !String(traveler.name || "").trim()
                               ? "border-red-500 focus:border-red-400"
                               : "border-border focus:border-cyan/50"
@@ -3409,7 +3409,7 @@ const CountryDetails = () => {
                     </div>
 
                     <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/90 px-4 py-3.5">
+                      <div className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3.5">
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
                             <Receipt className="h-4 w-4" />
@@ -3452,7 +3452,7 @@ const CountryDetails = () => {
                         </div>
                       </div>
 
-                      <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/95 p-4">
+                      <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
                         <div className="space-y-3 text-sm">
                           <div className="flex items-center justify-between gap-3">
                             <div>
