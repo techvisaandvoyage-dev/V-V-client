@@ -477,6 +477,72 @@ export const useAuthStore = create(
           return { success: false };
         }
       },
+
+      /**
+       * Popup Auth Methods
+       */
+      popupRequestOtp: async (phone) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/popup/request-otp", { phone });
+          set({ isLoading: false });
+          return { success: true, devOtp: data.devOtp };
+        } catch (error) {
+          const message = error.response?.data?.message || "Failed to send OTP";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      popupVerifyOtp: async (phone, otp) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/popup/verify-otp", { phone, otp });
+          if (data.success && data.userExists) {
+            localStorage.setItem("token", data.token);
+            let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
+            if (!userFromProfile) {
+              const fallback = mapApiUserToAuthState(data.user);
+              if (fallback) {
+                set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "otp" });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true, userExists: true };
+          }
+          set({ isLoading: false });
+          return { success: true, userExists: false };
+        } catch (error) {
+          const message = error.response?.data?.message || "OTP verification failed";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      popupCompleteSignup: async (phone, otp, firstName, lastName, email) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/popup/complete-signup", { phone, otp, firstName, lastName, email });
+          if (data.success) {
+            localStorage.setItem("token", data.token);
+            let userFromProfile = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
+            if (!userFromProfile) {
+              const fallback = mapApiUserToAuthState(data.user);
+              if (fallback) {
+                set({ user: fallback, isAuthenticated: true, sessionAuthMethod: "otp" });
+              }
+            }
+            set({ isLoading: false });
+            return { success: true };
+          }
+          set({ isLoading: false });
+          return { success: false };
+        } catch (error) {
+          const message = error.response?.data?.message || "Signup failed";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
     }),
     {
       name: "visa-voyage-auth",          // localStorage key

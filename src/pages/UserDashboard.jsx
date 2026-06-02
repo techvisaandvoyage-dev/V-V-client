@@ -20,6 +20,7 @@ import { needsPhoneContactGate, needsEmailContactGate } from "../utils/contactVe
 import { formatOrdinalDate } from "../utils/dateUtils";
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
+import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 /**
  * Map every built-in doc key → its lucide icon component. Used to render the
  * tiny "missing documents" icon chips on each booking card. Unknown keys
@@ -751,9 +752,12 @@ const UserDashboard = () => {
                             navigate(`/dashboard/application/${booking._id || booking.id}`);
                           }}
                         >
-                          <div className="w-12 h-12 rounded-xl bg-surface-3 flex items-center justify-center text-2xl flex-shrink-0 mt-0.5 sm:mt-0">
-                            {booking.flagEmoji || "🛂"}
-                          </div>
+                          <CountryFlagBadge
+                            countryName={booking.countryName}
+                            flagEmoji={booking.flagEmoji}
+                            sizeClass="h-12 w-12"
+                            className="mt-0.5 text-4xl sm:mt-0"
+                          />
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">

@@ -18,6 +18,7 @@ import { saveTravelDraft } from "../utils/travelDraftStorage";
 import { getFileValidationRules } from "../utils/fileValidation";
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
+import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 
 const SUMMARY_UPLOAD_MAX_BYTES = 300 * 1024;
 const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
@@ -1248,9 +1249,10 @@ const ApplicationSummaryPage = () => {
         <div className="max-w-lg w-full mx-auto space-y-6">
         {/* Header */}
         <div>
-          <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-1">
-            {application.flagEmoji} {application.countryName}
-          </p>
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan">
+            <CountryFlagBadge countryName={application.countryName} flagEmoji={application.flagEmoji} sizeClass="h-5 w-5" className="text-lg" />
+            <span>{application.countryName}</span>
+          </div>
           <h1 className="text-2xl font-bold text-text-primary">Payment Summary</h1>
           <p className="text-sm text-text-secondary mt-1">{application.visaType}</p>
           <p className="text-xs font-mono text-text-muted mt-2">

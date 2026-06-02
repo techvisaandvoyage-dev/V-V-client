@@ -83,14 +83,14 @@ const ContactVerificationModal = ({
         showToast("Number is incomplete.", "error");
         return;
       }
-      const key = normalizePhoneInputTo10(value);
-      if (!key) {
-        setPhoneError("Enter a valid 10-digit mobile number.");
-        showToast("Enter a valid 10-digit mobile number.", "error");
+      const fullPhone = phoneCountryCode + String(value || "").replace(/\D/g, "");
+      if (fullPhone.length < 10) {
+        setPhoneError("Enter a valid mobile number.");
+        showToast("Enter a valid mobile number.", "error");
         return;
       }
       setPhoneError("");
-      const { success, message } = await updateProfile({ phone: key });
+      const { success, message } = await updateProfile({ phone: fullPhone });
       if (!success) {
         showToast(message || "Could not save phone.", "error");
         return;
@@ -215,7 +215,7 @@ const ContactVerificationModal = ({
             onChange={(e) => {
               const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
               setValue(digits);
-              if (!digits.length || digits.length === 10) {
+              if (!digits.length || digits.length >= 10) {
                 setPhoneError("");
               } else {
                 setPhoneError("Number is incomplete.");

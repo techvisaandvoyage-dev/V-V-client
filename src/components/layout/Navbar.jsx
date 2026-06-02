@@ -83,9 +83,7 @@ const Navbar = () => {
           fixed top-0 left-0 right-0 z-40 transition-all duration-300
           ${!isLanding
             ? "bg-white border-b border-border shadow-card"
-            : scrolled
-              ? "bg-white border-b border-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
-              : "bg-white"
+            : "bg-white"
           }
         `}
       >
@@ -107,7 +105,7 @@ const Navbar = () => {
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="block h-16 w-auto object-contain scale-[2.2] sm:scale-[2.8] origin-left"
+                className="block h-16 w-auto -translate-x-1 translate-y-1 object-contain scale-[2.2] origin-left sm:-translate-x-5 sm:scale-[2.8]"
               />
             </Link>
 

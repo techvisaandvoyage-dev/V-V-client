@@ -104,7 +104,7 @@ const LandingCountriesGrid = memo(
           <div className="mt-12 flex justify-center">
             <button
               onClick={onLoadMore}
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white px-8 font-semibold text-text-primary shadow-[0_2px_12px_rgba(15,23,42,0.06)] ring-1 ring-border transition-all hover:bg-surface hover:text-cyan hover:shadow-[0_8px_24px_rgba(14,116,217,0.12)] hover:ring-cyan/30 active:scale-[0.98]"
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white px-8 font-semibold text-text-primary shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition-all hover:bg-white hover:text-cyan hover:shadow-[0_8px_24px_rgba(14,116,217,0.12)] active:scale-[0.98]"
             >
               Show More Destinations
             </button>

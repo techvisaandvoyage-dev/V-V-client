@@ -1,8 +1,8 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import ImageWithShimmer from "../ui/ImageWithShimmer";
-import { getCountryFlagEmoji, getIsoAlpha2FromCountryName } from "../../utils/countrySearch";
+import CountryFlagBadge from "../ui/CountryFlagBadge";
 
 function getCardVisaTypeLabel(visaTypeValue) {
   const value = String(visaTypeValue || "").trim();
@@ -167,26 +167,6 @@ function getDocumentLabel(key, documentCatalog) {
     .trim();
 }
 
-function CountryFlagIcon({ country, className = "h-6 w-6 text-xl" }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const iso = getIsoAlpha2FromCountryName(country?.name);
-  const emoji = getCountryFlagEmoji(country?.name, country?.flagEmoji);
-
-  if (iso && !imgFailed) {
-    return (
-      <img
-        src={`https://flagcdn.com/${iso.toLowerCase()}.svg`}
-        alt={`${country?.name} flag`}
-        className={className}
-        loading="lazy"
-        onError={() => setImgFailed(true)}
-      />
-    );
-  }
-
-  return <span aria-hidden>{emoji}</span>;
-}
-
 const DesktopAnimatedCountryCard = memo(function DesktopAnimatedCountryCard({
   country,
   index = 0,
@@ -236,16 +216,11 @@ const DesktopAnimatedCountryCard = memo(function DesktopAnimatedCountryCard({
           priority={index < 4}
           width={500}
           height={400}
+          quality={82}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
         >
           {/* Dark gradient for text readability */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-500" />
-          
-          {/* Initial state: Blur that fades out from bottom to top */}
-          <div 
-            className="absolute inset-0 backdrop-blur-[8px] transition-opacity duration-500 group-hover:opacity-0" 
-            style={{ maskImage: 'linear-gradient(to top, black 0%, transparent 50%)', WebkitMaskImage: 'linear-gradient(to top, black 0%, transparent 50%)' }}
-          />
 
           {/* Hover state: Blur that covers the raised panel & text, but keeps the top image clear */}
           <div 
@@ -253,22 +228,14 @@ const DesktopAnimatedCountryCard = memo(function DesktopAnimatedCountryCard({
             style={{ maskImage: 'linear-gradient(to top, black 0%, black 55%, transparent 85%)', WebkitMaskImage: 'linear-gradient(to top, black 0%, black 55%, transparent 85%)' }}
           />
 
-          <div
-            className="absolute left-4 top-4 z-30 text-3xl drop-shadow-md"
-            role="img"
-            aria-label={`${country.name} flag`}
-          >
-            <CountryFlagIcon country={country} className="h-8 w-8 rounded-full object-cover shadow-sm" />
-          </div>
+          <CountryFlagBadge country={country} sizeClass="h-10 w-10" className="absolute left-4 top-4 z-30 text-3xl" />
 
           {!country.imageUrl ? (
-            <div
-              className="absolute left-1/2 top-[40%] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-white text-3xl shadow-xl"
-              role="img"
-              aria-label={country.name}
-            >
-              <CountryFlagIcon country={country} className="h-8 w-8 rounded-full object-cover" />
-            </div>
+            <CountryFlagBadge
+              country={country}
+              sizeClass="h-16 w-16"
+              className="absolute left-1/2 top-[40%] -translate-x-1/2 text-5xl"
+            />
           ) : null}
 
           <motion.div

@@ -219,7 +219,7 @@ const ProfilePage = () => {
       name: formData.name,
       age: formData.age ? Number(formData.age) : undefined,
       gender: formData.gender,
-      phone: String(formData.phone || "").replace(/\D/g, "").slice(0, 10),
+      phone: formData.phoneCountryCode + String(formData.phone || "").replace(/\D/g, ""),
     };
 
     const { success } = await updateProfile(updates);
@@ -468,7 +468,14 @@ const ProfilePage = () => {
                         !isEditing ? "cursor-default bg-slate-50 opacity-80" : "hover:border-[#235BFF]/40 focus:outline-none focus:ring-2 focus:ring-[#235BFF]/20"
                       }`}
                     >
-                      <span className="truncate text-left">{selectedCountryOption.label}</span>
+                      <span className="truncate text-left flex items-center gap-2">
+                        {selectedCountryOption?.flagUrl ? (
+                          <img src={selectedCountryOption.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-[2px]" />
+                        ) : selectedCountryOption?.flag ? (
+                          <span className="text-lg leading-none">{selectedCountryOption.flag}</span>
+                        ) : null}
+                        <span>{selectedCountryOption?.value || "+91"}</span>
+                      </span>
                       <ChevronDown size={18} className={`shrink-0 transition-transform ${countryCodeOpen ? "rotate-180" : ""}`} />
                     </button>
 
@@ -502,7 +509,14 @@ const ProfilePage = () => {
                                     : "text-slate-800 hover:bg-slate-50"
                                 }`}
                               >
-                                {option.label}
+                                <div className="flex items-center gap-2">
+                                  {option.flagUrl ? (
+                                    <img src={option.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-[2px]" />
+                                  ) : option.flag ? (
+                                    <span className="text-lg leading-none">{option.flag}</span>
+                                  ) : null}
+                                  <span>{option.label}</span>
+                                </div>
                               </button>
                             ))
                           ) : (

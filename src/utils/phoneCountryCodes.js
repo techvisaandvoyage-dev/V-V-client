@@ -1,11 +1,11 @@
 export const DEFAULT_PHONE_COUNTRY_CODE = "+91";
 
 const FALLBACK_PHONE_COUNTRY_OPTIONS = [
-  { value: "+91", label: "India (+91)", searchText: "india delhi mumbai bangalore hyderabad chennai pune kolkata maharashtra karnataka tamil nadu" },
-  { value: "+1", label: "United States (+1)", searchText: "united states usa america washington new york california texas florida los angeles chicago" },
-  { value: "+44", label: "United Kingdom (+44)", searchText: "united kingdom uk britain england london manchester birmingham scotland wales" },
-  { value: "+61", label: "Australia (+61)", searchText: "australia sydney melbourne brisbane perth canberra victoria queensland" },
-  { value: "+971", label: "United Arab Emirates (+971)", searchText: "united arab emirates uae dubai abu dhabi sharjah ajman" },
+  { value: "+91", label: "India (+91)", flagUrl: "https://flagcdn.com/in.svg", searchText: "india delhi mumbai bangalore hyderabad chennai pune kolkata maharashtra karnataka tamil nadu" },
+  { value: "+1", label: "United States (+1)", flagUrl: "https://flagcdn.com/us.svg", searchText: "united states usa america washington new york california texas florida los angeles chicago" },
+  { value: "+44", label: "United Kingdom (+44)", flagUrl: "https://flagcdn.com/gb.svg", searchText: "united kingdom uk britain england london manchester birmingham scotland wales" },
+  { value: "+61", label: "Australia (+61)", flagUrl: "https://flagcdn.com/au.svg", searchText: "australia sydney melbourne brisbane perth canberra victoria queensland" },
+  { value: "+971", label: "United Arab Emirates (+971)", flagUrl: "https://flagcdn.com/ae.svg", searchText: "united arab emirates uae dubai abu dhabi sharjah ajman" },
 ];
 
 const REST_COUNTRY_ALPHA_CODES = [
@@ -123,6 +123,7 @@ const normalizeRestCountryOption = (country) => {
   return {
     value,
     label: `${name} (${value})`,
+    flagUrl: `https://flagcdn.com/${alpha2.toLowerCase()}.svg`,
     searchText: keywordParts.join(" ").toLowerCase(),
   };
 };

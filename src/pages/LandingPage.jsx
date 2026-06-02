@@ -549,17 +549,17 @@ const LandingPage = () => {
             className={isSearchPinned ? "h-16" : ""}
           >
           <div
-            className={
-              isSearchPinned
-                ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
-                : "relative z-20 mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
-            }
+              className={
+                isSearchPinned
+                  ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
+                  : "relative z-[100] mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
+              }
             >
               <div className={isSearchPinned ? "pointer-events-auto mx-auto w-full max-w-[34rem] md:max-w-[36rem] lg:max-w-[38rem]" : ""}>
             <form
               onSubmit={handleSearch}
               autoComplete="off"
-              className="relative h-16 rounded-full border border-sky-100 bg-white px-4 shadow-[0_16px_38px_rgba(15,23,42,0.11)] sm:px-5"
+              className="relative h-16 rounded-full border border-slate-200 bg-white px-4 sm:px-5"
               role="search"
               aria-label="Search visa destinations"
             >
@@ -595,10 +595,10 @@ const LandingPage = () => {
                 <div className="absolute left-0 right-0 top-[calc(100%+14px)] z-30 text-left">
                   <div
                     ref={searchFormRef}
-                    className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl border border-border bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+                    className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
                   >
                     {suggestionRows.length > 0 ? (
-                      <div className="overflow-y-auto overscroll-contain divide-y divide-border">
+                      <div className="overflow-y-auto overscroll-contain">
                         {suggestionRows.map((row) => (
                           <button
                             type="button"
@@ -627,7 +627,7 @@ const LandingPage = () => {
                                 </>
                               )}
                             </span>
-                            <span className="w-9 h-9 rounded-full bg-white border border-border flex items-center justify-center text-lg shadow-sm flex-shrink-0">
+                            <span className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex-shrink-0">
                               {getCountryFlagEmoji(row.country.name, row.country.flagEmoji)}
                             </span>
                           </button>
@@ -647,13 +647,13 @@ const LandingPage = () => {
           </div>
 
           <div
-            className="mx-auto mt-6 w-full max-w-5xl rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(2,132,199,0.06)] sm:mt-8 sm:px-6 animate-home-enter [animation-delay:80ms]"
+            className="mx-auto mt-6 w-full max-w-5xl rounded-2xl bg-white px-4 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] sm:mt-8 sm:px-6 animate-home-enter [animation-delay:80ms]"
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-sky-100">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {heroHighlights.map(({ icon: Icon, title, body }) => (
                 <div key={title} className="flex items-center gap-3 rounded-xl px-2 py-2 lg:px-4 first:lg:pl-0 last:lg:pr-0">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-cyan">
-                    <Icon size={18} strokeWidth={2.2} />
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center text-cyan">
+                    <Icon size={20} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold leading-tight text-[#0b1f45]">{title}</p>

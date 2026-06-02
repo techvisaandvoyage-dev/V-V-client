@@ -3,11 +3,9 @@
 //  Landing page footer: CMS links, social icons, trust badges.
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
-import { api } from "../../store/authStore";
-
-const BRAND_LOGO_SRC = "/images/visa-voyage-logo.png";
+import { Link } from "react-router-dom";
+import { Loader2, Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send, X } from "lucide-react";
+import { api, SERVER_URL } from "../../store/authStore";
 
 const FOOTER_SECTIONS = [
   { key: "company", title: "Company" },
@@ -107,27 +105,35 @@ const FOOTER_SOCIAL_ICON_COMPONENTS = {
   custom: LinkIcon,
 };
 
+const resolveAssetUrl = (value) => {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${SERVER_URL}${url}`;
+  return `${SERVER_URL}/${url}`;
+};
+
 const Footer = () => {
-  const location = useLocation();
-  const isTransientPage =
-    location.pathname === "/login" ||
-    location.pathname === "/register" ||
-    location.pathname.startsWith("/apply") ||
-    location.pathname.endsWith("/summary");
   const currentYear = new Date().getFullYear();
   const [pages, setPages] = useState([]);
   const [socialIcons, setSocialIcons] = useState([]);
   const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
+  const [activeCountryCount, setActiveCountryCount] = useState(0);
+  const [pageModalOpen, setPageModalOpen] = useState(false);
+  const [modalPage, setModalPage] = useState(null);
+  const [modalPageLoading, setModalPageLoading] = useState(false);
+  const [modalPageError, setModalPageError] = useState("");
 
   useEffect(() => {
     let active = true;
 
     const loadFooterData = async () => {
       try {
-        const [pagesRes, iconsRes, footerConfigRes] = await Promise.all([
+        const [pagesRes, iconsRes, footerConfigRes, countriesRes] = await Promise.all([
           api.get("/pages"),
           api.get("/footer-social-icons"),
           api.get("/config/footer"),
+          api.get("/countries"),
         ]);
 
         if (!active) return;
@@ -157,11 +163,20 @@ const Footer = () => {
         } else {
           setFooterContent(FOOTER_CONTENT_FALLBACK);
         }
+
+        if (countriesRes?.data?.success && Array.isArray(countriesRes.data.countries)) {
+          setActiveCountryCount(
+            countriesRes.data.countries.filter((country) => country?.isActive !== false).length
+          );
+        } else {
+          setActiveCountryCount(0);
+        }
       } catch {
         if (active) {
           setPages([]);
           setSocialIcons([]);
           setFooterContent(FOOTER_CONTENT_FALLBACK);
+          setActiveCountryCount(0);
         }
       }
     };
@@ -172,6 +187,48 @@ const Footer = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!pageModalOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setPageModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pageModalOpen]);
+
+  const openPageModal = async (page) => {
+    const slug = page?.slug;
+    if (!slug) return;
+
+    setPageModalOpen(true);
+    setModalPage(page);
+    setModalPageError("");
+    setModalPageLoading(true);
+
+    try {
+      const { data } = await api.get(`/pages/${slug}`);
+      setModalPage(data?.page || page);
+    } catch (error) {
+      setModalPageError(error.response?.data?.message || "Could not load this page.");
+    } finally {
+      setModalPageLoading(false);
+    }
+  };
+
+  const closePageModal = () => {
+    setPageModalOpen(false);
+  };
+
   const columns = useMemo(
     () =>
       FOOTER_SECTIONS.map((section) => ({
@@ -179,8 +236,9 @@ const Footer = () => {
         links: pages
           .filter((page) => (page.footerSection || "company") === section.key)
           .map((page) => ({
+            page,
             label: page.title,
-            to: `/page/${page.slug}`,
+            slug: page.slug,
           })),
       })),
     [pages]
@@ -189,15 +247,16 @@ const Footer = () => {
   const trustBadges = [
     { icon: Shield, label: "SSL Secured" },
     { icon: Lock, label: "Data Protected" },
-    { icon: Globe, label: "150+ Countries" },
+    { icon: Globe, label: `${activeCountryCount || 0} Countries` },
   ];
 
   return (
-    <footer className="bg-surface border-t border-border" id="footer">
+    <footer className="bg-white" id="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12 mb-12">
           <div className="lg:col-span-2 lg:pr-12">
-            <Link to="/" replace className="mb-0 flex items-center">
+            <div className="-mt-2 flex max-w-sm flex-col items-start sm:-mt-1 lg:-mt-2">
+            <Link to="/" replace className="-mb-3 flex items-center leading-none sm:-mb-4">
               <img
                 src="/images/visa-voyage-logo.webp"
                 alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
@@ -205,14 +264,14 @@ const Footer = () => {
                 height="80"
                 loading="lazy"
                 decoding="async"
-                className="block h-20 w-auto object-contain scale-[2.2] sm:scale-[2.6] origin-left -translate-x-6 sm:-translate-x-12 lg:-translate-x-16 translate-y-2 sm:translate-y-4"
+                className="block h-20 w-auto -translate-x-5 object-contain origin-left scale-[2.05] sm:-translate-x-7 sm:scale-[2.3]"
               />
             </Link>
-            <p className="text-sm text-text-secondary leading-relaxed mb-6">
+            <p className="mb-6 text-sm leading-relaxed text-text-secondary">
               {footerContent.description}
             </p>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {socialIcons.map(({ _id, label, type, url }) => {
                 const Icon = FOOTER_SOCIAL_ICON_COMPONENTS[type] || LinkIcon;
                 return (
@@ -223,12 +282,13 @@ const Footer = () => {
                   title={label}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-cyan hover:border-cyan/30 transition-all duration-200"
+                  className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-text-muted hover:text-cyan transition-all duration-200"
                 >
                   <Icon size={16} />
                 </a>
                 );
               })}
+            </div>
             </div>
           </div>
 
@@ -237,17 +297,14 @@ const Footer = () => {
               <h3 className="text-sm font-semibold text-text-primary mb-4">{col.title}</h3>
               <ul className="space-y-3">
                 {col.links.map((link) => (
-                  <li key={link.to}>
-                    <Link
-                      to={link.to}
-                      replace={isTransientPage}
-                      state={{
-                        from: `${location.pathname}${location.search}${location.hash}`,
-                      }}
+                  <li key={link.slug}>
+                    <button
+                      type="button"
+                      onClick={() => openPageModal(link.page)}
                       className="text-sm text-text-secondary hover:text-cyan transition-colors duration-200"
                     >
                       {link.label}
-                    </Link>
+                    </button>
                   </li>
                 ))}
                 {col.links.length === 0 && (
@@ -258,7 +315,7 @@ const Footer = () => {
           ))}
         </div>
 
-        <div className="border-t border-border pt-8">
+        <div className="pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <p className="text-sm text-text-muted">
               &copy; {currentYear} Visa & Voyage. All rights reserved.
@@ -275,6 +332,74 @@ const Footer = () => {
           </div>
         </div>
       </div>
+
+      {pageModalOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/45 px-4 py-6 backdrop-blur-md sm:px-6">
+          <button
+            type="button"
+            aria-label="Close page popup"
+            className="absolute inset-0 cursor-default"
+            onClick={closePageModal}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="footer-page-modal-title"
+            className="relative flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
+                  Visa & Voyage
+                </p>
+                <h2 id="footer-page-modal-title" className="mt-1 truncate text-xl font-bold text-text-primary sm:text-2xl">
+                  {modalPage?.title || "Page"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closePageModal}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
+              {modalPageLoading ? (
+                <div className="flex min-h-[260px] flex-col items-center justify-center text-text-secondary">
+                  <Loader2 size={30} className="mb-3 animate-spin text-cyan" />
+                  <p className="text-sm font-medium">Loading page...</p>
+                </div>
+              ) : modalPageError ? (
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-5 text-sm font-medium text-red-600">
+                  {modalPageError}
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {modalPage?.featuredImage && (
+                    <img
+                      src={resolveAssetUrl(modalPage.featuredImage)}
+                      alt={modalPage.title || ""}
+                      className="max-h-64 w-full rounded-xl object-cover"
+                    />
+                  )}
+                  {(modalPage?.summary || modalPage?.seo?.metaDescription) && (
+                    <p className="text-sm leading-6 text-text-secondary">
+                      {modalPage.summary || modalPage.seo?.metaDescription}
+                    </p>
+                  )}
+                  <article
+                    className="prose prose-neutral max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-cyan [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-3 [&_th]:border [&_th]:border-border [&_th]:bg-surface-2 [&_th]:p-3 [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: modalPage?.content || "" }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </footer>
   );
 };

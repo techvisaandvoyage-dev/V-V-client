@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle,
-  CircleCheck,
   Upload,
   CreditCard,
   Loader2,
@@ -59,6 +58,7 @@ import { openRazorpayForApplication, validateRazorpayCheckoutReadiness } from ".
 import SharedGoogleDriveLinkSection from "../components/application/SharedGoogleDriveLinkSection";
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
+import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -176,7 +176,7 @@ const buildDisplayDocFields = (documentKeys = ["passport"], catalog = []) => {
     return {
       ...field,
       label: meta?.label || field.label,
-      description: meta?.description || "",
+      description: meta?.description || "Supporting document for visa processing.",
       iconClass: meta?.iconClass || "",
     };
   });
@@ -1627,9 +1627,10 @@ const ApplicationDetails = () => {
         <div className="rounded-3xl border border-border bg-surface p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-2">
-                {booking.flagEmoji} {booking.countryName}
-              </p>
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan">
+                <CountryFlagBadge countryName={booking.countryName} flagEmoji={booking.flagEmoji} sizeClass="h-5 w-5" className="text-lg" />
+                <span>{booking.countryName}</span>
+              </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-text-primary">Application Details</h2>
               <p className="text-sm text-text-secondary mt-2 max-w-2xl">
                 Review your full application, payment summary, and traveler-specific document status in one place.
@@ -2115,10 +2116,11 @@ const ApplicationDetails = () => {
                         <p className="text-sm font-normal leading-tight text-text-primary">
                           {getDocumentDisplayName(field.label)}
                         </p>
-                      </div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-cyan/8 px-3 py-2 text-cyan text-xs font-normal">
-                        <CircleCheck size={16} strokeWidth={2.4} />
-                        <span>Required</span>
+                        {field.description ? (
+                          <p className="mt-1 text-xs leading-snug text-text-muted">
+                            {field.description}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -2134,7 +2136,7 @@ const ApplicationDetails = () => {
                   <FileText size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Other Documents</h3>
+                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Optional Documents</h3>
                   <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
                     You can also attach other documents in the same Drive link.
                   </p>
@@ -2167,12 +2169,11 @@ const ApplicationDetails = () => {
                           <p className="text-sm font-normal leading-tight text-text-primary">
                             {getDocumentDisplayName(field.label)}
                           </p>
-                        </div>
-                        <div className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-normal ${
-                          hasError ? "bg-red-50 text-red-500" : "bg-cyan/8 text-cyan"
-                        }`}>
-                          <CircleCheck size={16} strokeWidth={2.4} />
-                          <span>{hasError ? "Review" : "Optional"}</span>
+                          {field.description ? (
+                            <p className="mt-1 text-xs leading-snug text-text-muted">
+                              {field.description}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     );

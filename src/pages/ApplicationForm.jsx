@@ -52,6 +52,7 @@ import {
   getUploadLimitForDocType,
 } from "../utils/optimizeUploadFile";
 import { getFileValidationRules } from "../utils/fileValidation";
+import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -183,17 +184,29 @@ const DOCUMENT_META = {
   companyRegistration: { label: "Company Registration Certificate Upload", Icon: Briefcase },
 };
 
-const buildDocFields = (documentKeys = ["passport"]) => {
+const buildDocFields = (documentKeys = ["passport"], catalog = []) => {
   const keys = Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"];
   const seen = new Set();
   const normalizedKeys = ["passport", ...keys.filter((key) => key !== "passport")];
+  const catalogByKey = new Map(
+    (Array.isArray(catalog) ? catalog : [])
+      .map((item) => ({
+        key: String(item?.key ?? "").trim(),
+        label: String(item?.label ?? "").trim(),
+        description: String(item?.description ?? "").trim(),
+      }))
+      .filter((item) => item.key && item.key !== "[object Object]")
+      .map((item) => [item.key, item])
+  );
 
   const fields = normalizedKeys.reduce((acc, key, index) => {
     if (!key || seen.has(key)) return acc;
     seen.add(key);
+    const catalogItem = catalogByKey.get(key);
     acc.push({
       key,
-      label: DOCUMENT_META[key]?.label || `${key.replace(/([A-Z])/g, " $1")} Upload`,
+      label: catalogItem?.label || DOCUMENT_META[key]?.label || `${key.replace(/([A-Z])/g, " $1")} Upload`,
+      description: catalogItem?.description || "Supporting document for visa processing.",
       Icon: DOCUMENT_META[key]?.Icon || FileText,
       required: index === 0,
     });
@@ -205,10 +218,14 @@ const buildDocFields = (documentKeys = ["passport"]) => {
     : [{
       key: "passport",
       label: DOCUMENT_META.passport.label,
+      description: catalogByKey.get("passport")?.description || "Primary identity document for visa processing.",
       Icon: DOCUMENT_META.passport.Icon,
       required: true,
     }];
 };
+
+const getDocumentDisplayName = (label = "") =>
+  String(label || "").replace(/\s*Upload\s*$/i, "").trim();
 
 const formatFileSize = (size = 0) => {
   if (!size) return "0 KB";
@@ -258,7 +275,7 @@ const ApplicationForm = () => {
   const location = useLocation();
   const { showToast } = useUIStore();
   const { user, isAuthenticated, sessionAuthMethod } = useAuthStore();
-  const { countries: allCountries } = useCountries();
+  const { countries: allCountries, documentCatalog } = useCountries();
   const prefillApplied = useRef(false);
   const travelerNameInputRefs = useRef({});
 
@@ -266,8 +283,8 @@ const ApplicationForm = () => {
   const country =
     useMergedCountry(countryId, listCountry) || getCountryById(countryId) || COUNTRIES[0];
   const docFields = useMemo(
-    () => buildDocFields(country?.requiredDocuments),
-    [country?.requiredDocuments]
+    () => buildDocFields(country?.requiredDocuments, documentCatalog),
+    [country?.requiredDocuments, documentCatalog]
   );
   const optionalDocFields = useMemo(
     () => docFields.filter((field) => field.key !== "passport"),
@@ -1299,9 +1316,10 @@ const ApplicationForm = () => {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6">
           <div className="space-y-6 lg:col-span-8">
             <div>
-              <p className="text-xs uppercase tracking-wider text-cyan font-semibold mb-1">
-                {country.flagEmoji} {country.name}
-              </p>
+              <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan">
+                <CountryFlagBadge country={country} sizeClass="h-5 w-5" className="text-lg" />
+                <span>{country.name}</span>
+              </div>
               <h1 className="text-2xl font-bold text-text-primary">Traveler Document Upload</h1>
               <p className="text-sm text-text-secondary mt-1">
                 {uploadSettings.enableFileUpload && uploadSettings.enableGDriveUpload
@@ -1527,7 +1545,7 @@ const ApplicationForm = () => {
 {uploadSettings.enableFileUpload && optionalDocFields.length > 0 && (
               <div className="flex w-full flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-                  Other Documents
+                  Optional Documents
                 </p>
                 {optionalDocFields.map((field) => {
                   const file = traveler.documents[field.key];
@@ -1563,11 +1581,13 @@ const ApplicationForm = () => {
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-text-primary">
-                            {field.label}{" "}
-                            <span className="text-[10px] font-medium text-text-muted">
-                              (optional)
-                            </span>
+                            {getDocumentDisplayName(field.label)}
                           </p>
+                          {field.description ? (
+                            <p className="truncate text-[10px] text-text-muted">
+                              {field.description}
+                            </p>
+                          ) : null}
                           <p className="truncate text-[10px] text-text-muted">
                             {file
                               ? `${file.name} · ${formatFileSize(file.size)}`

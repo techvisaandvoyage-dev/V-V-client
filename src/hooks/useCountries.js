@@ -301,6 +301,7 @@ export function normalizeCountryFromApi(c) {
     trending: Boolean(c.trending),
     successRate: c.successRate || 80,
     visitCount: Number.isFinite(Number(c.visitCount)) ? Number(c.visitCount) : 0,
+    paymentCount: Number.isFinite(Number(c.paymentCount)) ? Number(c.paymentCount) : 0,
     lastVisitedAt: c.lastVisitedAt || null,
     whyBookNow: Array.isArray(c.whyBookNow)
       ? c.whyBookNow.map((s) => String(s ?? "").trim()).filter(Boolean)

@@ -43,6 +43,7 @@ import ImageWithShimmer from "../components/ui/ImageWithShimmer";
 import DateRangePicker from "../components/ui/DateRangePicker";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore, api, SERVER_URL } from "../store/authStore";
+import AuthModal from "../components/auth/AuthModal";
 import { useUIStore } from "../store/uiStore";
 import { useCountries, useMergedCountry } from "../hooks/useCountries";
 import {
@@ -474,6 +475,25 @@ const CountryDetails = () => {
   const [showTravelDetails, setShowTravelDetails] = useState(false);
   const [visaOption, setVisaOption] = useState("e-Visa");
   const [activeVisaTypes, setActiveVisaTypes] = useState([]);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const pendingAuthActionRef = useRef(null);
+
+  const requireAuth = (actionFn) => {
+    if (isAuthenticated) {
+      if (actionFn) actionFn();
+    } else {
+      pendingAuthActionRef.current = actionFn;
+      setAuthModalOpen(true);
+    }
+  };
+
+  const handleAuthComplete = () => {
+    setAuthModalOpen(false);
+    if (pendingAuthActionRef.current) {
+      pendingAuthActionRef.current();
+      pendingAuthActionRef.current = null;
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -1482,6 +1502,10 @@ const CountryDetails = () => {
   };
 
   const handleTravelerPassportFile = async (index, rawFile) => {
+    if (!isAuthenticated) {
+      requireAuth(() => handleTravelerPassportFile(index, rawFile));
+      return;
+    }
     const travelerNo = index + 1;
     if (!rawFile) {
       updateTravelerPassportFile(index, null);
@@ -1853,7 +1877,7 @@ const CountryDetails = () => {
   };
 
   const handleStartApplication = () => {
-    gateContactOrRun(() => openTravelDetails());
+    requireAuth(() => gateContactOrRun(() => openTravelDetails()));
   };
 
   /**
@@ -2232,6 +2256,10 @@ const CountryDetails = () => {
   };
 
   const handleProceedToPayment = async () => {
+    if (!isAuthenticated) {
+      requireAuth(handleProceedToPayment);
+      return;
+    }
     if (!visaTermsAccepted || paymentSubmitting) return;
     if (!razorpayReady) {
       showToast(
@@ -3035,6 +3063,9 @@ const CountryDetails = () => {
                           // programmatically via the Enter handler below.
                           autoFocus={index === 0}
                           value={traveler.name}
+                          onFocus={(e) => {
+                            // Auth gate removed
+                          }}
                           onChange={(e) => updateTravelerName(index, e.target.value)}
                           onKeyDown={(e) => {
                             // Press Enter → jump to the next traveler row. On
@@ -3191,6 +3222,14 @@ const CountryDetails = () => {
                         type="url"
                         autoComplete="off"
                         value={sharedDriveLink}
+                        onFocus={(e) => {
+                          if (!isAuthenticated) {
+                            e.target.blur();
+                            requireAuth(() => {
+                              setTimeout(() => sharedDriveLinkInputRef.current?.focus(), 100);
+                            });
+                          }
+                        }}
                         onChange={(e) => handleSharedDriveLinkChange(e.target.value)}
                         placeholder="https://drive.google.com/your-folder-link"
                         className={`w-full rounded-2xl border bg-white py-3 pl-12 pr-4 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 ${
@@ -3689,6 +3728,11 @@ const CountryDetails = () => {
         )}
       </AnimatePresence>
 
+      <AuthModal 
+        isOpen={authModalOpen} 
+        onClose={() => setAuthModalOpen(false)} 
+        onComplete={handleAuthComplete} 
+      />
       <Footer />
     </div>
   );
