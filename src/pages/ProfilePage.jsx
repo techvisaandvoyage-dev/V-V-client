@@ -25,6 +25,7 @@ import Navbar from "../components/layout/Navbar";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input, { Select } from "../components/ui/Input";
+import OtpInput from "../components/ui/OtpInput";
 import { useNavigate } from "react-router-dom";
 import { formatOrdinalDate } from "../utils/dateUtils";
 import {
@@ -42,6 +43,8 @@ const formatMemberSince = (value) => {
   if (Number.isNaN(parsed.getTime())) return "Recently joined";
   return formatOrdinalDate(parsed);
 };
+
+const createEmptyOtp = (length = 6) => Array.from({ length: length === 4 ? 4 : 6 }, () => "");
 
 const StatusPill = ({ children, tone = "green" }) => {
   const tones = {
@@ -93,6 +96,8 @@ const ProfilePage = () => {
   const {
     user,
     updateProfile,
+    requestProfilePhoneOtp,
+    verifyProfilePhoneOtp,
     uploadProfileImage,
     changeUserPassword,
     isLoading,
@@ -108,6 +113,13 @@ const ProfilePage = () => {
   const [countryCodeSearch, setCountryCodeSearch] = useState("");
   const [phoneCountryOptions, setPhoneCountryOptions] = useState(() => getPhoneCountryOptions());
   const [showSecurityForm, setShowSecurityForm] = useState(false);
+  const [phoneOtpActive, setPhoneOtpActive] = useState(false);
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpDigits, setPhoneOtpDigits] = useState(createEmptyOtp(6));
+  const [phoneOtpLength, setPhoneOtpLength] = useState(6);
+  const [phoneOtpChannel, setPhoneOtpChannel] = useState("");
+  const [phoneDevOtp, setPhoneDevOtp] = useState("");
+  const [phoneChangeError, setPhoneChangeError] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -219,7 +231,6 @@ const ProfilePage = () => {
       name: formData.name,
       age: formData.age ? Number(formData.age) : undefined,
       gender: formData.gender,
-      phone: formData.phoneCountryCode + String(formData.phone || "").replace(/\D/g, ""),
     };
 
     const { success } = await updateProfile(updates);
@@ -244,6 +255,112 @@ const ProfilePage = () => {
         phoneCountryCode: parsedPhone.countryCode,
       });
     }
+    setPhoneOtpActive(false);
+    setPhoneOtpSent(false);
+    setPhoneOtpDigits(createEmptyOtp(6));
+    setPhoneOtpLength(6);
+    setPhoneOtpChannel("");
+    setPhoneDevOtp("");
+    setPhoneChangeError("");
+  };
+
+  const handleStartPhoneChange = () => {
+    const parsedPhone = parsePhoneWithCountryCode(user.phone, phoneCountryOptions);
+    setFormData((prev) => ({
+      ...prev,
+      phone: parsedPhone.phone,
+      phoneCountryCode: parsedPhone.countryCode,
+    }));
+    setPhoneOtpActive(true);
+    setPhoneOtpSent(false);
+    setPhoneOtpDigits(createEmptyOtp(6));
+    setPhoneOtpLength(6);
+    setPhoneOtpChannel("");
+    setPhoneDevOtp("");
+    setPhoneChangeError("");
+  };
+
+  const handleCancelPhoneChange = () => {
+    const parsedPhone = parsePhoneWithCountryCode(user.phone, phoneCountryOptions);
+    setFormData((prev) => ({
+      ...prev,
+      phone: parsedPhone.phone,
+      phoneCountryCode: parsedPhone.countryCode,
+    }));
+    setPhoneOtpActive(false);
+    setPhoneOtpSent(false);
+    setPhoneOtpDigits(createEmptyOtp(6));
+    setPhoneOtpLength(6);
+    setPhoneOtpChannel("");
+    setPhoneDevOtp("");
+    setPhoneChangeError("");
+  };
+
+  const getEnteredFullPhone = () => {
+    const digits = String(formData.phone || "").replace(/\D/g, "");
+    return `${formData.phoneCountryCode || DEFAULT_PHONE_COUNTRY_CODE}${digits}`;
+  };
+
+  const handleSendPhoneOtp = async () => {
+    const digits = String(formData.phone || "").replace(/\D/g, "");
+    if (digits.length !== 10) {
+      setPhoneChangeError("Enter a valid 10-digit mobile number.");
+      showToast("Enter a valid 10-digit mobile number.", "error");
+      return;
+    }
+
+    const currentDigits = String(user.phone || "").replace(/\D/g, "").slice(-10);
+    if (currentDigits && currentDigits === digits) {
+      setPhoneChangeError("Enter a different mobile number.");
+      showToast("Enter a different mobile number.", "error");
+      return;
+    }
+
+    const fullPhone = getEnteredFullPhone();
+    const { success, message, devOtp, channel, otpLength } = await requestProfilePhoneOtp(fullPhone);
+    if (!success) {
+      setPhoneChangeError(message || "Could not send OTP.");
+      showToast(message || "Could not send OTP.", "error");
+      return;
+    }
+
+    const nextLength = otpLength === 4 ? 4 : 6;
+    const nextDevOtp = devOtp != null ? String(devOtp).slice(0, nextLength) : "";
+    setPhoneOtpSent(true);
+    setPhoneOtpLength(nextLength);
+    setPhoneOtpDigits(nextDevOtp ? nextDevOtp.padEnd(nextLength, "").split("").slice(0, nextLength) : createEmptyOtp(nextLength));
+    setPhoneOtpChannel(channel || "");
+    setPhoneDevOtp(nextDevOtp);
+    setPhoneChangeError("");
+    showToast(nextDevOtp ? "Testing OTP filled automatically." : "OTP sent to your mobile number.", "success");
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    const otp = phoneOtpDigits.join("");
+    if (otp.length !== phoneOtpLength) {
+      showToast(`Please enter the ${phoneOtpLength}-digit OTP.`, "error");
+      return;
+    }
+
+    const fullPhone = getEnteredFullPhone();
+    const { success, message } = await verifyProfilePhoneOtp(fullPhone, otp);
+    if (!success) {
+      showToast(message || "Invalid OTP.", "error");
+      return;
+    }
+
+    const parsedPhone = parsePhoneWithCountryCode(fullPhone, phoneCountryOptions);
+    setFormData((prev) => ({
+      ...prev,
+      phone: parsedPhone.phone,
+      phoneCountryCode: parsedPhone.countryCode,
+    }));
+    setPhoneOtpActive(false);
+    setPhoneOtpSent(false);
+    setPhoneOtpDigits(createEmptyOtp(phoneOtpLength));
+    setPhoneDevOtp("");
+    setPhoneChangeError("");
+    showToast("Mobile number updated successfully.", "success");
   };
 
   const handleImageClick = () => {
@@ -309,6 +426,8 @@ const ProfilePage = () => {
 
   const filteredCountryOptions = filterPhoneCountryOptions(countryCodeSearch, phoneCountryOptions);
   const selectedCountryOption = findPhoneCountryOption(formData.phoneCountryCode, phoneCountryOptions);
+  const phoneInputLocked = !phoneOtpActive || phoneOtpSent;
+  const phoneActionLabel = displayPhoneDigits ? "Change mobile no." : "Add mobile no.";
 
   const memberSince = formatMemberSince(user.createdAt);
 
@@ -458,14 +577,14 @@ const ProfilePage = () => {
                   <div ref={countryCodeDropdownRef} className="relative">
                     <button
                       type="button"
-                      disabled={!isEditing}
+                      disabled={phoneInputLocked}
                       onClick={() => {
-                        if (!isEditing) return;
+                        if (phoneInputLocked) return;
                         setCountryCodeOpen((prev) => !prev);
                         setCountryCodeSearch("");
                       }}
                       className={`flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-900 shadow-sm transition-all ${
-                        !isEditing ? "cursor-default bg-slate-50 opacity-80" : "hover:border-[#235BFF]/40 focus:outline-none focus:ring-2 focus:ring-[#235BFF]/20"
+                        phoneInputLocked ? "cursor-default bg-slate-50 opacity-80" : "hover:border-[#235BFF]/40 focus:outline-none focus:ring-2 focus:ring-[#235BFF]/20"
                       }`}
                     >
                       <span className="truncate text-left flex items-center gap-2">
@@ -479,7 +598,7 @@ const ProfilePage = () => {
                       <ChevronDown size={18} className={`shrink-0 transition-transform ${countryCodeOpen ? "rotate-180" : ""}`} />
                     </button>
 
-                    {countryCodeOpen && isEditing && (
+                    {countryCodeOpen && !phoneInputLocked && (
                       <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
                         <div className="relative border-b border-slate-100 p-3">
                           <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -538,15 +657,108 @@ const ProfilePage = () => {
                       const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
                       setFormData((prev) => ({ ...prev, phone: digitsOnly }));
                     }}
-                    disabled={!isEditing}
-                    className={`rounded-2xl border-slate-200 bg-white px-5 py-4 text-base ${!isEditing ? "cursor-default bg-slate-50 opacity-80" : ""}`}
+                    disabled={phoneInputLocked}
+                    className={`rounded-2xl border-slate-200 bg-white px-5 py-4 text-base ${phoneInputLocked ? "cursor-default bg-slate-50 opacity-80" : ""}`}
                   />
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {isEditing
-                    ? "Choose a country code and enter a 10-digit mobile number."
-                    : "Add or edit in Edit Profile. Filled automatically after phone OTP log-in."}
-                </p>
+                {phoneChangeError ? (
+                  <p className="mt-1 text-xs text-red-500">{phoneChangeError}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {phoneOtpActive
+                      ? phoneOtpSent
+                        ? "Enter the OTP sent to this mobile number."
+                        : "Choose a country code and enter a 10-digit mobile number."
+                      : "Use OTP verification to add or change your mobile number."}
+                  </p>
+                )}
+
+                {!phoneOtpActive ? (
+                  <button
+                    type="button"
+                    onClick={handleStartPhoneChange}
+                    className="mt-1 inline-flex w-fit items-center justify-center self-start rounded-xl border border-[#235BFF]/20 bg-[#235BFF]/5 px-3 py-1.5 text-xs font-semibold text-[#235BFF] transition-colors hover:bg-[#235BFF]/10"
+                  >
+                    {phoneActionLabel}
+                  </button>
+                ) : (
+                  <div className="mt-3 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                    {!phoneOtpSent ? (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-slate-600">Send an OTP to confirm this mobile number.</p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={handleCancelPhoneChange}
+                            className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            loading={isLoading}
+                            onClick={handleSendPhoneOtp}
+                            className="rounded-2xl bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)] text-white hover:bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)]"
+                          >
+                            Send OTP
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm font-medium text-slate-700">
+                            OTP sent{phoneOtpChannel ? ` via ${phoneOtpChannel}` : ""}.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleSendPhoneOtp}
+                            className="w-fit text-sm font-semibold text-[#235BFF] hover:text-[#1746D8]"
+                          >
+                            Resend OTP
+                          </button>
+                        </div>
+                        {phoneDevOtp && (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                            Test OTP:{" "}
+                            <button
+                              type="button"
+                              className="font-bold underline"
+                              onClick={() => setPhoneOtpDigits(phoneDevOtp.split("").slice(0, phoneOtpLength))}
+                            >
+                              {phoneDevOtp}
+                            </button>
+                          </div>
+                        )}
+                        <OtpInput value={phoneOtpDigits} onChange={setPhoneOtpDigits} disabled={isLoading} length={phoneOtpLength} />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            fullWidth
+                            onClick={handleCancelPhoneChange}
+                            className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            fullWidth
+                            loading={isLoading}
+                            disabled={phoneOtpDigits.join("").length !== phoneOtpLength}
+                            onClick={handleVerifyPhoneOtp}
+                            className="rounded-2xl bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)] text-white hover:bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)]"
+                          >
+                            Verify & Save
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Input
