@@ -25,7 +25,7 @@ const PassportUploadRow = ({
 }) => {
   const inputRef = useRef(null);
   const normalizeHelperText = (text) => String(text || "")
-    .replace(/Ãƒâ€šÃ‚Â·/g, " - ")
+    .replace(/Ãƒ”šÃ‚Â·/g, " - ")
     .replace(/Ã‚Â·/g, " - ")
     .replace(/Â·/g, " - ");
 

@@ -2882,7 +2882,7 @@ const CountryDetails = () => {
                   </div>
                   <div>
                     <p className="text-xs text-white/65 uppercase tracking-[0.18em] mb-2">Validity</p>
-                    <p className="text-sm font-semibold text-white">{country.validity || "â€”"}</p>
+                    <p className="text-sm font-semibold text-white">{country.validity || "—"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-white/65 uppercase tracking-[0.18em] mb-2">Processing</p>
@@ -2891,7 +2891,7 @@ const CountryDetails = () => {
                         ? /^\d+(\s*-\s*\d+)?$/.test(String(country.processingDays).trim())
                           ? `${String(country.processingDays).trim()} days`
                           : String(country.processingDays).trim()
-                        : "â€”"}
+                        : "—"}
                     </p>
                   </div>
                 </div>

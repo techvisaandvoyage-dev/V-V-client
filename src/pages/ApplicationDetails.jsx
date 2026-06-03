@@ -2231,7 +2231,7 @@ const ApplicationDetails = () => {
                   </>
                 ) : (
                   <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm text-text-secondary whitespace-pre-wrap">
-                    {String(booking.applicantNotes || "").trim() || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                    {String(booking.applicantNotes || "").trim() || "ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â"}
                   </div>
                 )}
               </div>
@@ -2242,7 +2242,7 @@ const ApplicationDetails = () => {
               !uploadSettings.enableFileUpload && false && (
                 <div className="space-y-4 mb-6">
                   <h4 className="text-sm font-semibold text-text-primary">
-                    Further information ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Google Drive (optional)
+                    Further information ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â Google Drive (optional)
                   </h4>
                   <p className="text-[11px] text-text-muted leading-relaxed">
                     Optional second folder per traveler (references, samples, etc.). Does not replace the main documents folder above.
@@ -2264,7 +2264,7 @@ const ApplicationDetails = () => {
                         <p className="text-sm font-semibold text-text-primary">Traveler {travelerNo}</p>
                         <div>
                           <label className="text-xs text-text-muted block mb-1.5">
-                            Google Drive ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â further information (optional)
+                            Google Drive ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â further information (optional)
                           </label>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                             <input
@@ -2340,7 +2340,7 @@ const ApplicationDetails = () => {
                       {false && uploadSettings.enableGDriveUpload && (
                         <div className="space-y-1.5 pb-3 border-b border-border">
                           <label className="text-xs text-text-muted block">
-                            Google Drive ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â further information (optional)
+                            Google Drive ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â further information (optional)
                           </label>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                             <input
@@ -2358,7 +2358,7 @@ const ApplicationDetails = () => {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") e.preventDefault();
                             }}
-                            placeholder="Extra folder for references, samplesÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                            placeholder="Extra folder for references, samplesÃƒÂ¢Ã¢”šÂ¬Ã‚Â¦"
                             disabled={docUploading || submissionLocked}
                             className="min-w-0 flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-cyan/50 placeholder:text-text-muted"
                             autoComplete="off"
@@ -2526,7 +2526,7 @@ const ApplicationDetails = () => {
                 <Upload size={18} className="text-cyan shrink-0" />
                 <div>
                   <h3 className="text-base font-semibold text-text-primary">Upload documents</h3>
-                  <p className="text-xs text-text-muted">Per traveler ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â all documents max 300 KB.</p>
+                  <p className="text-xs text-text-muted">Per traveler ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â all documents max 300 KB.</p>
                 </div>
               </div>
               {(uploadSettings.enableFileUpload || uploadSettings.enableGDriveUpload) && (
@@ -2646,7 +2646,7 @@ const ApplicationDetails = () => {
 
                   {/* Global GDrive link moved outside traveler loop */}
 
-                  {/* Doc uploads ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â compact rows below traveler header */}
+                  {/* Doc uploads ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â compact rows below traveler header */}
                   {uploadSettings.enableFileUpload && (
                     <>
                     <div className="flex flex-col gap-2 mt-3">

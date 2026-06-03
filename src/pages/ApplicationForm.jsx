@@ -315,7 +315,7 @@ const ApplicationForm = () => {
    * Toggles the "Do you want to skip document upload?" confirmation modal.
    * Shown when the user hits Continue without uploading every required
    * document (or providing a Google Drive link). They can confirm to proceed
-   * straight to payment summary â€” the missing docs become uploadable later
+   * straight to payment summary — the missing docs become uploadable later
    * from their dashboard.
    */
   const [skipDocsConfirmOpen, setSkipDocsConfirmOpen] = useState(false);
@@ -1122,7 +1122,7 @@ const ApplicationForm = () => {
       const appId = data.application._id;
       setApplicationDraftId(String(appId));
       await syncSavedTravelerUpdates();
-      // Persist whatever travelers already uploaded â€” when skipped, this may
+      // Persist whatever travelers already uploaded — when skipped, this may
       // be partial / empty; that's fine. The summary tile and the dashboard
       // missing-docs indicator will reflect reality from the application
       // record, not from `docsUploaded` alone.
@@ -1149,7 +1149,7 @@ const ApplicationForm = () => {
       // force it to false so the summary tile always reads as Pending Upload.
       const everythingUploaded = !skipped && allComplete;
       showToast(
-        everythingUploaded ? "Opening payment summary." : "Saved â€” you can upload remaining docs later.",
+        everythingUploaded ? "Opening payment summary." : "Saved — you can upload remaining docs later.",
         "success"
       );
       const applyFlowState = {
@@ -1173,7 +1173,7 @@ const ApplicationForm = () => {
       }
       navigate(`/destination/${country.id}/summary`, {
         state: {
-          // `docsSkipped` is the same flag CountryDetails â†’ "Upload later"
+          // `docsSkipped` is the same flag CountryDetails → "Upload later"
           // sets, so the summary page surfaces the consistent "skipped" banner.
           ...sourceMeta,
           docsSkipped: !everythingUploaded,
@@ -1263,7 +1263,7 @@ const ApplicationForm = () => {
   };
 
   const handleContinue = async () => {
-    // Names are mandatory regardless of skip choice â€” block & toast for them.
+    // Names are mandatory regardless of skip choice — block & toast for them.
     const missingNameIndex = travelers.findIndex((t) => !String(t?.name || "").trim());
     if (missingNameIndex >= 0) {
       showToast(`Please enter Traveler ${missingNameIndex + 1}'s name to continue.`, "error");
@@ -1303,7 +1303,7 @@ const ApplicationForm = () => {
               })),
               showTravelDetails: true,
             });
-            // Replace so history is not [â€¦, destination, apply, destination]; Back on country won't return to apply.
+            // Replace so history is not […, destination, apply, destination]; Back on country won't return to apply.
             navigate(`/destination/${cid}`, { replace: true });
           }}
           aria-label="Back"
@@ -1912,7 +1912,7 @@ const ApplicationForm = () => {
             </p>
             <p className="text-sm text-text-muted leading-relaxed">
               You can still continue to the payment summary now and add the missing documents later from
-              your <span className="text-text-primary font-medium">Dashboard â†’ Application details</span>.
+              your <span className="text-text-primary font-medium">Dashboard → Application details</span>.
             </p>
           </div>
         </div>
