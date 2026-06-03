@@ -133,7 +133,7 @@ const Footer = () => {
           api.get("/pages"),
           api.get("/footer-social-icons"),
           api.get("/config/footer"),
-          api.get("/countries"),
+          api.get("/countries", { params: { active: true } }),
         ]);
 
         if (!active) return;
@@ -165,9 +165,7 @@ const Footer = () => {
         }
 
         if (countriesRes?.data?.success && Array.isArray(countriesRes.data.countries)) {
-          setActiveCountryCount(
-            countriesRes.data.countries.filter((country) => country?.isActive !== false).length
-          );
+          setActiveCountryCount(countriesRes.data.countries.length);
         } else {
           setActiveCountryCount(0);
         }

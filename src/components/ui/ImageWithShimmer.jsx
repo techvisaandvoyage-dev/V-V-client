@@ -126,7 +126,7 @@ const ImageWithShimmer = ({
               setLoaded(true);
             }
           }}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         />
       )}
 

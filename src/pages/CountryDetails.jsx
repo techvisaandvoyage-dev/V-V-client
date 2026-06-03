@@ -2861,7 +2861,7 @@ const CountryDetails = () => {
             <ImageWithShimmer
               src={country.imageUrl}
               alt={country.name}
-              className="w-full h-[450px] sm:h-[520px] md:h-[79vh] object-cover"
+              className="h-[450px] w-full object-cover object-center sm:h-[520px] md:h-[79vh]"
               priority
               width={1280}
               height={900}
@@ -3009,7 +3009,7 @@ const CountryDetails = () => {
                       <ImageWithShimmer
                         src={country.imageUrl}
                         alt={country.name}
-                        className="w-full h-64 sm:h-72 md:h-[79vh] object-cover"
+                        className="h-64 w-full object-cover object-center sm:h-72 md:h-[79vh]"
                         priority
                         width={1600}
                       >

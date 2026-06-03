@@ -436,7 +436,9 @@ export function useCountries() {
 
     const fetchFromDB = async () => {
       try {
-        const { data } = await api.get("/countries");
+        const { data } = await api.get("/countries", {
+          params: { active: true },
+        });
 
         if (!cancelled && data.success && data.countries?.length > 0) {
           const normalised = data.countries.map((c) => normalizeCountryFromApi(c));
@@ -453,7 +455,7 @@ export function useCountries() {
         // If DB returns empty (very first boot before seed finishes) keep static
       } catch {
         if (!cancelled) {
-          setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))));
+          setCountries(COUNTRIES.map((c) => withRegionLabel(prepareCountry(c))).filter((c) => c.isActive !== false));
         }
         // Server unreachable — keep static data as fallback
       } finally {
