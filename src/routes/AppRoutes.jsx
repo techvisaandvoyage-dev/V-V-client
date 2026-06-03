@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { getAdminAppUrl } from "../utils/adminAppUrl";
@@ -15,7 +15,6 @@ const ApplicationDetails  = lazy(() => import("../pages/ApplicationDetails"));
 const ApplicationSummaryPage = lazy(() => import("../pages/ApplicationSummaryPage"));
 const ApplicationForm     = lazy(() => import("../pages/ApplicationForm"));
 const CountryDetails      = lazy(() => import("../pages/CountryDetails"));
-const AllDestinationsPage = lazy(() => import("../pages/AllDestinationsPage"));
 const StaticPage          = lazy(() => import("../pages/StaticPage"));
 const BlogListingPage     = lazy(() => import("../pages/BlogListingPage"));
 const BlogDetailsPage     = lazy(() => import("../pages/BlogDetailsPage"));
@@ -108,7 +107,7 @@ const AppRoutes = () => {
             <Routes location={location}>
         {/* ── Public routes ── */}
         <Route path="/" element={<LandingPage />} />
-      <Route path="/destinations" element={<AllDestinationsPage />} />
+      <Route path="/destinations" element={<Navigate to="/" replace />} />
       <Route path="/destination/:countryId" element={<CountryDetails />} />
       <Route path="/blog" element={<BlogListingPage />} />
       <Route path="/blog/:slug" element={<BlogDetailsPage />} />

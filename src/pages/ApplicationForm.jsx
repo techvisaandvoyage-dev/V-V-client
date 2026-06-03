@@ -1287,7 +1287,7 @@ const ApplicationForm = () => {
           onClick={() => {
             const cid = country?.id || countryId;
             if (!cid) {
-              navigate("/destinations");
+              navigate("/");
               return;
             }
             const flow = location.state || {};

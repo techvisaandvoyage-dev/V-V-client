@@ -1067,7 +1067,7 @@ const BlogDetailsPage = () => {
                 fees to avoidable mistakes.
               </p>
               <Link
-                to="/destinations"
+                to="/"
                 className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold bg-white text-cyan px-4 py-2 rounded-full hover:bg-white/90 transition-colors relative"
               >
                 Explore destinations <ArrowRight size={14} />
