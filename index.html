@@ -1,62 +1,66 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/visa-icon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>visavo.in</title>
-    <meta
-      name="description"
-      content="Visa & Voyage makes visa applications effortless. Apply for tourist, business, and student visas to 150+ countries with a 98% approval rate. Fast, secure, and expert-guided."
-    />
-    <meta name="keywords" content="visa application, tourist visa, travel visa, visa booking, visa services" />
-    <meta name="author" content="Visa & Voyage Technologies" />
-    <meta name="theme-color" content="#0252D5" />
-    <!-- Preload brand logo (LCP element) -->
-    <link rel="preload" as="image" href="/images/visa-voyage-logo.webp" type="image/webp" fetchpriority="high" />
-    <meta property="og:title" content="Visa & Voyage â€” Professional Visa Application Platform" />
-    <meta property="og:description" content="Apply for visas to 150+ countries. 98% approval rate. Fast, secure, expert-guided." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/og-image.jpg" />
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/visa-icon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>visavo.in</title>
+  <meta name="description"
+    content="Visa & Voyage makes visa applications effortless. Apply for tourist, business, and student visas to 7 countries  Fast, secure, and expert-guided." />
+  <meta name="keywords" content="visa application, tourist visa, travel visa, visa booking, visa services" />
+  <meta name="author" content="Visa & Voyage Technologies" />
+  <meta name="theme-color" content="#0252D5" />
+  <!-- Preload brand logo (LCP element) -->
+  <link rel="preload" as="image" href="/images/visa-voyage-logo.webp" type="image/webp" fetchpriority="high" />
+  <meta property="og:title" content="Visa & Voyage â€” Professional Visa Application Platform" />
+  <meta property="og:description"
+    content="Apply for visas to 150+ countries. 98% approval rate. Fast, secure, expert-guided." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/og-image.jpg" />
 
-    <style>
-      body {
-        margin: 0;
-        background-color: #ffffff;
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      margin: 0;
+      background-color: #ffffff;
+    }
+
+    /* :empty pseudo-class ensure karta hai ki jaise hi React load hoga, ye loader hide ho jayega */
+    #root:empty {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(2, 82, 213, 0.15);
+      border-radius: 50%;
+      border-top-color: #0252D5;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
       }
+    }
+  </style>
+</head>
 
-      /* :empty pseudo-class ensure karta hai ki jaise hi React load hoga, ye loader hide ho jayega */
-      #root:empty {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        width: 100vw;
-      }
+<body>
+  <div id="root">
+    <div class="spinner"></div>
+  </div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 
-      .spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid rgba(2, 82, 213, 0.15);
-        border-radius: 50%;
-        border-top-color: #0252D5;
-        animation: spin 1s ease-in-out infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root">
-      <div class="spinner"></div>
-    </div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
 </html>
