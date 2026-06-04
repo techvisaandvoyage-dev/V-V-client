@@ -124,14 +124,52 @@ const Navbar = () => {
                 Blog
               </Link>
               <NotificationBell className="ml-2" />
-              <button
-                id="user-dashboard-btn"
-                onClick={handleProfileIconClick}
-                className="w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow transition-all duration-200"
-                aria-label={isAuthenticated ? "Open dashboard" : "Open login"}
-              >
-                <User size={18} />
-              </button>
+              <div className="group relative">
+                <button
+                  id="user-dashboard-btn"
+                  onClick={handleProfileIconClick}
+                  className="w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow transition-all duration-200"
+                  aria-label={isAuthenticated ? "Open account menu" : "Open login"}
+                  aria-haspopup={isAuthenticated ? "menu" : undefined}
+                >
+                  <User size={18} />
+                </button>
+
+                {isAuthenticated && (
+                  <div
+                    className="invisible absolute right-0 top-full z-50 w-44 translate-y-3 rounded-lg border border-border bg-white py-2 opacity-0 shadow-card transition-all duration-150 group-hover:visible group-hover:translate-y-2 group-hover:opacity-100"
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate("/dashboard/profile", { replace: isTransientPage })}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                      role="menuitem"
+                    >
+                      <User size={15} />
+                      Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDashboardOpen}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                      role="menuitem"
+                    >
+                      <LayoutDashboard size={15} />
+                      Dashboard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                      role="menuitem"
+                    >
+                      <LogOut size={15} />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ── Mobile hamburger ── */}

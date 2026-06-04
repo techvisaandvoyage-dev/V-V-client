@@ -54,8 +54,12 @@ const mapProfileUserToAuthState = (u) => ({
   role: "user",
   id: u._id?.toString?.() ? u._id.toString() : String(u._id || u.id || ""),
   name: u.name,
+  firstName: u.firstName,
+  lastName: u.lastName,
   email: u.email,
   phone: u.phone,
+  authProvider: u.authProvider,
+  profileCompleted: Boolean(u.profileCompleted),
   isVerified: u.isVerified,
   profileImage: u.profileImage,
   age: u.age,
@@ -72,8 +76,12 @@ const mapApiUserToAuthState = (raw) => {
     role: "user",
     id: raw.id?.toString?.() ? raw.id.toString() : String(raw.id || raw._id || ""),
     name: raw.name,
+    firstName: raw.firstName,
+    lastName: raw.lastName,
     email: raw.email,
     phone: raw.phone,
+    authProvider: raw.authProvider,
+    profileCompleted: Boolean(raw.profileCompleted),
     isVerified: raw.isVerified,
     profileImage: raw.profileImage,
     age: raw.age,
@@ -168,6 +176,11 @@ export const useAuthStore = create(
               : {}),
           });
           if (data.success) {
+            if (data.userExists === true) {
+              const message = "Account already exists. Please log in.";
+              set({ error: message, isLoading: false, pendingSignup: null });
+              return { success: false, role: null, userExists: true, message };
+            }
             localStorage.setItem("token", data.token);
             const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
             if (!refreshed) {
@@ -177,7 +190,7 @@ export const useAuthStore = create(
               }
             }
             set({ isLoading: false, pendingSignup: null });
-            return { success: true, role: "user" };
+            return { success: true, role: "user", userExists: data.userExists === true };
           }
           set({ isLoading: false });
           return { success: false };
@@ -386,7 +399,12 @@ export const useAuthStore = create(
       register: async (name, identifier, password) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/auth/send-otp", { identifier, purpose: "auth", channel: "auto" });
+          const { data } = await api.post("/auth/send-otp", {
+            identifier,
+            purpose: "auth",
+            channel: "auto",
+            rejectExisting: true,
+          });
           if (data.success) {
             set({ isLoading: false, pendingSignup: { name, identifier, password } });
             return {
@@ -438,6 +456,24 @@ export const useAuthStore = create(
         }
         set({ isLoading: false });
         return { success: false, message: "Update failed" };
+      },
+
+      completeProfile: async (updates) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.put("/users/profile/complete", updates);
+          if (data.success && data.user) {
+            const mapped = mapProfileUserToAuthState(data.user);
+            set({ user: { ...get().user, ...mapped }, isLoading: false });
+            return { success: true };
+          }
+          set({ isLoading: false });
+          return { success: false, message: data.message || "Could not complete profile" };
+        } catch (error) {
+          const message = error.response?.data?.message || "Could not complete profile";
+          set({ isLoading: false, error: message });
+          return { success: false, message };
+        }
       },
 
       /**

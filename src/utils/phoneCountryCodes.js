@@ -212,6 +212,13 @@ export const parsePhoneWithCountryCode = (value, options = cachedPhoneCountryOpt
     };
   }
 
+  if (digits.length <= 10) {
+    return {
+      countryCode: DEFAULT_PHONE_COUNTRY_CODE,
+      phone: digits.slice(-10),
+    };
+  }
+
   const byLongestCode = [...options]
     .sort((a, b) => b.value.length - a.value.length)
     .find((option) => digits.startsWith(option.value.replace(/\D/g, "")));

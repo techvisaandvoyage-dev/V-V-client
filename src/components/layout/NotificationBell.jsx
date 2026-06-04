@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Bell, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api, useAuthStore } from "../../store/authStore";
@@ -19,9 +20,11 @@ const NotificationBell = ({ className = "" }) => {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
+  const buttonRef = useRef(null);
   const dropdownRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 76, right: 16 });
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const [notificationReadKeys, setNotificationReadKeys] = useState(() => readNotificationKeys());
@@ -30,14 +33,36 @@ const NotificationBell = ({ className = "" }) => {
     if (!isAuthenticated) return undefined;
 
     const handlePointerDown = (event) => {
-      if (!dropdownRef.current?.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
+      if (buttonRef.current?.contains(event.target) || dropdownRef.current?.contains(event.target)) return;
+      setNotificationsOpen(false);
     };
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    const updateDropdownPosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      setDropdownPosition({
+        top: rect.bottom + 12,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    };
+
+    updateDropdownPosition();
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [notificationsOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -147,8 +172,9 @@ const NotificationBell = ({ className = "" }) => {
   };
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <div className={`relative ${className}`}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setNotificationsOpen((prev) => !prev)}
         className="relative flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 border border-cyan/30 text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow transition-all duration-200"
@@ -162,8 +188,12 @@ const NotificationBell = ({ className = "" }) => {
         )}
       </button>
 
-      {notificationsOpen && (
-        <div className="absolute right-0 top-[calc(100%+12px)] z-50 w-[360px] overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur-xl">
+      {notificationsOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[300] w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur-xl"
+          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+        >
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <div>
               <h3 className="text-base font-bold text-slate-900">Notifications</h3>
@@ -237,7 +267,8 @@ const NotificationBell = ({ className = "" }) => {
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

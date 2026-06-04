@@ -11,6 +11,8 @@ import {
   ArrowLeft,
   KeyRound,
   RefreshCw,
+  Smartphone,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../store/authStore";
@@ -24,6 +26,7 @@ import {
   prefetchFirebaseAuth,
 } from "../utils/firebaseAuth";
 import { parseAuthContactInput } from "../utils/authIdentifier";
+import { useAuthControls } from "../hooks/useAuthControls";
 
 // ── Resend timer ──────────────────────────────────────────────
 const useResendTimer = (seconds = 30) => {
@@ -68,6 +71,92 @@ const FacebookMark = () => (
 );
 
 // ─────────────────────────────────────────────────────────────
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
+const splitDisplayName = (value) => {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" "),
+  };
+};
+
+const needsProfileCompletion = (user, provider) => {
+  if (!user) return false;
+  if (user.profileCompleted && user.firstName && user.lastName) return false;
+  if (provider === "google" || provider === "facebook" || provider === "emailOtp" || provider === "phoneOtp") {
+    return true;
+  }
+  if (!user.firstName || !user.lastName) return true;
+  return false;
+};
+
+const ProfileCompletionStep = ({ values, errors, showEmail, onChange, onSubmit, loading }) => (
+  <motion.div key="profile-completion" {...slideIn}>
+    <div className="mb-8 text-center relative">
+      <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface border border-border text-text-primary shadow-sm">
+        <KeyRound size={22} />
+      </div>
+      <h1 className="text-3xl font-semibold tracking-tight text-text-primary sm:text-[32px] mb-2">
+        Complete your profile
+      </h1>
+      <p className="text-[15px] text-text-secondary">
+        Just a few details to personalize your application.
+      </p>
+    </div>
+
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      <Input
+        label=""
+        type="text"
+        placeholder="First Name"
+        value={values.firstName}
+        onChange={(e) => onChange("firstName", e.target.value)}
+        error={errors.firstName}
+        className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+        required
+      />
+      <Input
+        label=""
+        type="text"
+        placeholder="Last Name"
+        value={values.lastName}
+        onChange={(e) => onChange("lastName", e.target.value)}
+        error={errors.lastName}
+        className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+        required
+      />
+      {showEmail && (
+        <Input
+          label=""
+          type="email"
+          autoComplete="email"
+          placeholder="Email"
+          value={values.email}
+          onChange={(e) => onChange("email", e.target.value)}
+          error={errors.email}
+          className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+          required
+        />
+      )}
+      {errors.form && (
+        <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+          {errors.form}
+        </p>
+      )}
+      <Button
+        type="submit"
+        variant="primary"
+        fullWidth
+        loading={loading}
+        className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
+      >
+        Continue
+      </Button>
+    </form>
+  </motion.div>
+);
+
 const RegisterPage = () => {
   const navigate = useNavigate();
   const {
@@ -75,13 +164,15 @@ const RegisterPage = () => {
     verifyOtp,
     loginWithFirebaseGoogle,
     loginWithFirebaseFacebook,
+    completeProfile,
     isLoading,
     error,
     clearError,
   } = useAuthStore();
   const { showToast } = useUIStore();
+  const { authControls, loading: controlsLoading } = useAuthControls();
 
-  const [step, setStep]         = useState(1); // 1: Signup form, 2: OTP
+  const [step, setStep]         = useState(1); // 1: Signup form, 2: OTP, 3: Profile completion
   const [name, setName]         = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -93,6 +184,11 @@ const RegisterPage = () => {
   const [strength, setStrength] = useState(0); // 0–4
   const [signupDevOtp, setSignupDevOtp] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [signupMethod, setSignupMethod] = useState("");
+  const [signupUsesPassword, setSignupUsesPassword] = useState(false);
+  const [completionContext, setCompletionContext] = useState(null);
+  const [completionValues, setCompletionValues] = useState({ firstName: "", lastName: "", email: "" });
+  const [completionErrors, setCompletionErrors] = useState({});
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
 
@@ -119,15 +215,62 @@ const RegisterPage = () => {
   const strengthColor = ["", "bg-red-500", "bg-amber-500", "bg-amber-400", "bg-emerald-500"][strength];
 
   const contactParsedPreview = parseAuthContactInput(identifier);
+  const otpPhonePreview = contactParsedPreview?.type === "phone" ? contactParsedPreview : null;
+  const otpEmailPreview = contactParsedPreview?.type === "email" ? contactParsedPreview : null;
+  const otpPhoneEnabled = authControls.phoneOtpEnabled !== false;
+  const otpEmailEnabled = authControls.emailOtpEnabled !== false;
+  const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
+  const otpSignupLabel =
+    otpPhoneEnabled && otpEmailEnabled
+      ? "Sign up with phone/Email OTP"
+      : otpPhoneEnabled
+        ? "Sign up with phone OTP"
+        : "Sign up with email OTP";
+  const otpInputPlaceholder =
+    otpPhoneEnabled && otpEmailEnabled
+      ? "Email or mobile number"
+      : otpPhoneEnabled
+        ? "Mobile number"
+        : "Email address";
+
+  const openProfileCompletion = ({ provider, user, fallbackName = "", email = "", phone = "" }) => {
+    const fromName = splitDisplayName(user?.name || fallbackName);
+    const firstName = user?.firstName || fromName.firstName;
+    const lastName = user?.lastName || fromName.lastName;
+    const resolvedEmail = user?.email || email || "";
+    setCompletionContext({
+      provider,
+      email: resolvedEmail,
+      phone: user?.phone || phone || "",
+      showEmail: provider === "phoneOtp" || (provider === "facebook" && !resolvedEmail),
+    });
+    setCompletionValues({
+      firstName,
+      lastName,
+      email: resolvedEmail,
+    });
+    setCompletionErrors({});
+    setStep(3);
+  };
+
+  const continueAfterRegisterAuth = ({ provider, user, fallbackName = "", email = "", phone = "" }) => {
+    if (needsProfileCompletion(user, provider)) {
+      openProfileCompletion({ provider, user, fallbackName, email, phone });
+      return;
+    }
+    navigate("/", { replace: true });
+  };
 
   const handleGoogleSignup = async () => {
+    if (!authControls.googleEnabled) return;
     clearError();
     try {
       const idToken = await signInWithGooglePopup();
       const { success } = await loginWithFirebaseGoogle(idToken);
       if (success) {
+        const authedUser = useAuthStore.getState().user;
         showToast("Account ready. Logged in with Google.");
-        navigate("/", { replace: true });
+        continueAfterRegisterAuth({ provider: "google", user: authedUser });
       }
     } catch (err) {
       showToast(err.message || "Google signup failed", "error");
@@ -135,75 +278,111 @@ const RegisterPage = () => {
   };
 
   const handleFacebookSignup = async () => {
+    if (!authControls.facebookEnabled) return;
     clearError();
     try {
       const idToken = await signInWithFacebookPopup();
       const { success } = await loginWithFirebaseFacebook(idToken);
       if (success) {
+        const authedUser = useAuthStore.getState().user;
         showToast("Account ready. Logged in with Facebook.");
-        navigate("/", { replace: true });
+        continueAfterRegisterAuth({ provider: "facebook", user: authedUser });
       }
     } catch (err) {
       showToast(err.message || "Facebook signup failed", "error");
     }
   };
 
-  // ── Signup submit ────────────────────────────────────────
-  const handleSignupSubmit = async (e) => {
-    e.preventDefault();
+  const requestSignupOtp = async ({ withPassword }) => {
     clearError();
     setConfirmPasswordError("");
-    const nameTrim = name.trim();
-    if (!nameTrim) {
+    const nameTrim = withPassword ? name.trim() : "";
+    if (withPassword && !nameTrim) {
       showToast("Please enter your name", "error");
       return;
     }
     const parsed = parseAuthContactInput(identifier);
-    if (!parsed) {
-      showToast("Enter a valid email address or a 10-digit mobile number.", "error");
+    const otpAllowed =
+      parsed &&
+      (withPassword ||
+        (parsed.type === "phone" && otpPhoneEnabled) ||
+        (parsed.type === "email" && otpEmailEnabled));
+    if (!otpAllowed) {
+      showToast(
+        otpPhoneEnabled && otpEmailEnabled
+            ? "Enter a valid email address or 10-digit mobile number."
+            : otpPhoneEnabled
+              ? "Enter a valid 10-digit mobile number."
+              : "Enter a valid email address.",
+        "error"
+      );
       return;
     }
     const contact = parsed.value;
     setIdentifier(contact);
-    if (!SIGNUP_PASSWORD_REGEX.test(password)) {
+    if (withPassword && !SIGNUP_PASSWORD_REGEX.test(password)) {
       showToast(
         "Password needs 8+ characters with uppercase, lowercase, a number, and one of @$!%*?&",
         "error"
       );
       return;
     }
-    if (password !== confirmPassword) {
+    if (withPassword && password !== confirmPassword) {
       setConfirmPasswordError("Passwords do not match.");
       showToast("Passwords do not match.", "error");
       return;
     }
-    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(nameTrim, contact, password);
+    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(
+      nameTrim,
+      contact,
+      withPassword ? password : ""
+    );
     if (success) {
       const nextLength = sentOtpLength === 4 ? 4 : 6;
       setOtpLength(nextLength);
       setOtpChannel(channel || "");
       setOtpDigits(Array.from({ length: nextLength }, () => ""));
       setSignupDevOtp(devOtp && String(devOtp).length >= 4 ? String(devOtp) : "");
+      setSignupUsesPassword(Boolean(withPassword));
       startTimer();
       setStep(2);
       showToast(
         parsed.type === "phone"
-          ? "Account created with your mobile — enter the code we texted you."
-          : "Account created — check your email for the verification code.",
+          ? "Account created with your mobile. Enter the code we texted you."
+          : "Account created. Check your email for the verification code.",
         "success"
       );
     }
   };
 
+  // ── Signup submit ────────────────────────────────────────
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    await requestSignupOtp({ withPassword: authControls.passwordEnabled });
+  };
+
+  const handleOtpSignupSubmit = async (e) => {
+    e.preventDefault();
+    await requestSignupOtp({ withPassword: false });
+  };
+
   // ── Resend OTP (re-register same user — server resends OTP) ─
   const handleResend = async () => {
     clearError();
-    const nameTrim = name.trim();
-    if (!nameTrim || !SIGNUP_PASSWORD_REGEX.test(password)) return;
+    const nameTrim = signupUsesPassword ? name.trim() : "";
+    if (signupUsesPassword && (!nameTrim || !SIGNUP_PASSWORD_REGEX.test(password))) return;
     const parsed = parseAuthContactInput(identifier);
-    if (!parsed) return;
+    if (
+      !parsed ||
+      (!signupUsesPassword &&
+        !((parsed.type === "phone" && otpPhoneEnabled) || (parsed.type === "email" && otpEmailEnabled)))
+    ) return;
     const contact = parsed.value;
-    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(nameTrim, contact, password);
+    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(
+      nameTrim,
+      contact,
+      signupUsesPassword ? password : ""
+    );
     if (success) {
       const nextLength = sentOtpLength === 4 ? 4 : 6;
       setOtpLength(nextLength);
@@ -226,9 +405,60 @@ const RegisterPage = () => {
     const otp = otpDigits.join("");
     const { success } = await verifyOtp(identifier, otp);
     if (success) {
-      showToast("Account created! Welcome 🎉");
+      const authedUser = useAuthStore.getState().user;
+      if (!signupUsesPassword) {
+        const parsed = parseAuthContactInput(identifier);
+        const provider = parsed?.type === "phone" ? "phoneOtp" : "emailOtp";
+        showToast("OTP verified. Complete your profile.");
+        continueAfterRegisterAuth({
+          provider,
+          user: authedUser,
+          email: parsed?.type === "email" ? parsed.value : "",
+          phone: parsed?.type === "phone" ? parsed.value : "",
+        });
+        return;
+      }
+      showToast("Account created! Welcome");
       navigate("/", { replace: true });
     }
+  };
+
+  const handleCompletionChange = (field, value) => {
+    setCompletionValues((current) => ({ ...current, [field]: value }));
+    setCompletionErrors((current) => ({ ...current, [field]: "", form: "" }));
+  };
+
+  const handleProfileCompletionSubmit = async (e) => {
+    e.preventDefault();
+    const nextErrors = {};
+    const firstName = completionValues.firstName.trim();
+    const lastName = completionValues.lastName.trim();
+    const email = completionValues.email.trim().toLowerCase();
+
+    if (!firstName) nextErrors.firstName = "First name is required";
+    if (!lastName) nextErrors.lastName = "Last name is required";
+    if (completionContext?.showEmail && !isValidEmail(email)) {
+      nextErrors.email = "Enter a valid email address";
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setCompletionErrors(nextErrors);
+      return;
+    }
+
+    const payload = {
+      provider: completionContext?.provider,
+      firstName,
+      lastName,
+      ...(completionContext?.showEmail ? { email } : {}),
+    };
+    const result = await completeProfile(payload);
+    if (!result.success) {
+      setCompletionErrors({ form: result.message || "Could not complete profile" });
+      return;
+    }
+    showToast("Profile completed.");
+    navigate("/", { replace: true });
   };
 
   const goBack = () => {
@@ -238,6 +468,14 @@ const RegisterPage = () => {
     setSignupDevOtp("");
     setConfirmPasswordError("");
   };
+
+  if (controlsLoading) {
+    return (
+      <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+        <Loader2 className="animate-spin text-text-muted" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
@@ -268,27 +506,119 @@ const RegisterPage = () => {
               </div>
 
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  disabled={isLoading}
-                  className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
-                >
-                  <GoogleMark />
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFacebookSignup}
-                  disabled={isLoading}
-                  className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
-                >
-                  <FacebookMark />
-                  Continue with Facebook
-                </button>
+                {authControls.googleEnabled && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignup}
+                    disabled={isLoading}
+                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
+                  >
+                    <GoogleMark />
+                    Continue with Google
+                  </button>
+                )}
+                {authControls.facebookEnabled && (
+                  <button
+                    type="button"
+                    onClick={handleFacebookSignup}
+                    disabled={isLoading}
+                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
+                  >
+                    <FacebookMark />
+                    Continue with Facebook
+                  </button>
+                )}
+
+                {otpAuthEnabled && (
+                <div className="rounded-3xl border border-border bg-surface overflow-hidden transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignupMethod(signupMethod === "otp" ? "" : "otp");
+                      clearError();
+                    }}
+                    className="w-full px-4 py-3.5 text-[15px] font-medium text-text-primary hover:bg-surface-2 flex items-center justify-center gap-3"
+                  >
+                    <Smartphone size={18} className="text-text-primary" />
+                    {otpSignupLabel}
+                  </button>
+                  <AnimatePresence>
+                    {signupMethod === "otp" && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-4 pt-1 border-t border-border/30">
+                          <form onSubmit={handleOtpSignupSubmit} className="space-y-3" noValidate>
+                            <AnimatePresence>
+                              {error && (
+                                <motion.div
+                                  key="otp-signup-err"
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: "auto" }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500"
+                                >
+                                  {error}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+
+                            <div className="space-y-1">
+                              <Input
+                                label=""
+                                type="text"
+                                inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
+                                autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
+                                placeholder={otpInputPlaceholder}
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                required
+                              />
+                              {identifier.trim() && (
+                                <p
+                                  className={`px-4 text-[12px] leading-snug ${
+                                    (otpPhonePreview && otpPhoneEnabled) || (otpEmailPreview && otpEmailEnabled)
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-amber-600 dark:text-amber-400"
+                                  }`}
+                                >
+                                  {otpPhonePreview && otpPhoneEnabled
+                                    ? `We'll text a code to ...${otpPhonePreview.value.slice(-4)}`
+                                    : otpEmailPreview && otpEmailEnabled
+                                      ? "We'll email a code to this address"
+                                      : otpPhoneEnabled && otpEmailEnabled
+                                        ? "Enter a valid email or mobile number"
+                                        : otpPhoneEnabled
+                                          ? "Enter a valid mobile number"
+                                          : "Enter a valid email address"}
+                                </p>
+                              )}
+                            </div>
+
+                            <Button
+                              type="submit"
+                              variant="primary"
+                              fullWidth
+                              loading={isLoading}
+                              className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
+                            >
+                              Send OTP
+                            </Button>
+                          </form>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                )}
               </div>
 
 
+              {authControls.passwordEnabled && (
               <form onSubmit={handleSignupSubmit} className="space-y-4 mt-6" noValidate>
                 <AnimatePresence>
                   {error && (
@@ -344,71 +674,75 @@ const RegisterPage = () => {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Input
-                    label=""
-                    type={showPass ? "text" : "password"}
-                    placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                    rightIcon={
-                      <button
-                        type="button"
-                        onClick={() => setShowPass((v) => !v)}
-                        className="hover:text-text-primary text-text-muted transition-colors mr-2 mt-0.5"
-                      >
-                        {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    }
-                    required
-                  />
+                {authControls.passwordEnabled && (
+                  <>
+                    <div className="space-y-2">
+                      <Input
+                        label=""
+                        type={showPass ? "text" : "password"}
+                        placeholder="Create a password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                        className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                        rightIcon={
+                          <button
+                            type="button"
+                            onClick={() => setShowPass((v) => !v)}
+                            className="hover:text-text-primary text-text-muted transition-colors mr-2 mt-0.5"
+                          >
+                            {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        }
+                        required
+                      />
 
-                  {password && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-1.5 px-3 pt-1"
-                    >
-                      <div className="flex gap-1">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`h-[3px] flex-1 rounded-full transition-all duration-300 ${
-                              i < strength ? strengthColor : "bg-border"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex justify-between items-center mt-1 text-[12px]">
-                        <span className={`font-medium ${
-                          strength <= 1 ? "text-red-500" :
-                          strength === 2 ? "text-amber-500" :
-                          strength === 3 ? "text-amber-400" : "text-emerald-500"
-                        }`}>
-                          {strengthLabel || "Weak"}
-                        </span>
-                        <span className="text-text-muted text-[11px]">8+ chars, 1 uppercase, 1 number, 1 symbol</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
+                      {password && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-1.5 px-3 pt-1"
+                        >
+                          <div className="flex gap-1">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`h-[3px] flex-1 rounded-full transition-all duration-300 ${
+                                  i < strength ? strengthColor : "bg-border"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center mt-1 text-[12px]">
+                            <span className={`font-medium ${
+                              strength <= 1 ? "text-red-500" :
+                              strength === 2 ? "text-amber-500" :
+                              strength === 3 ? "text-amber-400" : "text-emerald-500"
+                            }`}>
+                              {strengthLabel || "Weak"}
+                            </span>
+                            <span className="text-text-muted text-[11px]">8+ chars, 1 uppercase, 1 number, 1 symbol</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
 
-                <Input
-                  label=""
-                  type={showPass ? "text" : "password"}
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (confirmPasswordError) setConfirmPasswordError("");
-                  }}
-                  autoComplete="new-password"
-                  className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
-                  error={confirmPasswordError}
-                  required
-                />
+                    <Input
+                      label=""
+                      type={showPass ? "text" : "password"}
+                      placeholder="Confirm password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (confirmPasswordError) setConfirmPasswordError("");
+                      }}
+                      autoComplete="new-password"
+                      className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                      error={confirmPasswordError}
+                      required
+                    />
+                  </>
+                )}
 
                 <Button
                   type="submit"
@@ -420,6 +754,7 @@ const RegisterPage = () => {
                   Continue
                 </Button>
               </form>
+              )}
 
               <div className="mt-8 text-center text-[14px]">
                 <p className="text-text-primary font-medium">
@@ -536,6 +871,17 @@ const RegisterPage = () => {
                 )}
               </div>
             </motion.div>
+          )}
+
+          {step === 3 && (
+            <ProfileCompletionStep
+              values={completionValues}
+              errors={completionErrors}
+              showEmail={Boolean(completionContext?.showEmail)}
+              onChange={handleCompletionChange}
+              onSubmit={handleProfileCompletionSubmit}
+              loading={isLoading}
+            />
           )}
 
         </AnimatePresence>

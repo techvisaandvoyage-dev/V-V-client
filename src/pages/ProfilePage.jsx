@@ -28,6 +28,7 @@ import Input, { Select } from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
 import { useNavigate } from "react-router-dom";
 import { formatOrdinalDate } from "../utils/dateUtils";
+import { useAuthControls } from "../hooks/useAuthControls";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   filterPhoneCountryOptions,
@@ -101,9 +102,9 @@ const ProfilePage = () => {
     uploadProfileImage,
     changeUserPassword,
     isLoading,
-    sessionAuthMethod,
   } = useAuthStore();
   const { showToast } = useUIStore();
+  const { authControls } = useAuthControls();
 
   const fileInputRef = useRef(null);
   const countryCodeDropdownRef = useRef(null);
@@ -141,7 +142,7 @@ const ProfilePage = () => {
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  const isGooglePasswordSetup = sessionAuthMethod === "google" && !user?.hasPassword;
+  const isCreatingPassword = !user?.hasPassword;
 
   const validatePasswordChange = ({ currentPassword, newPassword, confirmPassword }) => {
     const errors = {
@@ -150,7 +151,7 @@ const ProfilePage = () => {
       confirmPassword: "",
     };
 
-    if (!isGooglePasswordSetup && !currentPassword.trim()) {
+    if (!isCreatingPassword && !currentPassword.trim()) {
       errors.currentPassword = "Current password is required.";
     }
 
@@ -402,12 +403,12 @@ const ProfilePage = () => {
 
     setPasswordErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
     setIsChangingPassword(true);
-    const currentPasswordValue = isGooglePasswordSetup ? "" : passwordForm.currentPassword;
+    const currentPasswordValue = isCreatingPassword ? "" : passwordForm.currentPassword;
     const { success, message } = await changeUserPassword(currentPasswordValue, passwordForm.newPassword);
     setIsChangingPassword(false);
 
     if (success) {
-      showToast(isGooglePasswordSetup ? "Password created successfully!" : "Password updated successfully!", "success");
+      showToast(isCreatingPassword ? "Password created successfully!" : "Password updated successfully!", "success");
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setShowSecurityForm(false);
     } else {
@@ -495,7 +496,7 @@ const ProfilePage = () => {
                   </span>
                 </div>
 
-                <StatusPill tone="green">{user.isVerified ? "Verified Account" : "Profile Active"}</StatusPill>
+                <StatusPill tone="green">Profile Active</StatusPill>
 
                 <div className="space-y-3 text-[1.02rem] text-slate-600">
                   <div className="flex items-center gap-3">
@@ -793,18 +794,19 @@ const ProfilePage = () => {
             <SectionShell icon={BadgeCheck} title="Account Overview" className="px-0 py-0">
               <div className="divide-y divide-slate-100">
                 <OverviewRow icon={CalendarDays} label="Member Since" value={memberSince} valueTone="zinc" />
-                <OverviewRow icon={Mail} label="Verified Email" value={user.isVerified ? "Verified" : "Pending"} valueTone={user.isVerified ? "green" : "amber"} />
-                <OverviewRow icon={Phone} label="Phone Number" value={displayPhoneDigits ? "Verified" : "Add phone"} valueTone={displayPhoneDigits ? "green" : "amber"} />
+                <OverviewRow icon={Mail} label="Email Address" value={user.email ? "Added" : "Add email"} valueTone={user.email ? "green" : "amber"} />
+                <OverviewRow icon={Phone} label="Phone Number" value={displayPhoneDigits ? "Added" : "Add phone"} valueTone={displayPhoneDigits ? "green" : "amber"} />
                 <OverviewRow icon={Shield} label="Account Status" value="Active" valueTone="green" />
               </div>
             </SectionShell>
 
+            {authControls.passwordEnabled && (
             <SectionShell icon={Shield} title="Security" className="px-0 py-0">
               <div className="space-y-5">
                 <div className="space-y-2">
                   <p className="text-sm text-slate-600">
-                    {isGooglePasswordSetup
-                      ? "Create a password so this Google account can also sign in with email and password."
+                    {isCreatingPassword
+                      ? "Create a password so this account can also sign in with email and password."
                       : "Keep your account secure with a strong password."}
                   </p>
                 </div>
@@ -816,7 +818,7 @@ const ProfilePage = () => {
                     className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#235BFF]/20 bg-[#235BFF]/5 px-5 py-4 text-sm font-semibold text-[#235BFF] transition-colors hover:bg-[#235BFF]/10"
                   >
                     <KeyRound size={16} />
-                    {isGooglePasswordSetup ? "Create Password" : "Change Password"}
+                    {isCreatingPassword ? "Create Password" : "Change Password"}
                   </button>
                 ) : (
                   <motion.div
@@ -824,7 +826,7 @@ const ProfilePage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-4"
                   >
-                    {!isGooglePasswordSetup && (
+                    {!isCreatingPassword && (
                       <Input
                         label="Current Password"
                         type="password"
@@ -838,7 +840,7 @@ const ProfilePage = () => {
                     )}
 
                     <Input
-                      label={isGooglePasswordSetup ? "Create Password" : "New Password"}
+                      label={isCreatingPassword ? "Create Password" : "New Password"}
                       type="password"
                       name="newPassword"
                       value={passwordForm.newPassword}
@@ -850,7 +852,7 @@ const ProfilePage = () => {
                     />
 
                     <Input
-                      label={isGooglePasswordSetup ? "Re-enter Password" : "Confirm New Password"}
+                      label={isCreatingPassword ? "Re-enter Password" : "Confirm New Password"}
                       type="password"
                       name="confirmPassword"
                       value={passwordForm.confirmPassword}
@@ -881,13 +883,14 @@ const ProfilePage = () => {
                         loading={isChangingPassword}
                         className="rounded-2xl bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)] text-white hover:bg-[linear-gradient(135deg,#235BFF_0%,#2F6BFF_100%)]"
                       >
-                        {isGooglePasswordSetup ? "Create Password" : "Update Password"}
+                        {isCreatingPassword ? "Create Password" : "Update Password"}
                       </Button>
                     </div>
                   </motion.div>
                 )}
               </div>
             </SectionShell>
+            )}
 
 
           </div>

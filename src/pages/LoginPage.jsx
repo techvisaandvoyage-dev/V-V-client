@@ -7,6 +7,7 @@ import {
   KeyRound,
   RefreshCw,
   Smartphone,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../store/authStore";
@@ -20,6 +21,7 @@ import {
   prefetchFirebaseAuth,
 } from "../utils/firebaseAuth";
 import { isValidEmail, parseAuthContactInput } from "../utils/authIdentifier";
+import { useAuthControls } from "../hooks/useAuthControls";
 
 const useResendTimer = (seconds = 30) => {
   const [timeLeft, setTimeLeft] = useState(0);
@@ -85,6 +87,7 @@ const LoginPage = () => {
     clearError,
   } = useAuthStore();
   const { showToast } = useUIStore();
+  const { authControls, loading: controlsLoading } = useAuthControls();
 
   const [loginMethod, setLoginMethod] = useState("");
   const [otpStep, setOtpStep] = useState(1);
@@ -121,14 +124,42 @@ const LoginPage = () => {
     prefetchFirebaseAuth();
   }, []);
 
+  useEffect(() => {
+    if (authControls.passwordEnabled) return;
+    if (loginMethod === "password" || loginMethod === "firebase_email") setLoginMethod("");
+    if (forgotMode) resetForgotFlow();
+  }, [authControls.passwordEnabled, loginMethod, forgotMode]);
+
   const otpLoginIsEmail = otpSentKind === "email";
+  const otpPhoneEnabled = authControls.phoneOtpEnabled !== false;
+  const otpEmailEnabled = authControls.emailOtpEnabled !== false;
+  const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
+  const otpMethodLabel =
+    otpPhoneEnabled && otpEmailEnabled
+      ? "Log in with phone/Email OTP"
+      : otpPhoneEnabled
+        ? "Log in with phone OTP"
+        : "Log in with email OTP";
+  const otpInputPlaceholder =
+    otpPhoneEnabled && otpEmailEnabled
+      ? "Email or mobile number"
+      : otpPhoneEnabled
+        ? "Mobile number"
+        : "Email address";
   const otpStep2Display =
     otpSentKind === "phone" && otpSentValue
       ? `******${otpSentValue.slice(-4)}`
       : otpSentValue || "";
 
   const otpContactPreview = parseAuthContactInput(otpIdentifier);
+  const otpPhonePreview = otpContactPreview?.type === "phone" ? otpContactPreview : null;
+  const otpEmailPreview = otpContactPreview?.type === "email" ? otpContactPreview : null;
   const forgotContactPreview = parseAuthContactInput(forgotEmail);
+
+  useEffect(() => {
+    if (otpAuthEnabled) return;
+    if (loginMethod === "otp") setLoginMethod("");
+  }, [otpAuthEnabled, loginMethod]);
 
   const resetForgotFlow = () => {
     setForgotMode(false);
@@ -154,6 +185,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (!authControls.googleEnabled) return;
     clearError();
     try {
       const idToken = await signInWithGooglePopup();
@@ -168,6 +200,7 @@ const LoginPage = () => {
   };
 
   const handleFacebookLogin = async () => {
+    if (!authControls.facebookEnabled) return;
     clearError();
     try {
       const idToken = await signInWithFacebookPopup();
@@ -183,6 +216,7 @@ const LoginPage = () => {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
+    if (!authControls.passwordEnabled) return;
     clearError();
     const { success } = await login(identifier, password);
     if (success) {
@@ -193,6 +227,7 @@ const LoginPage = () => {
 
   const handleFirebaseEmailSubmit = async (e) => {
     e.preventDefault();
+    if (!authControls.passwordEnabled) return;
     clearError();
     if (!isValidEmail(firebaseEmail)) {
       showToast("Enter a valid email address.", "error");
@@ -227,8 +262,19 @@ const LoginPage = () => {
       if (!contact || !kind) return;
     } else {
       const parsed = parseAuthContactInput(otpIdentifier);
-      if (!parsed) {
-        showToast("Enter a valid email address or a 10-digit mobile number.", "error");
+      const allowed =
+        parsed &&
+        ((parsed.type === "phone" && otpPhoneEnabled) ||
+          (parsed.type === "email" && otpEmailEnabled));
+      if (!allowed) {
+        showToast(
+          otpPhoneEnabled && otpEmailEnabled
+            ? "Enter a valid email address or 10-digit mobile number."
+            : otpPhoneEnabled
+              ? "Enter a valid 10-digit mobile number."
+              : "Enter a valid email address.",
+          "error"
+        );
         return;
       }
       contact = parsed.value;
@@ -271,6 +317,7 @@ const LoginPage = () => {
 
   const handleForgotRequestOtp = async (e) => {
     e?.preventDefault();
+    if (!authControls.passwordEnabled) return;
     clearError();
     const parsed = parseAuthContactInput(String(forgotEmail || "").trim());
     if (!parsed) {
@@ -309,6 +356,7 @@ const LoginPage = () => {
 
   const handleForgotReset = async (e) => {
     e?.preventDefault();
+    if (!authControls.passwordEnabled) return;
     clearError();
     const otp = forgotOtpDigits.join("");
     if (otp.length !== 6) {
@@ -334,6 +382,14 @@ const LoginPage = () => {
       showToast(message, "error");
     }
   };
+
+  if (controlsLoading) {
+    return (
+      <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+        <Loader2 className="animate-spin text-text-muted" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
@@ -376,27 +432,32 @@ const LoginPage = () => {
 
               {!forgotMode ? (
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
-                  >
-                    <GoogleMark />
-                    Continue with Google
-                  </button>
+                  {authControls.googleEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
+                      className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
+                    >
+                      <GoogleMark />
+                      Continue with Google
+                    </button>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={handleFacebookLogin}
-                    disabled={isLoading}
-                    className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
-                  >
-                    <FacebookMark />
-                    Continue with Facebook
-                  </button>
+                  {authControls.facebookEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleFacebookLogin}
+                      disabled={isLoading}
+                      className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
+                    >
+                      <FacebookMark />
+                      Continue with Facebook
+                    </button>
+                  )}
 
                   {/* OTP Login Accordion */}
+                  {otpAuthEnabled && (
                   <div className="rounded-3xl border border-border bg-surface overflow-hidden transition-colors">
                     <button
                       type="button"
@@ -407,7 +468,7 @@ const LoginPage = () => {
                       className="w-full px-4 py-3.5 text-[15px] font-medium text-text-primary hover:bg-surface-2 flex items-center justify-center gap-3"
                     >
                       <Smartphone size={18} className="text-text-primary" />
-                      Log in with phone/Email OTP
+                      {otpMethodLabel}
                     </button>
                     <AnimatePresence>
                       {loginMethod === "otp" && (
@@ -422,23 +483,25 @@ const LoginPage = () => {
                               <Input
                                 label=""
                                 type="text"
-                                inputMode="text"
-                                autoComplete="username"
-                                placeholder="Email or mobile number"
+                                inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
+                                autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
+                                placeholder={otpInputPlaceholder}
                                 value={otpIdentifier}
                                 onChange={(e) => setOtpIdentifier(e.target.value)}
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                                 required
                               />
                               {otpIdentifier.trim() && (
-                                <p className={`px-4 text-[12px] leading-snug ${otpContactPreview ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                                  {otpContactPreview
-                                    ? otpContactPreview.type === "phone"
-                                      ? `We'll text a code — mobile …${otpContactPreview.value.slice(-4)}`
-                                      : "We'll email a code to this address"
-                                    : otpIdentifier.includes("@")
-                                      ? "Enter a valid email address"
-                                      : "Enter a valid mobile (10 digits, country code optional)"}
+                                <p className={`px-4 text-[12px] leading-snug ${(otpPhonePreview && otpPhoneEnabled) || (otpEmailPreview && otpEmailEnabled) ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                                  {otpPhonePreview && otpPhoneEnabled
+                                    ? `We'll text a code to mobile ...${otpPhonePreview.value.slice(-4)}`
+                                    : otpEmailPreview && otpEmailEnabled
+                                      ? "We'll email a code to this address"
+                                      : otpPhoneEnabled && otpEmailEnabled
+                                        ? "Enter a valid email or mobile number"
+                                        : otpPhoneEnabled
+                                          ? "Enter a valid mobile number"
+                                          : "Enter a valid email address"}
                                 </p>
                               )}
                               <Button
@@ -456,8 +519,10 @@ const LoginPage = () => {
                       )}
                     </AnimatePresence>
                   </div>
+                  )}
 
                   {/* Email Login Accordion */}
+                  {authControls.passwordEnabled && (
                   <div className="rounded-3xl border border-border bg-surface overflow-hidden transition-colors">
                     <button
                       type="button"
@@ -538,6 +603,7 @@ const LoginPage = () => {
                       )}
                     </AnimatePresence>
                   </div>
+                  )}
                 </div>
               ) : (
                 <form
