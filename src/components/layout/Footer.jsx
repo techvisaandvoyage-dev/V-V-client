@@ -15,6 +15,7 @@ const FOOTER_SECTIONS = [
 ];
 
 const FOOTER_CONTENT_FALLBACK = {
+  logo: "",
   brandPrimaryText: "Visa &",
   brandAccentText: "Voyage",
   description:
@@ -153,6 +154,7 @@ const Footer = () => {
         if (footerConfigRes?.data?.success && footerConfigRes?.data?.config) {
           const config = footerConfigRes.data.config;
           setFooterContent({
+            logo: config.logo || "",
             brandPrimaryText:
               String(config.brandPrimaryText || "").trim() || FOOTER_CONTENT_FALLBACK.brandPrimaryText,
             brandAccentText:
@@ -256,7 +258,7 @@ const Footer = () => {
             <div className="-mt-2 flex max-w-sm flex-col items-start sm:-mt-1 lg:-mt-2">
             <Link to="/" replace className="-mb-3 flex items-center leading-none sm:-mb-4">
               <img
-                src="/images/visa-voyage-logo.webp"
+                src={footerContent.logo || "/images/visa-voyage-logo.webp"}
                 alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
                 width="240"
                 height="80"
@@ -272,13 +274,33 @@ const Footer = () => {
             <div className="flex flex-wrap items-center gap-3">
               {socialIcons.map(({ _id, label, type, url }) => {
                 const Icon = FOOTER_SOCIAL_ICON_COMPONENTS[type] || LinkIcon;
+
+                let finalUrl = url || "";
+                  let target = "_blank";
+                  if (type === "email") {
+                    if (finalUrl.toLowerCase().startsWith("mailto:https://")) {
+                      finalUrl = finalUrl.substring(7);
+                    } else if (finalUrl.toLowerCase().startsWith("mailto:")) {
+                      const emailAddr = finalUrl.substring(7);
+                      finalUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emailAddr}`;
+                    } else if (finalUrl.includes("@") && !finalUrl.toLowerCase().startsWith("http")) {
+                      finalUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${finalUrl}`;
+                    }
+                    
+                    if (finalUrl.toLowerCase().startsWith("mailto:")) {
+                      target = "_self";
+                    } else {
+                      target = "_blank";
+                    }
+                  }
+
                 return (
                 <a
                   key={_id || `${type}-${label}`}
-                  href={url}
+                  href={finalUrl}
                   aria-label={label}
                   title={label}
-                  target="_blank"
+                  target={target}
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-text-muted hover:text-cyan transition-all duration-200"
                 >
