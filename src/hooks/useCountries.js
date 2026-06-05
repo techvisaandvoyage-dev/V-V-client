@@ -238,6 +238,17 @@ const resolveImageUrl = (url) => {
   return `${base.replace(/\/*$/, '')}/${url}`;
 };
 
+const resolveCountryImageUrl = (country = {}) =>
+  resolveImageUrl(
+    country.imageUrl ||
+      country.cardImageUrl ||
+      country.thumbnail ||
+      country.heroImage ||
+      country.bannerImage ||
+      country.image ||
+      ""
+  );
+
 export const isCountryActive = (country) => country?.isActive !== false;
 
 /** Normalise one country document from GET `/countries` or GET `/countries/:slug`. */
@@ -287,7 +298,7 @@ export function normalizeCountryFromApi(c) {
     continent,
     locatedIn,
     regionLabel: locatedIn,
-    imageUrl: resolveImageUrl(c.imageUrl),
+    imageUrl: resolveCountryImageUrl(c),
     description: c.description || "",
     requirements: Array.isArray(c.requirements) ? c.requirements : [],
     requiredDocuments: Array.isArray(c.requiredDocuments) ? c.requiredDocuments : ["passport"],

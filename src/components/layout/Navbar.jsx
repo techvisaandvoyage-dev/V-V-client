@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
 import NotificationBell from "./NotificationBell";
+
+const AuthPageModal = lazy(() => import("../auth/AuthPageModal"));
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ const Navbar = () => {
   const closeMobileMenu = useUIStore((state) => state.closeMobileMenu);
 
   const [scrolled, setScrolled] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // ── Detect scroll to toggle navbar style ─────────────────
   useEffect(() => {
@@ -31,6 +34,10 @@ const Navbar = () => {
   useEffect(() => {
     closeMobileMenu();
   }, [location.pathname, closeMobileMenu]);
+
+  useEffect(() => {
+    if (isAuthenticated && authModalOpen) setAuthModalOpen(false);
+  }, [authModalOpen, isAuthenticated]);
 
   const handleLogout = () => {
     logout();
@@ -56,7 +63,8 @@ const Navbar = () => {
     if (isAuthenticated) {
       handleDashboardOpen();
     } else {
-      navigate("/login", { replace: isTransientPage });
+      closeMobileMenu();
+      setAuthModalOpen(true);
     }
   };
 
@@ -223,7 +231,10 @@ const Navbar = () => {
                     </>
                   ) : (
                     <button
-                      onClick={() => navigate("/login", { replace: isTransientPage })}
+                      onClick={() => {
+                        closeMobileMenu();
+                        setAuthModalOpen(true);
+                      }}
                       className="mx-4 my-2 px-4 py-2.5 bg-cyan text-background text-sm font-bold rounded-xl hover:bg-cyan/90 transition-all text-center shadow-lg shadow-cyan/20"
                     >
                       Sign In
@@ -237,6 +248,9 @@ const Navbar = () => {
 
       {/* Spacer so content doesn't hide behind fixed navbar */}
       <div className="h-16" aria-hidden="true" />
+      <Suspense fallback={null}>
+        <AuthPageModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      </Suspense>
     </>
   );
 };

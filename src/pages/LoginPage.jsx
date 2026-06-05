@@ -68,7 +68,7 @@ const FacebookMark = () => (
   </svg>
 );
 
-const LoginPage = () => {
+const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthenticated }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const postLoginPath = safeRedirectPath(searchParams.get("redirect"));
@@ -123,6 +123,15 @@ const LoginPage = () => {
   useEffect(() => {
     prefetchFirebaseAuth();
   }, []);
+
+  const finishLogin = () => {
+    if (embedded) {
+      onAuthenticated?.();
+      onClose?.();
+      return;
+    }
+    navigate(postLoginPath, { replace: true });
+  };
 
   useEffect(() => {
     if (authControls.passwordEnabled) return;
@@ -192,7 +201,7 @@ const LoginPage = () => {
       const { success } = await loginWithFirebaseGoogle(idToken);
       if (success) {
         showToast("Logged in with Google.");
-        navigate(postLoginPath, { replace: true });
+        finishLogin();
       }
     } catch (err) {
       showToast(err.message || "Google login failed", "error");
@@ -207,7 +216,7 @@ const LoginPage = () => {
       const { success } = await loginWithFirebaseFacebook(idToken);
       if (success) {
         showToast("Logged in with Facebook.");
-        navigate(postLoginPath, { replace: true });
+        finishLogin();
       }
     } catch (err) {
       showToast(err.message || "Facebook login failed", "error");
@@ -221,7 +230,7 @@ const LoginPage = () => {
     const { success } = await login(identifier, password);
     if (success) {
       showToast("Welcome back! You're now logged in.");
-      navigate(postLoginPath, { replace: true });
+      finishLogin();
     }
   };
 
@@ -243,7 +252,7 @@ const LoginPage = () => {
     );
     if (success) {
       showToast("Logged in.");
-      navigate(postLoginPath, { replace: true });
+      finishLogin();
     } else if (message) {
       showToast(message, "error");
     }
@@ -311,7 +320,7 @@ const LoginPage = () => {
     const { success } = await verifyLoginOtp(otpSentValue, otp);
     if (success) {
       showToast("Logged in via OTP! Welcome back.");
-      navigate(postLoginPath, { replace: true });
+      finishLogin();
     }
   };
 
@@ -385,14 +394,14 @@ const LoginPage = () => {
 
   if (controlsLoading) {
     return (
-      <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+      <div className={`${embedded ? "min-h-[260px]" : "min-h-screen"} bg-background hero-gradient flex flex-col items-center justify-center px-4 py-8 font-sans relative overflow-hidden`}>
         <Loader2 className="animate-spin text-text-muted" size={32} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+    <div className={`${embedded ? "min-h-0" : "min-h-screen"} bg-background hero-gradient flex flex-col items-center justify-center px-4 ${embedded ? "py-8" : "py-10"} font-sans relative overflow-hidden`}>
       <div className="absolute inset-0 dot-pattern opacity-40 pointer-events-none" aria-hidden="true" />
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full opacity-20 blur-[120px] pointer-events-none"
@@ -404,12 +413,23 @@ const LoginPage = () => {
           {otpStep === 1 && (
             <motion.div key="login-step-1" {...slideIn}>
               <div className="mb-8 text-center relative">
-                <Link
-                  to="/"
-                  className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
-                >
-                  <ArrowLeft size={20} />
-                </Link>
+                {embedded ? (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
+                    aria-label="Close login"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                ) : (
+                  <Link
+                    to="/"
+                    className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    <ArrowLeft size={20} />
+                  </Link>
+                )}
 
                 <h1 className="text-3xl font-semibold tracking-tight text-text-primary sm:text-[32px] mt-2 mb-2">
                   Welcome back
@@ -752,9 +772,19 @@ const LoginPage = () => {
               <div className="mt-8 text-center text-[14px]">
                 <p className="text-text-primary font-medium">
                   Don't have an account?{" "}
-                  <Link to="/register" replace className="text-[#3b82f6] hover:text-[#2563eb] transition-colors">
-                    Sign up
-                  </Link>
+                  {embedded ? (
+                    <button
+                      type="button"
+                      onClick={onSwitchToRegister}
+                      className="text-[#3b82f6] hover:text-[#2563eb] transition-colors"
+                    >
+                      Sign up
+                    </button>
+                  ) : (
+                    <Link to="/register" replace className="text-[#3b82f6] hover:text-[#2563eb] transition-colors">
+                      Sign up
+                    </Link>
+                  )}
                 </p>
               </div>
             </motion.div>
@@ -858,7 +888,7 @@ const LoginPage = () => {
         </AnimatePresence>
       </div>
 
-      <div className="absolute z-10 bottom-6 w-full text-center text-[12px] text-text-muted flex justify-center gap-3">
+      {!embedded && <div className="absolute z-10 bottom-6 w-full text-center text-[12px] text-text-muted flex justify-center gap-3">
         <a href="#" className="hover:text-text-primary transition-colors">
           Terms of Use
         </a>
@@ -866,7 +896,7 @@ const LoginPage = () => {
         <a href="#" className="hover:text-text-primary transition-colors">
           Privacy Policy
         </a>
-      </div>
+      </div>}
     </div>
   );
 };

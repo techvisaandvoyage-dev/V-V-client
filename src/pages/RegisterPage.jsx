@@ -157,7 +157,7 @@ const ProfileCompletionStep = ({ values, errors, showEmail, onChange, onSubmit, 
   </motion.div>
 );
 
-const RegisterPage = () => {
+const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthenticated }) => {
   const navigate = useNavigate();
   const {
     register,
@@ -200,6 +200,15 @@ const RegisterPage = () => {
   useEffect(() => {
     prefetchFirebaseAuth();
   }, []);
+
+  const finishRegisterAuth = () => {
+    if (embedded) {
+      onAuthenticated?.();
+      onClose?.();
+      return;
+    }
+    navigate("/", { replace: true });
+  };
 
   // ── Password strength checker ─────────────────────────────
   useEffect(() => {
@@ -258,7 +267,7 @@ const RegisterPage = () => {
       openProfileCompletion({ provider, user, fallbackName, email, phone });
       return;
     }
-    navigate("/", { replace: true });
+    finishRegisterAuth();
   };
 
   const handleGoogleSignup = async () => {
@@ -419,7 +428,7 @@ const RegisterPage = () => {
         return;
       }
       showToast("Account created! Welcome");
-      navigate("/", { replace: true });
+      finishRegisterAuth();
     }
   };
 
@@ -458,7 +467,7 @@ const RegisterPage = () => {
       return;
     }
     showToast("Profile completed.");
-    navigate("/", { replace: true });
+    finishRegisterAuth();
   };
 
   const goBack = () => {
@@ -471,14 +480,14 @@ const RegisterPage = () => {
 
   if (controlsLoading) {
     return (
-      <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+      <div className={`${embedded ? "min-h-[260px]" : "min-h-screen"} bg-background hero-gradient flex flex-col items-center justify-center px-4 py-8 font-sans relative overflow-hidden`}>
         <Loader2 className="animate-spin text-text-muted" size={32} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background hero-gradient flex flex-col items-center justify-center px-4 py-10 font-sans relative overflow-hidden">
+    <div className={`${embedded ? "min-h-0" : "min-h-screen"} bg-background hero-gradient flex flex-col items-center justify-center px-4 ${embedded ? "py-8" : "py-10"} font-sans relative overflow-hidden`}>
       <div className="absolute inset-0 dot-pattern opacity-40 pointer-events-none" aria-hidden="true" />
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full opacity-20 blur-[120px] pointer-events-none"
@@ -492,13 +501,24 @@ const RegisterPage = () => {
           {step === 1 && (
             <motion.div key="reg-step1" {...slideIn}>
               <div className="mb-8 text-center relative">
-                <Link
-                  to="/login"
-                  replace
-                  className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
-                >
-                  <ArrowLeft size={20} />
-                </Link>
+                {embedded ? (
+                  <button
+                    type="button"
+                    onClick={onSwitchToLogin || onClose}
+                    className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
+                    aria-label="Back to login"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    replace
+                    className="absolute -left-2 top-0 p-2 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    <ArrowLeft size={20} />
+                  </Link>
+                )}
 
                 <h1 className="text-3xl font-semibold tracking-tight text-text-primary sm:text-[32px] mt-2 mb-2">
                   Create account
@@ -759,9 +779,19 @@ const RegisterPage = () => {
               <div className="mt-8 text-center text-[14px]">
                 <p className="text-text-primary font-medium">
                   Already have an account?{" "}
-                  <Link to="/login" replace className="text-[#3b82f6] hover:text-[#2563eb] transition-colors">
-                    Log in
-                  </Link>
+                  {embedded ? (
+                    <button
+                      type="button"
+                      onClick={onSwitchToLogin}
+                      className="text-[#3b82f6] hover:text-[#2563eb] transition-colors"
+                    >
+                      Log in
+                    </button>
+                  ) : (
+                    <Link to="/login" replace className="text-[#3b82f6] hover:text-[#2563eb] transition-colors">
+                      Log in
+                    </Link>
+                  )}
                 </p>
               </div>
             </motion.div>
@@ -887,7 +917,7 @@ const RegisterPage = () => {
         </AnimatePresence>
       </div>
 
-      <div className="absolute z-10 bottom-6 w-full text-center text-[12px] text-text-muted flex justify-center gap-3">
+      {!embedded && <div className="absolute z-10 bottom-6 w-full text-center text-[12px] text-text-muted flex justify-center gap-3">
         <a href="#" className="hover:text-text-primary transition-colors">
           Terms of Use
         </a>
@@ -895,7 +925,7 @@ const RegisterPage = () => {
         <a href="#" className="hover:text-text-primary transition-colors">
           Privacy Policy
         </a>
-      </div>
+      </div>}
     </div>
   );
 };

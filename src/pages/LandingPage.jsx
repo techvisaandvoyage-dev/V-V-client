@@ -74,7 +74,7 @@ const DEFAULT_HERO_HIGHLIGHTS = [
 ];
 
 // ── Animation variants ─────────────────────────────────────
-const POPULAR_COUNTRIES_CACHE_KEY = "vb_popular_countries_home_v1";
+const POPULAR_COUNTRIES_CACHE_KEY = "vb_popular_countries_home_v2";
 const POPULAR_COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const loadPopularCountriesCache = () => {
@@ -363,7 +363,20 @@ const LandingPage = () => {
   const filteredCountries = useMemo(() => {
     const term = searchDestination.trim();
     if (!term) {
-      if (popularCountryCards.length > 0) return popularCountryCards;
+      if (popularCountryCards.length > 0) {
+        const freshById = new Map(
+          [...allCountries, ...trendingCountries].map((country) => [getCountryRouteId(country), country])
+        );
+        return popularCountryCards.map((country) => {
+          const fresh = freshById.get(getCountryRouteId(country));
+          if (!fresh) return country;
+          return {
+            ...fresh,
+            ...country,
+            imageUrl: fresh.imageUrl || country.imageUrl || "",
+          };
+        });
+      }
       if (popularCountriesLoading) return [];
       return allCountries.length > 0 ? allCountries : trendingCountries;
     }
@@ -384,13 +397,13 @@ const LandingPage = () => {
     popularCountriesLoading &&
     popularCountryCards.length === 0;
 
-  /** Stable key so the memoized grid skips re-rendering when unrelated parent state ticks. */
+  /** Stable key so the memoized grid skips unrelated ticks but still updates when card images arrive. */
   const displayedCountries = useMemo(() => {
     return filteredCountries.slice(0, visibleCount);
   }, [filteredCountries, visibleCount]);
 
   const countryIdsKey = useMemo(
-    () => displayedCountries.map((c) => getCountryRouteId(c)).join("|"),
+    () => displayedCountries.map((c) => `${getCountryRouteId(c)}:${c.imageUrl || ""}`).join("|"),
     [displayedCountries]
   );
 
