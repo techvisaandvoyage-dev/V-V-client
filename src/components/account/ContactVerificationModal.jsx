@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, RefreshCw } from "lucide-react";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
+import OtpInput from "../ui/OtpInput";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { isValidEmail } from "../../utils/authIdentifier";
-import { normalizePhoneInputTo10 } from "../../utils/contactVerificationGate";
 import {
   DEFAULT_PHONE_COUNTRY_CODE,
   filterPhoneCountryOptions,
@@ -16,8 +16,10 @@ import {
   parsePhoneWithCountryCode,
 } from "../../utils/phoneCountryCodes";
 
+const createEmptyOtp = (length = 6) => Array.from({ length: length === 4 ? 4 : 6 }, () => "");
+
 /**
- * Inline phone or email capture (saved via profile API). No redirect.
+ * Inline phone or email capture (phone is saved only after OTP verification). No redirect.
  * @param {"phone"|"email"} mode
  */
 const ContactVerificationModal = ({
@@ -29,7 +31,14 @@ const ContactVerificationModal = ({
   onSkip,
   skipLabel = "Remind me later",
 }) => {
-  const { user, updateProfile, refreshUserFromServer, isLoading } = useAuthStore();
+  const {
+    user,
+    updateProfile,
+    refreshUserFromServer,
+    requestProfilePhoneOtp,
+    verifyProfilePhoneOtp,
+    isLoading,
+  } = useAuthStore();
   const { showToast } = useUIStore();
   const countryCodeDropdownRef = useRef(null);
   const [value, setValue] = useState("");
@@ -38,6 +47,11 @@ const ContactVerificationModal = ({
   const [countryCodeSearch, setCountryCodeSearch] = useState("");
   const [phoneCountryOptions, setPhoneCountryOptions] = useState(() => getPhoneCountryOptions());
   const [phoneError, setPhoneError] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpDigits, setPhoneOtpDigits] = useState(createEmptyOtp(6));
+  const [phoneOtpLength, setPhoneOtpLength] = useState(6);
+  const [phoneOtpChannel, setPhoneOtpChannel] = useState("");
+  const [phoneDevOtp, setPhoneDevOtp] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +74,11 @@ const ContactVerificationModal = ({
       setPhoneError("");
       setCountryCodeOpen(false);
       setCountryCodeSearch("");
+      setPhoneOtpSent(false);
+      setPhoneOtpDigits(createEmptyOtp(6));
+      setPhoneOtpLength(6);
+      setPhoneOtpChannel("");
+      setPhoneDevOtp("");
     } else {
       setValue(String(user?.email || "").trim());
     }
@@ -76,39 +95,80 @@ const ContactVerificationModal = ({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
-  const handleSave = async () => {
-    if (mode === "phone") {
-      if (String(value || "").length < 10) {
-        setPhoneError("Number is incomplete.");
-        showToast("Number is incomplete.", "error");
-        return;
-      }
-      const fullPhone = phoneCountryCode + String(value || "").replace(/\D/g, "");
-      if (fullPhone.length < 10) {
-        setPhoneError("Enter a valid mobile number.");
-        showToast("Enter a valid mobile number.", "error");
-        return;
-      }
-      setPhoneError("");
-      const { success, message } = await updateProfile({ phone: fullPhone });
-      if (!success) {
-        showToast(message || "Could not save phone.", "error");
-        return;
-      }
-    } else {
-      const em = String(value || "").trim().toLowerCase();
-      if (!isValidEmail(em)) {
-        showToast("Enter a valid email address.", "error");
-        return;
-      }
-      const { success, message } = await updateProfile({ email: em });
-      if (!success) {
-        showToast(message || "Could not save email.", "error");
-        return;
-      }
+  const getEnteredFullPhone = () => `${phoneCountryCode}${String(value || "").replace(/\D/g, "")}`;
+
+  const validatePhone = () => {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.length !== 10) {
+      const message = digits.length ? "Number is incomplete." : "Enter a valid mobile number.";
+      setPhoneError(message);
+      showToast(message, "error");
+      return false;
+    }
+    setPhoneError("");
+    return true;
+  };
+
+  const resetPhoneOtp = () => {
+    setPhoneOtpSent(false);
+    setPhoneOtpDigits(createEmptyOtp(phoneOtpLength));
+    setPhoneOtpChannel("");
+    setPhoneDevOtp("");
+  };
+
+  const handleSendPhoneOtp = async () => {
+    if (!validatePhone()) return;
+
+    const { success, message, devOtp, channel, otpLength } = await requestProfilePhoneOtp(getEnteredFullPhone());
+    if (!success) {
+      showToast(message || "Could not send OTP.", "error");
+      return;
+    }
+
+    const nextLength = otpLength === 4 ? 4 : 6;
+    const nextDevOtp = devOtp != null ? String(devOtp).slice(0, nextLength) : "";
+    setPhoneOtpSent(true);
+    setPhoneOtpLength(nextLength);
+    setPhoneOtpDigits(nextDevOtp ? nextDevOtp.split("").slice(0, nextLength) : createEmptyOtp(nextLength));
+    setPhoneOtpChannel(channel || "");
+    setPhoneDevOtp(nextDevOtp);
+    showToast(nextDevOtp ? "Testing OTP filled automatically." : "OTP sent to your mobile number.", "success");
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    if (!validatePhone()) return;
+
+    const otp = phoneOtpDigits.join("");
+    if (otp.length !== phoneOtpLength) {
+      showToast(`Please enter the ${phoneOtpLength}-digit OTP.`, "error");
+      return;
+    }
+
+    const { success, message } = await verifyProfilePhoneOtp(getEnteredFullPhone(), otp);
+    if (!success) {
+      showToast(message || "Invalid OTP.", "error");
+      return;
+    }
+
+    await refreshUserFromServer();
+    showToast("Phone number verified and saved.", "success");
+    onCompleted?.();
+    onClose?.();
+  };
+
+  const handleSaveEmail = async () => {
+    const em = String(value || "").trim().toLowerCase();
+    if (!isValidEmail(em)) {
+      showToast("Enter a valid email address.", "error");
+      return;
+    }
+    const { success, message } = await updateProfile({ email: em });
+    if (!success) {
+      showToast(message || "Could not save email.", "error");
+      return;
     }
     await refreshUserFromServer();
-    showToast(mode === "phone" ? "Phone number saved." : "Email saved.", "success");
+    showToast("Email saved.", "success");
     onCompleted?.();
     onClose?.();
   };
@@ -116,10 +176,12 @@ const ContactVerificationModal = ({
   const title = mode === "phone" ? "Add your mobile number" : "Add your email address";
   const subtitle =
     mode === "phone"
-      ? "We use this for SMS updates and to reach you about your visa application. You can change it later in Profile."
+      ? "We use this for SMS updates and to reach you about your visa application. Verify it with OTP to continue."
       : "We use this for receipts and important updates about your application. You can change it later in Profile.";
   const filteredCountryOptions = filterPhoneCountryOptions(countryCodeSearch, phoneCountryOptions);
   const selectedCountryOption = findPhoneCountryOption(phoneCountryCode, phoneCountryOptions);
+  const footerActionLabel = mode === "phone" ? (phoneOtpSent ? "Verify & continue" : "Send OTP") : "Save & continue";
+  const footerAction = mode === "phone" ? (phoneOtpSent ? handleVerifyPhoneOtp : handleSendPhoneOtp) : handleSaveEmail;
 
   return (
     <Modal
@@ -137,8 +199,8 @@ const ContactVerificationModal = ({
                 {skipLabel}
               </Button>
           )}
-          <Button type="button" variant="primary" className="sm:min-w-[140px]" loading={isLoading} onClick={handleSave}>
-            Save &amp; continue
+          <Button type="button" variant="primary" className="sm:min-w-[140px]" loading={isLoading} onClick={footerAction}>
+            {footerActionLabel}
           </Button>
         </div>
       }
@@ -154,10 +216,13 @@ const ContactVerificationModal = ({
               <button
                 type="button"
                 onClick={() => {
+                  if (phoneOtpSent) return;
                   setCountryCodeOpen((prev) => !prev);
                   setCountryCodeSearch("");
                 }}
-                className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-text-primary transition-all duration-200 hover:border-cyan/40 focus:outline-none focus:ring-2 focus:ring-cyan/20"
+                className={`w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-text-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan/20 ${
+                  phoneOtpSent ? "cursor-default opacity-80" : "hover:border-cyan/40"
+                }`}
               >
                 <span className="truncate text-left">{selectedCountryOption.label}</span>
                 <ChevronDown size={16} className={`shrink-0 transition-transform ${countryCodeOpen ? "rotate-180" : ""}`} />
@@ -215,14 +280,43 @@ const ContactVerificationModal = ({
             onChange={(e) => {
               const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
               setValue(digits);
+              if (phoneOtpSent) resetPhoneOtp();
               if (!digits.length || digits.length >= 10) {
                 setPhoneError("");
               } else {
                 setPhoneError("Number is incomplete.");
               }
             }}
+            disabled={phoneOtpSent}
             helper={!phoneError ? "Enter a 10-digit mobile number." : ""}
           />
+          {phoneOtpSent && (
+            <div className="space-y-3 rounded-2xl border border-border bg-surface-2 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Enter OTP</p>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    Code sent{phoneOtpChannel ? ` via ${phoneOtpChannel}` : ""} to {phoneCountryCode} ******{String(value).slice(-4)}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendPhoneOtp}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan hover:text-cyan-dim disabled:opacity-50"
+                >
+                  <RefreshCw size={13} />
+                  Resend
+                </button>
+              </div>
+              {phoneDevOtp && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                  Test OTP: <span className="font-mono font-bold tracking-widest text-amber-900">{phoneDevOtp}</span>
+                </div>
+              )}
+              <OtpInput value={phoneOtpDigits} onChange={setPhoneOtpDigits} disabled={isLoading} length={phoneOtpLength} />
+            </div>
+          )}
         </div>
       ) : (
         <Input
