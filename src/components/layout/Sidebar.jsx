@@ -12,8 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
-
-const BRAND_LOGO_SRC = "/images/visa-voyage-logo.webp";
+import { useSiteLogo } from "../../hooks/useSiteLogo";
 
 // ── Nav item groups per role ───────────────────────────────
 const USER_NAV = [
@@ -27,6 +26,7 @@ const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const navigate = useNavigate();
+  const siteLogo = useSiteLogo();
 
   // Choose nav items based on user role
   const navItems = USER_NAV;
@@ -53,13 +53,13 @@ const Sidebar = () => {
         <div className="flex items-center h-16 px-4 border-b border-border flex-shrink-0">
           <Link to="/" replace className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer group" title="Back to Home">
             <img
-              src="/images/visa-voyage-logo.webp"
+              src={siteLogo}
               alt="Visa &amp; Voyage"
               width="160"
               height="64"
               loading="lazy"
               decoding="async"
-              className={sidebarOpen ? "block h-16 w-auto object-contain scale-[2.2] origin-left" : "block h-10 w-10 object-contain object-left scale-[2] origin-left"}
+              className={sidebarOpen ? "block h-10 w-auto object-contain" : "block h-8 w-8 object-contain object-left"}
             />
           </Link>
 

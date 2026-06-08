@@ -15,6 +15,7 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
+import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 import {
   signInWithGooglePopup,
   signInWithFacebookPopup,
@@ -22,6 +23,22 @@ import {
 } from "../utils/firebaseAuth";
 import { isValidEmail, parseAuthContactInput } from "../utils/authIdentifier";
 import { useAuthControls } from "../hooks/useAuthControls";
+import { DEFAULT_PHONE_COUNTRY_CODE } from "../utils/phoneCountryCodes";
+
+const sanitizeAuthIdentifierInput = (value) => {
+  const raw = String(value || "");
+  if (raw.includes("@")) return raw.trim();
+  return raw.replace(/\D/g, "").slice(0, 10);
+};
+
+const buildAuthIdentifierValue = (value, countryCode) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("@")) return trimmed.toLowerCase();
+  const digits = trimmed.replace(/\D/g, "").slice(0, 10);
+  if (!digits) return "";
+  return `${countryCode || DEFAULT_PHONE_COUNTRY_CODE}${digits}`;
+};
 
 const useResendTimer = (seconds = 30) => {
   const [timeLeft, setTimeLeft] = useState(0);
@@ -112,6 +129,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
   const [firebaseEmail, setFirebaseEmail] = useState("");
   const [firebasePassword, setFirebasePassword] = useState("");
   const [firebaseShowPass, setFirebaseShowPass] = useState(false);
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
   const {
@@ -149,21 +167,19 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       : otpPhoneEnabled
         ? "Log in with phone OTP"
         : "Log in with email OTP";
-  const otpInputPlaceholder =
-    otpPhoneEnabled && otpEmailEnabled
-      ? "Email or mobile number"
-      : otpPhoneEnabled
-        ? "Mobile number"
-        : "Email address";
   const otpStep2Display =
     otpSentKind === "phone" && otpSentValue
       ? `******${otpSentValue.slice(-4)}`
       : otpSentValue || "";
 
-  const otpContactPreview = parseAuthContactInput(otpIdentifier);
+  const otpContactPreview = parseAuthContactInput(
+    buildAuthIdentifierValue(otpIdentifier, phoneCountryCode)
+  );
   const otpPhonePreview = otpContactPreview?.type === "phone" ? otpContactPreview : null;
   const otpEmailPreview = otpContactPreview?.type === "email" ? otpContactPreview : null;
-  const forgotContactPreview = parseAuthContactInput(forgotEmail);
+  const forgotContactPreview = parseAuthContactInput(
+    buildAuthIdentifierValue(forgotEmail, phoneCountryCode)
+  );
 
   useEffect(() => {
     if (otpAuthEnabled) return;
@@ -227,7 +243,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     e.preventDefault();
     if (!authControls.passwordEnabled) return;
     clearError();
-    const { success } = await login(identifier, password);
+    const { success } = await login(buildAuthIdentifierValue(identifier, phoneCountryCode), password);
     if (success) {
       showToast("Welcome back! You're now logged in.");
       finishLogin();
@@ -262,15 +278,21 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     e?.preventDefault();
     clearError();
 
+    if (otpStep === 2 && !canResend) {
+      showToast(`Please wait ${timeLeft}s before requesting a new OTP.`, "error");
+      return;
+    }
+
     let contact;
     let kind;
+    let displayValue = "";
 
     if (otpStep === 2) {
       contact = otpSentValue;
       kind = otpSentKind;
       if (!contact || !kind) return;
     } else {
-      const parsed = parseAuthContactInput(otpIdentifier);
+      const parsed = parseAuthContactInput(buildAuthIdentifierValue(otpIdentifier, phoneCountryCode));
       const allowed =
         parsed &&
         ((parsed.type === "phone" && otpPhoneEnabled) ||
@@ -288,6 +310,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       }
       contact = parsed.value;
       kind = parsed.type;
+      displayValue = parsed.type === "phone" ? parsed.value.slice(-10) : parsed.value;
     }
 
     const {
@@ -304,7 +327,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       setOtpLength(nextLength);
       setOtpChannel(channel || "");
       setOtpDigits(Array.from({ length: nextLength }, () => ""));
-      if (otpStep === 1) setOtpIdentifier(contact);
+      if (otpStep === 1) setOtpIdentifier(displayValue || contact);
       setLoginTestOtp(devOtp ? String(devOtp) : "");
       startTimer();
       setOtpStep(2);
@@ -328,7 +351,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     e?.preventDefault();
     if (!authControls.passwordEnabled) return;
     clearError();
-    const parsed = parseAuthContactInput(String(forgotEmail || "").trim());
+    const parsed = parseAuthContactInput(buildAuthIdentifierValue(forgotEmail, phoneCountryCode));
     if (!parsed) {
       showToast("Enter a valid email or 10-digit mobile number.", "error");
       return;
@@ -500,14 +523,19 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                         >
                           <div className="p-4 pt-1 border-t border-border/30">
                             <form onSubmit={handleRequestOtp} className="space-y-3" noValidate>
+                              <PhoneCountryCodeSelect
+                                value={phoneCountryCode}
+                                onChange={setPhoneCountryCode}
+                                label="Country Code"
+                              />
                               <Input
                                 label=""
                                 type="text"
                                 inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
-                                placeholder={otpInputPlaceholder}
+                                placeholder="Enter mobile no."
                                 value={otpIdentifier}
-                                onChange={(e) => setOtpIdentifier(e.target.value)}
+                                onChange={(e) => setOtpIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                                 required
                               />
@@ -518,9 +546,9 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                     : otpEmailPreview && otpEmailEnabled
                                       ? "We'll email a code to this address"
                                       : otpPhoneEnabled && otpEmailEnabled
-                                        ? "Enter a valid email or mobile number"
+                                        ? "Enter a valid email or 10-digit mobile number"
                                         : otpPhoneEnabled
-                                          ? "Enter a valid mobile number"
+                                          ? "Enter a valid 10-digit mobile number"
                                           : "Enter a valid email address"}
                                 </p>
                               )}
@@ -565,12 +593,17 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                         >
                           <div className="p-4 pt-1 border-t border-border/30">
                             <form onSubmit={handlePasswordSubmit} className="space-y-3" noValidate>
+                              <PhoneCountryCodeSelect
+                                value={phoneCountryCode}
+                                onChange={setPhoneCountryCode}
+                                label="Country Code"
+                              />
                               <Input
                                 label=""
                                 type="text"
-                                placeholder="Email or mobile number"
+                                placeholder="Enter mobile no."
                                 value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
+                                onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 autoComplete="username"
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                                 required
@@ -599,8 +632,8 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                   type="button"
                                   onClick={() => {
                                     setForgotMode(true);
-                                    const parsed = parseAuthContactInput(identifier.trim());
-                                    setForgotEmail(parsed ? parsed.value : identifier.trim());
+                                    const parsed = parseAuthContactInput(buildAuthIdentifierValue(identifier, phoneCountryCode));
+                                    setForgotEmail(parsed?.type === "phone" ? parsed.value : (parsed?.value || identifier.trim()));
                                     clearError();
                                   }}
                                   className="text-[13px] text-text-muted transition-colors hover:text-text-primary font-medium"
@@ -645,14 +678,19 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
 
                     {forgotStep === 1 ? (
                       <>
+                        <PhoneCountryCodeSelect
+                          value={phoneCountryCode}
+                          onChange={setPhoneCountryCode}
+                          label="Country Code"
+                        />
                         <Input
                           label=""
                           type="text"
                           inputMode="text"
                           autoComplete="username"
                           value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          placeholder="Registered email or mobile"
+                          onChange={(e) => setForgotEmail(sanitizeAuthIdentifierInput(e.target.value))}
+                          placeholder="Enter mobile no."
                           className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                           required
                         />
@@ -670,7 +708,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 : "We'll email a reset code to this address"
                               : forgotEmail.includes("@")
                                 ? "Enter a valid email address"
-                                : "Enter a valid mobile (10 digits, country code optional)"}
+                                : "Enter a valid 10-digit mobile number"}
                           </p>
                         )}
                         <Button

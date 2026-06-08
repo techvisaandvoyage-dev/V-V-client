@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send, X } from "lucide-react";
 import { api, SERVER_URL } from "../../store/authStore";
+import { useSiteLogo } from "../../hooks/useSiteLogo";
 
 const FOOTER_SECTIONS = [
   { key: "company", title: "Company" },
@@ -116,6 +117,7 @@ const resolveAssetUrl = (value) => {
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const siteLogo = useSiteLogo();
   const [pages, setPages] = useState([]);
   const [socialIcons, setSocialIcons] = useState([]);
   const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
@@ -255,27 +257,28 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12 mb-12">
           <div className="lg:col-span-2 lg:pr-12">
-            <div className="-mt-2 flex max-w-sm flex-col items-start sm:-mt-1 lg:-mt-2">
-            <Link to="/" replace className="-mb-3 flex items-center leading-none sm:-mb-4">
-              <img
-                src={footerContent.logo || "/images/visa-voyage-logo.webp"}
-                alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
-                width="240"
-                height="80"
-                loading="lazy"
-                decoding="async"
-                className="block h-20 w-auto -translate-x-5 object-contain origin-left scale-[2.05] sm:-translate-x-7 sm:scale-[2.3]"
-              />
-            </Link>
-            <p className="mb-6 text-sm leading-relaxed text-text-secondary">
-              {footerContent.description}
-            </p>
+            <div className="flex max-w-sm flex-col items-start">
+              <Link to="/" replace className="flex h-16 items-center leading-none">
+                <img
+                  src={siteLogo}
+                  alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
+                  width="240"
+                  height="80"
+                  loading="lazy"
+                  decoding="async"
+                  className="block h-16 w-auto object-contain"
+                />
+              </Link>
+              <p className="max-w-[20rem] text-sm leading-6 text-text-secondary">
+                {footerContent.description}
+              </p>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {socialIcons.map(({ _id, label, type, url }) => {
-                const Icon = FOOTER_SOCIAL_ICON_COMPONENTS[type] || LinkIcon;
+              {socialIcons.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                  {socialIcons.map(({ _id, label, type, url }) => {
+                    const Icon = FOOTER_SOCIAL_ICON_COMPONENTS[type] || LinkIcon;
 
-                let finalUrl = url || "";
+                    let finalUrl = url || "";
                   let target = "_blank";
                   if (type === "email") {
                     if (finalUrl.toLowerCase().startsWith("mailto:https://")) {
@@ -294,21 +297,22 @@ const Footer = () => {
                     }
                   }
 
-                return (
-                <a
-                  key={_id || `${type}-${label}`}
-                  href={finalUrl}
-                  aria-label={label}
-                  title={label}
-                  target={target}
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-text-muted hover:text-cyan transition-all duration-200"
-                >
-                  <Icon size={16} />
-                </a>
-                );
-              })}
-            </div>
+                    return (
+                      <a
+                        key={_id || `${type}-${label}`}
+                        href={finalUrl}
+                        aria-label={label}
+                        title={label}
+                        target={target}
+                        rel="noopener noreferrer"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-text-muted transition-all duration-200 hover:border-cyan/30 hover:text-cyan"
+                      >
+                        <Icon size={16} />
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

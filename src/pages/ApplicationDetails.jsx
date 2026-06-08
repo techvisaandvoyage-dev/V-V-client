@@ -312,6 +312,13 @@ const ApplicationDetails = () => {
   const [travelerGdriveFurtherInfoLinks, setTravelerGdriveFurtherInfoLinks] = useState({});
   const [loading, setLoading] = useState(true);
   const [docFields, setDocFields] = useState(buildDocFields());
+  const [countryOptionalDocuments, setCountryOptionalDocuments] = useState(null);
+  const [documentSectionCopy, setDocumentSectionCopy] = useState({
+    requiredHeading: "Documents Required",
+    requiredDescription: "These are the country documents required for this application.",
+    optionalHeading: "Optional Documents",
+    optionalDescription: "You can also attach other documents in the same Drive link.",
+  });
   const [uploadSettings, setUploadSettings] = useState({
     enableGDriveUpload: true,
     enableFileUpload: true,
@@ -490,17 +497,25 @@ const ApplicationDetails = () => {
   );
   const visibleOtherDocFields = useMemo(() => {
     const requiredKeys = new Set(visibleRequiredDocFields.map((field) => field.key));
+    const hasConfiguredOptionalDocuments = Array.isArray(countryOptionalDocuments);
+    const configuredOptionalKeys = hasConfiguredOptionalDocuments
+      ? countryOptionalDocuments
+          .map((key) => String(key ?? "").trim())
+          .filter((key) => key && key !== "passport" && !requiredKeys.has(key))
+      : [];
     const catalogKeys = Array.isArray(documentCatalog)
       ? documentCatalog
           .filter((d) => !d.deleted)
           .map((item) => String(item?.key ?? "").trim())
           .filter((key) => key && key !== "passport" && !requiredKeys.has(key))
       : [];
-    const preferredKeys = (Array.isArray(documentCatalog) && documentCatalog.length > 0)
-      ? catalogKeys
-      : OTHER_DOCUMENT_LIBRARY_KEYS.filter((key) => !requiredKeys.has(key));
+    const preferredKeys = hasConfiguredOptionalDocuments
+      ? configuredOptionalKeys
+      : (Array.isArray(documentCatalog) && documentCatalog.length > 0)
+        ? catalogKeys
+        : OTHER_DOCUMENT_LIBRARY_KEYS.filter((key) => !requiredKeys.has(key));
     return buildDisplayDocFields(preferredKeys, documentCatalog).filter((field) => field.key !== "passport");
-  }, [documentCatalog, visibleRequiredDocFields]);
+  }, [countryOptionalDocuments, documentCatalog, visibleRequiredDocFields]);
   const detailsHeaderStatus = useMemo(() => {
     if (["approved", "rejected", "cancelled", "review", "doc_pending", "drive_link_pending", "pending_payment"].includes(resolvedApplicationStatus)) {
       return resolvedApplicationStatus;
@@ -586,6 +601,19 @@ const ApplicationDetails = () => {
       try {
         const { data } = await api.get(`/countries/${booking.countryId}`);
         const keys = data?.country?.requiredDocuments;
+        const optionalKeys = data?.country?.optionalDocuments;
+        const copy = data?.country?.documentSectionCopy || {};
+        setDocumentSectionCopy({
+          requiredHeading: String(copy.requiredHeading ?? "Documents Required").trim() || "Documents Required",
+          requiredDescription:
+            String(copy.requiredDescription ?? "These are the country documents required for this application.").trim() ||
+            "These are the country documents required for this application.",
+          optionalHeading: String(copy.optionalHeading ?? "Optional Documents").trim() || "Optional Documents",
+          optionalDescription:
+            String(copy.optionalDescription ?? "You can also attach other documents in the same Drive link.").trim() ||
+            "You can also attach other documents in the same Drive link.",
+        });
+        setCountryOptionalDocuments(Array.isArray(optionalKeys) ? optionalKeys.filter(Boolean) : []);
         if (Array.isArray(keys) && keys.length > 0) {
           setDocFields(buildDocFields(keys));
           return;
@@ -597,6 +625,13 @@ const ApplicationDetails = () => {
       const bookingRequiredDocuments = Array.isArray(booking?.requiredDocuments) && booking.requiredDocuments.length
         ? booking.requiredDocuments
         : [];
+      setCountryOptionalDocuments(null);
+      setDocumentSectionCopy({
+        requiredHeading: "Documents Required",
+        requiredDescription: "These are the country documents required for this application.",
+        optionalHeading: "Optional Documents",
+        optionalDescription: "You can also attach other documents in the same Drive link.",
+      });
       setDocFields(buildDocFields(bookingRequiredDocuments));
     };
 
@@ -2089,9 +2124,9 @@ const ApplicationDetails = () => {
                   <ShieldCheck size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Documents Required</h3>
+                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.requiredHeading}</h3>
                   <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-                    These are the country documents required for this application.
+                    {documentSectionCopy.requiredDescription}
                   </p>
                 </div>
               </div>
@@ -2136,9 +2171,9 @@ const ApplicationDetails = () => {
                   <FileText size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Optional Documents</h3>
+                  <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.optionalHeading}</h3>
                   <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-                    You can also attach other documents in the same Drive link.
+                    {documentSectionCopy.optionalDescription}
                   </p>
                 </div>
               </div>

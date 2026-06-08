@@ -161,19 +161,15 @@ export const useAuthStore = create(
       },
 
       /**
-       * verifyOtp() — Verify OTP for NEW user signup
+       * verifyOtp() — Verify OTP for signup contact without creating the account yet
        */
-      verifyOtp: async (identifier, otp) => {
+      verifyOtp: async (identifier, otp, options = {}) => {
         set({ isLoading: true, error: null });
         try {
-          const pending = get().pendingSignup;
           const { data } = await api.post("/auth/verify-otp", {
             identifier,
             otp,
             purpose: "auth",
-            ...(pending?.identifier === identifier
-              ? { name: pending.name, password: pending.password, completeSignup: true }
-              : {}),
           });
           if (data.success) {
             if (data.userExists === true) {
@@ -181,6 +177,52 @@ export const useAuthStore = create(
               set({ error: message, isLoading: false, pendingSignup: null });
               return { success: false, role: null, userExists: true, message };
             }
+            if (options.keepPendingSignup === false) {
+              set({ pendingSignup: null });
+            }
+            set({ isLoading: false });
+            return {
+              success: true,
+              verified: true,
+              role: data.token ? "user" : null,
+              userExists: false,
+              message: data.message,
+            };
+          }
+          set({ isLoading: false });
+          return { success: false };
+        } catch (error) {
+          const message = error.response?.data?.message || "OTP verification failed";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      completePendingSignup: async ({ identifier, otp, firstName, lastName, email }) => {
+        set({ isLoading: true, error: null });
+        try {
+          const pending = get().pendingSignup;
+          if (!pending?.identifier || pending.identifier !== identifier) {
+            const message = "Your signup session expired. Please request a new OTP.";
+            set({ isLoading: false, error: message, pendingSignup: null });
+            return { success: false, message };
+          }
+
+          const fullName = `${String(firstName || "").trim()} ${String(lastName || "").trim()}`.trim();
+          const payload = {
+            identifier,
+            otp,
+            purpose: "auth",
+            completeSignup: true,
+            name: fullName,
+            firstName: String(firstName || "").trim(),
+            lastName: String(lastName || "").trim(),
+            email: String(email || "").trim().toLowerCase(),
+            password: pending.password || "",
+          };
+
+          const { data } = await api.post("/auth/verify-otp", payload);
+          if (data.success && data.token) {
             localStorage.setItem("token", data.token);
             const refreshed = await get().refreshUserFromServer({ sessionAuthMethod: "otp" });
             if (!refreshed) {
@@ -190,14 +232,16 @@ export const useAuthStore = create(
               }
             }
             set({ isLoading: false, pendingSignup: null });
-            return { success: true, role: "user", userExists: data.userExists === true };
+            return { success: true, role: "user" };
           }
-          set({ isLoading: false });
-          return { success: false };
+
+          const message = data.message || "Could not complete signup";
+          set({ isLoading: false, error: message });
+          return { success: false, message };
         } catch (error) {
-          const message = error.response?.data?.message || "OTP verification failed";
-          set({ error: message, isLoading: false });
-          return { success: false };
+          const message = error.response?.data?.message || "Could not complete signup";
+          set({ isLoading: false, error: message });
+          return { success: false, message };
         }
       },
 

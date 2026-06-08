@@ -479,7 +479,11 @@ const CountryDetails = () => {
   const pendingAuthActionRef = useRef(null);
 
   const requireAuth = (actionFn) => {
-    if (isAuthenticated) {
+    const authenticatedNow =
+      isAuthenticated ||
+      useAuthStore.getState().isAuthenticated ||
+      Boolean(localStorage.getItem("token"));
+    if (authenticatedNow) {
       if (actionFn) actionFn();
     } else {
       pendingAuthActionRef.current = actionFn;
@@ -1396,6 +1400,16 @@ const CountryDetails = () => {
     Icon: getDocumentIcon(key),
     featured: false,
   }));
+  const documentSectionCopy = {
+    requiredHeading: String(country?.documentSectionCopy?.requiredHeading ?? "Documents Required").trim() || "Documents Required",
+    requiredDescription:
+      String(country?.documentSectionCopy?.requiredDescription ?? "These are the country documents required for this application.").trim() ||
+      "These are the country documents required for this application.",
+    optionalHeading: String(country?.documentSectionCopy?.optionalHeading ?? "Optional Documents").trim() || "Optional Documents",
+    optionalDescription:
+      String(country?.documentSectionCopy?.optionalDescription ?? "You can also attach other documents in the same Drive link.").trim() ||
+      "You can also attach other documents in the same Drive link.",
+  };
   const travelDetailsRequiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
     label: getDocumentLabel(key),
@@ -1405,15 +1419,23 @@ const CountryDetails = () => {
   }));
   const travelDetailsOtherDocumentFields = (() => {
     const requiredKeys = new Set(requiredDocumentKeys);
+    const hasConfiguredOptionalDocuments = Array.isArray(country?.optionalDocuments);
+    const configuredOptionalKeys = hasConfiguredOptionalDocuments
+      ? country.optionalDocuments
+          .map((key) => String(key ?? "").trim())
+          .filter((key) => key && key !== "passport" && !requiredKeys.has(key))
+      : [];
     const catalogKeys = Array.isArray(documentCatalog)
       ? documentCatalog
           .filter((d) => !d.deleted)
           .map((item) => String(item?.key ?? "").trim())
           .filter((key) => key && key !== "passport" && !requiredKeys.has(key))
       : [];
-    const preferredKeys = (Array.isArray(documentCatalog) && documentCatalog.length > 0)
-      ? catalogKeys
-      : OTHER_DOCUMENT_LIBRARY_KEYS.filter((key) => !requiredKeys.has(key));
+    const preferredKeys = hasConfiguredOptionalDocuments
+      ? configuredOptionalKeys
+      : (Array.isArray(documentCatalog) && documentCatalog.length > 0)
+        ? catalogKeys
+        : OTHER_DOCUMENT_LIBRARY_KEYS.filter((key) => !requiredKeys.has(key));
 
     return preferredKeys.map((key) => ({
       key,
@@ -1432,9 +1454,9 @@ const CountryDetails = () => {
             <ShieldCheck size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0">
-            <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Documents Required</h3>
+            <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.requiredHeading}</h3>
             <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-              These are the country documents required for this application.
+              {documentSectionCopy.requiredDescription}
             </p>
           </div>
         </div>
@@ -1481,9 +1503,9 @@ const CountryDetails = () => {
               <FileText size={20} strokeWidth={2} />
             </span>
             <div className="min-w-0">
-              <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">Optional Documents</h3>
+              <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.optionalHeading}</h3>
               <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
-                You can also attach other documents in the same Drive link.
+                {documentSectionCopy.optionalDescription}
             </p>
             </div>
           </div>
@@ -2069,8 +2091,7 @@ const CountryDetails = () => {
     const token = localStorage.getItem("token");
     persistCurrentTravelDraft();
     if (!isAuthenticated && !token) {
-      const next = buildLoginRedirect("upload-later");
-      navigate(`/login?redirect=${encodeURIComponent(next)}`);
+      requireAuth(handleUploadDocsLater);
       return;
     }
 
@@ -2280,8 +2301,7 @@ const CountryDetails = () => {
       // Pull the draft persistence + post-login resume forward here too — this
       // path is reached when the token silently expires mid-flow.
       persistCurrentTravelDraft();
-      const next = buildLoginRedirect("upload-later");
-      navigate(`/login?redirect=${encodeURIComponent(next)}`);
+      requireAuth(handleUploadDocsLater);
       showToast("Please log in to continue with your application.", "info");
       return null;
     }
@@ -2341,8 +2361,7 @@ const CountryDetails = () => {
       if (err?.response?.status === 401) {
         localStorage.removeItem("token");
         persistCurrentTravelDraft();
-        const next = buildLoginRedirect("upload-later");
-        navigate(`/login?redirect=${encodeURIComponent(next)}`);
+        requireAuth(handleUploadDocsLater);
         showToast("Session expired. Please log in again.", "info");
         return null;
       }

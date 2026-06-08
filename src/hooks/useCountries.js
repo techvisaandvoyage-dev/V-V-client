@@ -302,6 +302,19 @@ export function normalizeCountryFromApi(c) {
     description: c.description || "",
     requirements: Array.isArray(c.requirements) ? c.requirements : [],
     requiredDocuments: Array.isArray(c.requiredDocuments) ? c.requiredDocuments : ["passport"],
+    optionalDocuments: Array.isArray(c.optionalDocuments)
+      ? c.optionalDocuments.map((k) => String(k ?? "").trim()).filter(Boolean)
+      : undefined,
+    documentSectionCopy: {
+      requiredHeading: String(c.documentSectionCopy?.requiredHeading ?? "Documents Required").trim() || "Documents Required",
+      requiredDescription:
+        String(c.documentSectionCopy?.requiredDescription ?? "These are the country documents required for this application.").trim() ||
+        "These are the country documents required for this application.",
+      optionalHeading: String(c.documentSectionCopy?.optionalHeading ?? "Optional Documents").trim() || "Optional Documents",
+      optionalDescription:
+        String(c.documentSectionCopy?.optionalDescription ?? "You can also attach other documents in the same Drive link.").trim() ||
+        "You can also attach other documents in the same Drive link.",
+    },
     useGlobalRequiredDocuments: c.useGlobalRequiredDocuments !== false,
     useGlobalGst: c.useGlobalGst !== false,
     gstEnabled: c.gstEnabled !== false,

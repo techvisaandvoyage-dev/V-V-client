@@ -20,6 +20,7 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
+import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 import {
   signInWithGooglePopup,
   signInWithFacebookPopup,
@@ -27,6 +28,7 @@ import {
 } from "../utils/firebaseAuth";
 import { parseAuthContactInput } from "../utils/authIdentifier";
 import { useAuthControls } from "../hooks/useAuthControls";
+import { DEFAULT_PHONE_COUNTRY_CODE } from "../utils/phoneCountryCodes";
 
 // ── Resend timer ──────────────────────────────────────────────
 const useResendTimer = (seconds = 30) => {
@@ -72,6 +74,21 @@ const FacebookMark = () => (
 
 // ─────────────────────────────────────────────────────────────
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
+const sanitizeAuthIdentifierInput = (value) => {
+  const raw = String(value || "");
+  if (raw.includes("@")) return raw.trim();
+  return raw.replace(/\D/g, "").slice(0, 10);
+};
+
+const buildAuthIdentifierValue = (value, countryCode) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("@")) return trimmed.toLowerCase();
+  const digits = trimmed.replace(/\D/g, "").slice(0, 10);
+  if (!digits) return "";
+  return `${countryCode || DEFAULT_PHONE_COUNTRY_CODE}${digits}`;
+};
 
 const splitDisplayName = (value) => {
   const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
@@ -162,9 +179,9 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const {
     register,
     verifyOtp,
+    completePendingSignup,
     loginWithFirebaseGoogle,
     loginWithFirebaseFacebook,
-    completeProfile,
     isLoading,
     error,
     clearError,
@@ -175,6 +192,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const [step, setStep]         = useState(1); // 1: Signup form, 2: OTP, 3: Profile completion
   const [name, setName]         = useState("");
   const [identifier, setIdentifier] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -192,7 +210,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
 
-  const signupOtpIsSms = /^\d{10}$/.test(identifier);
+  const signupOtpIsSms = !String(identifier || "").includes("@");
   const otpDestinationLabel = signupOtpIsSms
     ? `******${identifier.slice(-4)}`
     : identifier;
@@ -223,7 +241,9 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"][strength];
   const strengthColor = ["", "bg-red-500", "bg-amber-500", "bg-amber-400", "bg-emerald-500"][strength];
 
-  const contactParsedPreview = parseAuthContactInput(identifier);
+  const contactParsedPreview = parseAuthContactInput(
+    buildAuthIdentifierValue(identifier, phoneCountryCode)
+  );
   const otpPhonePreview = contactParsedPreview?.type === "phone" ? contactParsedPreview : null;
   const otpEmailPreview = contactParsedPreview?.type === "email" ? contactParsedPreview : null;
   const otpPhoneEnabled = authControls.phoneOtpEnabled !== false;
@@ -235,13 +255,6 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       : otpPhoneEnabled
         ? "Sign up with phone OTP"
         : "Sign up with email OTP";
-  const otpInputPlaceholder =
-    otpPhoneEnabled && otpEmailEnabled
-      ? "Email or mobile number"
-      : otpPhoneEnabled
-        ? "Mobile number"
-        : "Email address";
-
   const openProfileCompletion = ({ provider, user, fallbackName = "", email = "", phone = "" }) => {
     const fromName = splitDisplayName(user?.name || fallbackName);
     const firstName = user?.firstName || fromName.firstName;
@@ -251,7 +264,11 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       provider,
       email: resolvedEmail,
       phone: user?.phone || phone || "",
-      showEmail: provider === "phoneOtp" || (provider === "facebook" && !resolvedEmail),
+      showEmail:
+        provider === "phoneOtp" ||
+        provider === "emailOtp" ||
+        provider === "password" ||
+        (provider === "facebook" && !resolvedEmail),
     });
     setCompletionValues({
       firstName,
@@ -310,7 +327,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       showToast("Please enter your name", "error");
       return;
     }
-    const parsed = parseAuthContactInput(identifier);
+    const parsed = parseAuthContactInput(buildAuthIdentifierValue(identifier, phoneCountryCode));
     const otpAllowed =
       parsed &&
       (withPassword ||
@@ -328,7 +345,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       return;
     }
     const contact = parsed.value;
-    setIdentifier(contact);
+    setIdentifier(parsed.type === "phone" ? parsed.value.slice(-10) : contact);
     if (withPassword && !SIGNUP_PASSWORD_REGEX.test(password)) {
       showToast(
         "Password needs 8+ characters with uppercase, lowercase, a number, and one of @$!%*?&",
@@ -357,8 +374,8 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       setStep(2);
       showToast(
         parsed.type === "phone"
-          ? "Account created with your mobile. Enter the code we texted you."
-          : "Account created. Check your email for the verification code.",
+          ? "Verification code sent to your mobile. Enter it to continue."
+          : "Verification code sent. Check your email to continue.",
         "success"
       );
     }
@@ -378,9 +395,13 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   // ── Resend OTP (re-register same user — server resends OTP) ─
   const handleResend = async () => {
     clearError();
+    if (!canResend) {
+      showToast(`Please wait ${timeLeft}s before requesting a new OTP.`, "error");
+      return;
+    }
     const nameTrim = signupUsesPassword ? name.trim() : "";
     if (signupUsesPassword && (!nameTrim || !SIGNUP_PASSWORD_REGEX.test(password))) return;
-    const parsed = parseAuthContactInput(identifier);
+    const parsed = parseAuthContactInput(buildAuthIdentifierValue(identifier, phoneCountryCode));
     if (
       !parsed ||
       (!signupUsesPassword &&
@@ -414,21 +435,21 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
     const otp = otpDigits.join("");
     const { success } = await verifyOtp(identifier, otp);
     if (success) {
-      const authedUser = useAuthStore.getState().user;
-      if (!signupUsesPassword) {
-        const parsed = parseAuthContactInput(identifier);
-        const provider = parsed?.type === "phone" ? "phoneOtp" : "emailOtp";
-        showToast("OTP verified. Complete your profile.");
-        continueAfterRegisterAuth({
-          provider,
-          user: authedUser,
-          email: parsed?.type === "email" ? parsed.value : "",
-          phone: parsed?.type === "phone" ? parsed.value : "",
-        });
-        return;
-      }
-      showToast("Account created! Welcome");
-      finishRegisterAuth();
+      const parsed = parseAuthContactInput(identifier);
+      const provider = signupUsesPassword
+        ? (parsed?.type === "phone" ? "password" : "password")
+        : parsed?.type === "phone"
+          ? "phoneOtp"
+          : "emailOtp";
+      showToast("OTP verified. Complete your profile.");
+      openProfileCompletion({
+        provider,
+        user: null,
+        fallbackName: name,
+        email: parsed?.type === "email" ? parsed.value : "",
+        phone: parsed?.type === "phone" ? parsed.value : "",
+      });
+      return;
     }
   };
 
@@ -455,18 +476,18 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       return;
     }
 
-    const payload = {
-      provider: completionContext?.provider,
+    const result = await completePendingSignup({
+      identifier,
+      otp: otpDigits.join(""),
       firstName,
       lastName,
-      ...(completionContext?.showEmail ? { email } : {}),
-    };
-    const result = await completeProfile(payload);
+      email: completionContext?.showEmail ? email : "",
+    });
     if (!result.success) {
       setCompletionErrors({ form: result.message || "Could not complete profile" });
       return;
     }
-    showToast("Profile completed.");
+    showToast("Account created.");
     finishRegisterAuth();
   };
 
@@ -586,15 +607,20 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                               )}
                             </AnimatePresence>
 
-                            <div className="space-y-1">
+                            <div className="space-y-3">
+                              <PhoneCountryCodeSelect
+                                value={phoneCountryCode}
+                                onChange={setPhoneCountryCode}
+                                label="Country Code"
+                              />
                               <Input
                                 label=""
                                 type="text"
                                 inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
-                                placeholder={otpInputPlaceholder}
+                                placeholder="Enter mobile no."
                                 value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
+                                onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                                 required
                               />
@@ -611,9 +637,9 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                                     : otpEmailPreview && otpEmailEnabled
                                       ? "We'll email a code to this address"
                                       : otpPhoneEnabled && otpEmailEnabled
-                                        ? "Enter a valid email or mobile number"
+                                        ? "Enter a valid email or 10-digit mobile number"
                                         : otpPhoneEnabled
-                                          ? "Enter a valid mobile number"
+                                          ? "Enter a valid 10-digit mobile number"
                                           : "Enter a valid email address"}
                                 </p>
                               )}
@@ -664,14 +690,19 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                   required
                 />
 
-                <div className="space-y-1">
+                <div className="space-y-3">
+                  <PhoneCountryCodeSelect
+                    value={phoneCountryCode}
+                    onChange={setPhoneCountryCode}
+                    label="Country Code"
+                  />
                   <Input
                     label=""
                     type="text"
                     autoComplete="username"
-                    placeholder="Email or mobile number"
+                    placeholder="Enter mobile no."
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                     className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                     required
                   />
@@ -689,7 +720,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                           : "Email signup — we'll email a verification code to this address"
                         : identifier.includes("@")
                           ? "Enter a valid email address"
-                          : "Enter a valid mobile (10 digits, country code optional)"}
+                          : "Enter a valid 10-digit mobile number"}
                     </p>
                   )}
                 </div>

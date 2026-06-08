@@ -4,6 +4,7 @@ import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
+import { useSiteLogo } from "../../hooks/useSiteLogo";
 import NotificationBell from "./NotificationBell";
 
 const AuthPageModal = lazy(() => import("../auth/AuthPageModal"));
@@ -23,6 +24,7 @@ const Navbar = () => {
 
   const [scrolled, setScrolled] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const siteLogo = useSiteLogo();
 
   // ── Detect scroll to toggle navbar style ─────────────────
   useEffect(() => {
@@ -106,14 +108,14 @@ const Navbar = () => {
               aria-label="VISAANDVOYAGE Home"
             >
               <img
-                src="/images/visa-voyage-logo.webp"
+                src={siteLogo}
                 alt="Visa &amp; Voyage"
                 width="240"
                 height="64"
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="block h-16 w-auto -translate-x-1 translate-y-1 object-contain scale-[2.2] origin-left sm:-translate-x-5 sm:scale-[2.8]"
+                className="block h-11 w-auto object-contain sm:h-12"
               />
             </Link>
 
