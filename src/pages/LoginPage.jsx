@@ -85,6 +85,80 @@ const FacebookMark = () => (
   </svg>
 );
 
+const splitDisplayName = (value) => {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" "),
+  };
+};
+
+const ProfileCompletionStep = ({ values, errors, showEmail, onChange, onSubmit, loading }) => (
+  <motion.div key="profile-completion" {...slideIn}>
+    <div className="mb-8 text-center relative">
+      <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface border border-border text-text-primary shadow-sm">
+        <KeyRound size={22} />
+      </div>
+      <h1 className="text-3xl font-semibold tracking-tight text-text-primary sm:text-[32px] mb-2">
+        Complete your profile
+      </h1>
+      <p className="text-[15px] text-text-secondary">
+        Just a few details to continue your application.
+      </p>
+    </div>
+
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      <Input
+        label=""
+        type="text"
+        placeholder="First Name"
+        value={values.firstName}
+        onChange={(e) => onChange("firstName", e.target.value)}
+        error={errors.firstName}
+        className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+        required
+      />
+      <Input
+        label=""
+        type="text"
+        placeholder="Last Name"
+        value={values.lastName}
+        onChange={(e) => onChange("lastName", e.target.value)}
+        error={errors.lastName}
+        className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+        required
+      />
+      {showEmail && (
+        <Input
+          label=""
+          type="email"
+          autoComplete="email"
+          placeholder="Email"
+          value={values.email}
+          onChange={(e) => onChange("email", e.target.value)}
+          error={errors.email}
+          className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+          required
+        />
+      )}
+      {errors.form && (
+        <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+          {errors.form}
+        </p>
+      )}
+      <Button
+        type="submit"
+        variant="primary"
+        fullWidth
+        loading={loading}
+        className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium mt-2 shadow-none border-none"
+      >
+        Continue
+      </Button>
+    </form>
+  </motion.div>
+);
+
 const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthenticated }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -94,6 +168,9 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     login,
     sendLoginOtp,
     verifyLoginOtp,
+    register,
+    verifyOtp,
+    completePendingSignup,
     loginWithFirebaseGoogle,
     loginWithFirebaseFacebook,
     loginWithFirebaseEmailPassword,
@@ -130,6 +207,10 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
   const [firebasePassword, setFirebasePassword] = useState("");
   const [firebaseShowPass, setFirebaseShowPass] = useState(false);
   const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
+  const [otpAuthMode, setOtpAuthMode] = useState("login");
+  const [completionContext, setCompletionContext] = useState(null);
+  const [completionValues, setCompletionValues] = useState({ firstName: "", lastName: "", email: "" });
+  const [completionErrors, setCompletionErrors] = useState({});
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
   const {
@@ -149,6 +230,22 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       return;
     }
     navigate(postLoginPath, { replace: true });
+  };
+
+  const openProfileCompletion = ({ provider, fallbackName = "", email = "", phone = "" }) => {
+    const fromName = splitDisplayName(fallbackName);
+    setCompletionContext({
+      provider,
+      email,
+      phone,
+      showEmail: true,
+    });
+    setCompletionValues({
+      firstName: fromName.firstName,
+      lastName: fromName.lastName,
+      email,
+    });
+    setCompletionErrors({});
   };
 
   useEffect(() => {
@@ -313,13 +410,34 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       displayValue = parsed.type === "phone" ? parsed.value.slice(-10) : parsed.value;
     }
 
+    let otpResult;
+    if (otpStep === 2 && otpAuthMode === "signup") {
+      otpResult = await register("", contact, "");
+    } else {
+      otpResult = await sendLoginOtp(contact, { suppressError: embedded && otpStep === 1 });
+      if (
+        !otpResult.success &&
+        otpStep === 1 &&
+        /not registered|sign up first/i.test(String(otpResult.message || ""))
+      ) {
+        otpResult = await register("", contact, "");
+        if (otpResult.success) {
+          clearError();
+          setOtpAuthMode("signup");
+          showToast("Verification code sent. Complete signup to continue.", "success");
+        }
+      } else if (otpResult.success) {
+        setOtpAuthMode("login");
+      }
+    }
+
     const {
       success,
       devOtp,
       message: otpSendMessage,
       otpLength: sentOtpLength,
       channel,
-    } = await sendLoginOtp(contact);
+    } = otpResult || {};
     if (success) {
       const nextLength = sentOtpLength === 4 ? 4 : 6;
       setOtpSentValue(contact);
@@ -331,6 +449,12 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       setLoginTestOtp(devOtp ? String(devOtp) : "");
       startTimer();
       setOtpStep(2);
+      if (otpStep === 2 && otpAuthMode === "signup") {
+        showToast(
+          kind === "phone" ? "A new verification code was sent to your phone." : `A new verification code was sent to ${contact}.`,
+          "success"
+        );
+      }
     } else if (otpSendMessage) {
       showToast(otpSendMessage, "error");
     }
@@ -340,11 +464,62 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     e.preventDefault();
     clearError();
     const otp = otpDigits.join("");
+    if (otpAuthMode === "signup") {
+      const { success } = await verifyOtp(otpSentValue, otp);
+      if (success) {
+        const provider = otpSentKind === "phone" ? "phoneOtp" : "emailOtp";
+        showToast("OTP verified. Complete your details to continue.");
+        openProfileCompletion({
+          provider,
+          email: otpSentKind === "email" ? otpSentValue : "",
+          phone: otpSentKind === "phone" ? otpSentValue : "",
+        });
+      }
+      return;
+    }
     const { success } = await verifyLoginOtp(otpSentValue, otp);
     if (success) {
       showToast("Logged in via OTP! Welcome back.");
       finishLogin();
     }
+  };
+
+  const handleCompletionChange = (field, value) => {
+    setCompletionValues((current) => ({ ...current, [field]: value }));
+    setCompletionErrors((current) => ({ ...current, [field]: "", form: "" }));
+  };
+
+  const handleProfileCompletionSubmit = async (e) => {
+    e.preventDefault();
+    const nextErrors = {};
+    const firstName = completionValues.firstName.trim();
+    const lastName = completionValues.lastName.trim();
+    const email = completionValues.email.trim().toLowerCase();
+
+    if (!firstName) nextErrors.firstName = "First name is required";
+    if (!lastName) nextErrors.lastName = "Last name is required";
+    if (completionContext?.showEmail && !isValidEmail(email)) {
+      nextErrors.email = "Enter a valid email address";
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setCompletionErrors(nextErrors);
+      return;
+    }
+
+    const result = await completePendingSignup({
+      identifier: otpSentValue,
+      otp: otpDigits.join(""),
+      firstName,
+      lastName,
+      email: completionContext?.showEmail ? email : "",
+    });
+    if (!result.success) {
+      setCompletionErrors({ form: result.message || "Could not complete profile" });
+      return;
+    }
+    showToast("Account created. You're now logged in.");
+    finishLogin();
   };
 
   const handleForgotRequestOtp = async (e) => {
@@ -433,7 +608,16 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       />
       <div className="relative z-10 w-full max-w-[400px]">
         <AnimatePresence mode="wait">
-          {otpStep === 1 && (
+          {completionContext ? (
+            <ProfileCompletionStep
+              values={completionValues}
+              errors={completionErrors}
+              showEmail={Boolean(completionContext?.showEmail)}
+              onChange={handleCompletionChange}
+              onSubmit={handleProfileCompletionSubmit}
+              loading={isLoading}
+            />
+          ) : otpStep === 1 ? (
             <motion.div key="login-step-1" {...slideIn}>
               <div className="mb-8 text-center relative">
                 {embedded ? (
@@ -826,9 +1010,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                 </p>
               </div>
             </motion.div>
-          )}
-
-          {otpStep === 2 && (
+          ) : otpStep === 2 ? (
             <motion.div key="login-step-2" {...slideIn}>
               <div className="mb-8 text-center relative">
                 <button
@@ -898,7 +1080,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                   disabled={otpDigits.join("").length !== otpLength || !otpSentValue}
                   className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium shadow-none border-none"
                 >
-                  Verify &amp; Log In
+                  {otpAuthMode === "signup" ? "Verify &amp; Continue" : "Verify &amp; Log In"}
                 </Button>
               </form>
 
@@ -922,7 +1104,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                 )}
               </div>
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
 

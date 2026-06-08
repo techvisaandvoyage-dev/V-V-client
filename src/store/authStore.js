@@ -248,7 +248,7 @@ export const useAuthStore = create(
       /**
        * sendLoginOtp() — Send OTP to existing user for passwordless login
        * @param {string} identifier — email or phone
-       * @param {{ otpLength?: 4 | 6 }} [opts] — default 6; use 4 for short apply/login flows
+       * @param {{ otpLength?: 4 | 6, suppressError?: boolean }} [opts] — default 6; use 4 for short apply/login flows
        */
       sendLoginOtp: async (identifier, opts = {}) => {
         set({ isLoading: true, error: null });
@@ -263,11 +263,11 @@ export const useAuthStore = create(
             return { success: true, devOtp: data.devOtp, channel: data.channel, otpLength: data.otpLength };
           }
           const failMsg = data.message || "Failed to send OTP";
-          set({ error: failMsg, isLoading: false });
+          set({ error: opts.suppressError ? null : failMsg, isLoading: false });
           return { success: false, message: failMsg };
         } catch (error) {
           const message = error.response?.data?.message || "Failed to send OTP";
-          set({ error: message, isLoading: false });
+          set({ error: opts.suppressError ? null : message, isLoading: false });
           return { success: false, message };
         }
       },
