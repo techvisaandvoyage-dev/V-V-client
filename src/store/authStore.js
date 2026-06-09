@@ -664,10 +664,28 @@ export const useAuthStore = create(
       /**
        * Popup Auth Methods
        */
+      popupCheckPhone: async (phone) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/auth/check-phone", { phone });
+          set({ isLoading: false });
+          return { success: true, exists: data.exists === true };
+        } catch (error) {
+          const message = error.response?.data?.message || "Could not check phone number";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
       popupRequestOtp: async (phone, channel = "auto") => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/auth/send-otp", { identifier: phone, purpose: "auth", channel });
+          const { data } = await api.post("/auth/send-otp", {
+            identifier: phone,
+            purpose: "auth",
+            channel,
+            popupFlow: true,
+          });
           set({ isLoading: false });
           return { success: true, devOtp: data.devOtp, channel: data.channel, otpLength: data.otpLength };
         } catch (error) {

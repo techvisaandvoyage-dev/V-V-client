@@ -86,20 +86,20 @@ const getConfiguredChannels = (config) => {
 };
 
 const AuthModal = ({ isOpen, onClose, onComplete }) => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState("phone");
+  const [isExistingUser, setIsExistingUser] = useState(false);
   const [phone, setPhone] = useState("");
   const [otpLength, setOtpLength] = useState(6);
   const [otpChannel, setOtpChannel] = useState("whatsapp");
   const [otpConfig, setOtpConfig] = useState(null);
   const [otp, setOtp] = useState(createEmptyOtp(6));
-  const [otpSent, setOtpSent] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { popupRequestOtp, popupVerifyOtp, popupCompleteSignup } = useAuthStore();
+  const { popupCheckPhone, popupRequestOtp, popupVerifyOtp, popupCompleteSignup } = useAuthStore();
   const { showToast } = useUIStore();
   const inputRefs = useRef([]);
 
@@ -165,12 +165,12 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      setStep(1);
+      setStep("phone");
+      setIsExistingUser(false);
       setPhone("");
       setOtpLength(6);
       setOtpChannel("whatsapp");
       setOtp(createEmptyOtp(6));
-      setOtpSent(false);
       setFirstName("");
       setLastName("");
       setEmail("");
@@ -190,6 +190,8 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
 
   const configuredPhoneChannels = getConfiguredChannels(otpConfig);
   const primaryPhoneChannel = "auto";
+  const otpSent = step === "otp";
+  const fullPhone = phoneCountryCode + phone;
 
   const handlePhoneSubmit = async (channel = primaryPhoneChannel) => {
     if (phone.length < 10) {
@@ -198,8 +200,14 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
     }
     setError("");
     setLoading(true);
-    // Combine country code and phone
-    const fullPhone = phoneCountryCode + phone;
+    const checkRes = await popupCheckPhone(fullPhone);
+    if (!checkRes.success) {
+      setLoading(false);
+      setError(checkRes.message || "Could not check phone number");
+      return;
+    }
+
+    setIsExistingUser(checkRes.exists);
     const res = await popupRequestOtp(fullPhone, channel);
     setLoading(false);
     
@@ -207,7 +215,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
       const nextLength = res.otpLength === 4 ? 4 : 6;
       setOtpLength(nextLength);
       setOtpChannel(res.channel || "whatsapp");
-      setOtpSent(true);
+      setStep("otp");
       if (res.devOtp) {
         setOtp(res.devOtp.split("").slice(0, nextLength));
       } else {
@@ -219,7 +227,8 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
   };
 
   const handleEditPhone = () => {
-    setOtpSent(false);
+    setStep("phone");
+    setIsExistingUser(false);
     setOtp(createEmptyOtp(otpLength));
     setError("");
   };
@@ -232,16 +241,15 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
     }
     setError("");
     setLoading(true);
-    const fullPhone = phoneCountryCode + phone;
     const res = await popupVerifyOtp(fullPhone, otpValue);
     setLoading(false);
 
     if (res.success) {
-      if (res.userExists) {
+      if (isExistingUser || res.userExists) {
         showToast("Logged in successfully!", "success");
         onComplete();
       } else {
-        setStep(2);
+        setStep("details");
       }
     } else {
       setError(res.message || "Invalid OTP");
@@ -257,19 +265,24 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
       setError("Last Name is required");
       return;
     }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email.trim()) {
+      setError("Email is required");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError("Enter a valid email address");
       return;
     }
     setError("");
     setLoading(true);
     const otpValue = otp.join("");
-    const fullPhone = phoneCountryCode + phone;
     const res = await popupCompleteSignup(fullPhone, otpValue, firstName, lastName, email);
     setLoading(false);
 
     if (res.success) {
-      setStep(3);
+      setStep("success");
+      showToast("Account created successfully!", "success");
+      window.setTimeout(() => onComplete(), 500);
     } else {
       setError(res.message || "Failed to create account");
     }
@@ -312,10 +325,13 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
           </button>
         </div>
 
-        {step === 2 && (
+        {(step === "otp" || step === "details") && (
           <div className="absolute left-5 top-5 z-10">
             <button 
-              onClick={() => setStep(1)}
+              onClick={() => {
+                setError("");
+                setStep(step === "details" ? "otp" : "phone");
+              }}
               className="flex h-9 w-9 items-center justify-center rounded-full text-[#02071d] transition-colors hover:bg-[#f3f7ff]"
               aria-label="Back"
             >
@@ -326,7 +342,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
 
         <div className="relative z-[1] px-6 pb-8 pt-8 sm:px-7">
           
-          {step === 1 && (
+          {(step === "phone" || step === "otp") && (
             <div className="flex flex-col items-center">
               <StepIconBubble>
                 <Smartphone size={48} strokeWidth={1.7} />
@@ -341,12 +357,12 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!otpSent) {
+                        if (step === "phone") {
                           setCountryCodeOpen((prev) => !prev);
                           setCountryCodeSearch("");
                         }
                       }}
-                      disabled={otpSent}
+                      disabled={step !== "phone"}
                       className="flex h-[58px] w-full items-center justify-between gap-3 rounded-lg border border-[#d9e2f0] bg-white px-5 text-[15px] font-bold text-[#05071d] transition-all duration-200 hover:border-[#b8c8e3] focus:border-[#0757F9] focus:outline-none focus:ring-2 focus:ring-[#0757F9]/15 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <span className="min-w-0 flex flex-1 items-center gap-2 text-left">
@@ -433,13 +449,13 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="Enter mobile number"
-                      disabled={otpSent}
+                      disabled={step !== "phone"}
                       className="h-[58px] w-full rounded-lg border border-[#d9e2f0] bg-white px-5 pl-14 text-[15px] font-medium text-[#05071d] transition-all placeholder:text-[#4f5878] focus:border-[#0757F9] focus:outline-none focus:ring-2 focus:ring-[#0757F9]/15 disabled:bg-[#f7f9fd] disabled:opacity-60"
                     />
                   </div>
                 </div>
 
-                {!otpSent && (
+                {step === "phone" && (
                   <div className="mt-2 space-y-2">
                     <button
                       onClick={() => handlePhoneSubmit(primaryPhoneChannel)}
@@ -462,7 +478,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                   </div>
                 )}
 
-                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${otpSent ? "mt-7 max-h-72 opacity-100" : "mt-0 max-h-0 opacity-0"}`}>
+                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${step === "otp" ? "mt-7 max-h-72 opacity-100" : "mt-0 max-h-0 opacity-0"}`}>
                   <div className="relative pt-7">
                     <div className="absolute left-0 right-0 top-0 h-px bg-[#d9e2f0]" />
                     <div className="absolute left-1/2 top-0 h-5 w-12 -translate-x-1/2 -translate-y-1/2 bg-white text-center text-[#d9e2f0]">
@@ -504,7 +520,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
             </div>
           )}
           
-          {step === 2 && (
+          {step === "details" && (
             <div className="flex flex-col items-center">
               <StepIconBubble>
                 <ClipboardList size={50} strokeWidth={1.7} />
@@ -576,7 +592,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
             </div>
           )}
           
-          {step === 3 && (
+          {step === "success" && (
             <div className="flex min-h-[560px] flex-col items-center">
               <SuccessArt />
               
