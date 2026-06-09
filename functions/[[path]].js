@@ -27,7 +27,7 @@ export async function onRequest(context) {
     if (!seoResp.ok) return response;
     
     const seoData = await seoResp.json();
-    if (seoData?.success && seoData?.config) {
+    if (seoData.success && seoData.config) {
       const config = seoData.config;
       
       const title = config.seoHomepageTitle || config.seoWebsiteTitle || "Visa & Voyage";
@@ -38,7 +38,7 @@ export async function onRequest(context) {
       const ogDescription = config.seoOpenGraphDescription || description;
       const twitterTitle = config.seoTwitterTitle || title;
       const twitterDescription = config.seoTwitterDescription || description;
-      const robots = config.seoRobotsIndex ? "index,follow" : "noindex,nofollow";
+      const robots = config.seoRobotsIndex  "index,follow" : "noindex,nofollow";
       
       const faviconUrl = config.seoFaviconUrl || "";
       const favicon32 = config.seoFavicon32Url || faviconUrl;

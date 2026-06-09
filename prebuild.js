@@ -20,7 +20,7 @@ async function updateIndexHtml() {
       
       // Helper to replace or inject meta tags
       const replaceOrInjectMeta = (htmlStr, nameAttr, nameValue, contentValue) => {
-        const regex = new RegExp(`<meta\\s+${nameAttr}="${nameValue}"\\s+content=".*?"\\s*\\/?>`, 'is');
+        const regex = new RegExp(`<meta\\s+${nameAttr}="${nameValue}"\\s+content=".*—\\s*\\/>`, 'is');
         if (regex.test(htmlStr)) {
           return htmlStr.replace(regex, `<meta ${nameAttr}="${nameValue}" content="${contentValue}" />`);
         } else {
@@ -31,7 +31,7 @@ async function updateIndexHtml() {
       
       // Update Title
       if (config.seoWebsiteTitle) {
-        html = html.replace(/<title>.*?<\/title>/i, `<title>${config.seoWebsiteTitle}</title>`);
+        html = html.replace(/<title>.*<\/title>/i, `<title>${config.seoWebsiteTitle}</title>`);
       }
       
       // Update Meta Description

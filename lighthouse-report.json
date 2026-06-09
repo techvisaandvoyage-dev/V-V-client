@@ -297,7 +297,7 @@
           },
           {
             "source": "javascript",
-            "description": "Access to XMLHttpRequest at 'https://api.visavo.in/api/countries/popular?limit=250' from origin 'http://localhost:4174' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+            "description": "Access to XMLHttpRequest at 'https://api.visavo.in/api/countries/popularlimit=250' from origin 'http://localhost:4174' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
             "sourceLocation": {
               "type": "source-location",
               "url": "http://localhost:4174/",
@@ -308,7 +308,7 @@
           },
           {
             "source": "javascript",
-            "description": "Access to XMLHttpRequest at 'https://api.visavo.in/api/countries/popular?limit=250' from origin 'http://localhost:4174' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+            "description": "Access to XMLHttpRequest at 'https://api.visavo.in/api/countries/popularlimit=250' from origin 'http://localhost:4174' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
             "sourceLocation": {
               "type": "source-location",
               "url": "http://localhost:4174/",
@@ -399,7 +399,7 @@
             "description": "Failed to load resource: net::ERR_FAILED",
             "sourceLocation": {
               "type": "source-location",
-              "url": "https://api.visavo.in/api/countries/popular?limit=250",
+              "url": "https://api.visavo.in/api/countries/popularlimit=250",
               "urlProvider": "network",
               "line": 0,
               "column": 0
@@ -476,7 +476,7 @@
             "description": "Failed to load resource: net::ERR_FAILED",
             "sourceLocation": {
               "type": "source-location",
-              "url": "https://api.visavo.in/api/countries/popular?limit=250",
+              "url": "https://api.visavo.in/api/countries/popularlimit=250",
               "urlProvider": "network",
               "line": 0,
               "column": 0
@@ -1001,7 +1001,7 @@
             "entity": "localhost"
           },
           {
-            "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+            "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap",
             "sessionTargetType": "page",
             "protocol": "h2",
             "rendererStartTime": 66.25600004196167,
@@ -1106,7 +1106,7 @@
             "entity": "localhost"
           },
           {
-            "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+            "url": "https://fonts.googleapis.com/css2family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
             "sessionTargetType": "page",
             "protocol": "h2",
             "rendererStartTime": 189.36500000953674,
@@ -1718,7 +1718,7 @@
             "entity": "visavo.in"
           },
           {
-            "url": "https://api.visavo.in/api/countries/popular?limit=250",
+            "url": "https://api.visavo.in/api/countries/popularlimit=250",
             "sessionTargetType": "page",
             "protocol": "",
             "rendererStartTime": 1437.3870000243187,
@@ -1735,7 +1735,7 @@
             "entity": "visavo.in"
           },
           {
-            "url": "https://api.visavo.in/api/countries/popular?limit=250",
+            "url": "https://api.visavo.in/api/countries/popularlimit=250",
             "sessionTargetType": "page",
             "protocol": "",
             "rendererStartTime": 1615.992999970913,
@@ -1959,7 +1959,7 @@
             },
             {
               "type": "parser",
-              "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+              "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap"
             },
             {
               "type": "parser",
@@ -1967,7 +1967,7 @@
             },
             {
               "type": "parser",
-              "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+              "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap"
             }
           ]
         }
@@ -3226,7 +3226,7 @@
                 "height": 216
               },
               "snippet": "<div class=\"w-full max-w-xl transform transition-all duration-300 ease-out pointer-eve…\" aria-hidden=\"true\">",
-              "nodeLabel": "Leaving already?\n\nComplete your visa application now and save your progress.\n\nC…",
+              "nodeLabel": "Leaving already\n\nComplete your visa application now and save your progress.\n\nC…",
               "explanation": "Fix all of the following:\n  Focusable content should be disabled or be removed from the DOM"
             },
             "subItems": {
@@ -5053,7 +5053,7 @@
                       "height": 216
                     },
                     "snippet": "<div class=\"w-full max-w-xl transform transition-all duration-300 ease-out pointer-eve…\" aria-hidden=\"true\">",
-                    "nodeLabel": "Leaving already?\n\nComplete your visa application now and save your progress.\n\nC…"
+                    "nodeLabel": "Leaving already\n\nComplete your visa application now and save your progress.\n\nC…"
                   }
                 }
               ]
@@ -5678,7 +5678,7 @@
                   "isLongest": true,
                   "children": {
                     "20548.3": {
-                      "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+                      "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap",
                       "navStartToEndTime": 475,
                       "transferSize": 862,
                       "isLongest": true,
@@ -5704,7 +5704,7 @@
                       "transferSize": 81641,
                       "children": {
                         "20548.117": {
-                          "url": "https://api.visavo.in/api/countries/popular?limit=250",
+                          "url": "https://api.visavo.in/api/countries/popularlimit=250",
                           "navStartToEndTime": 1782,
                           "transferSize": 0,
                           "children": {}
@@ -5735,7 +5735,7 @@
                           "children": {}
                         },
                         "20548.16": {
-                          "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+                          "url": "https://fonts.googleapis.com/css2family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
                           "navStartToEndTime": 472,
                           "transferSize": 1060,
                           "children": {}
@@ -5883,12 +5883,12 @@
         ],
         "items": [
           {
-            "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+            "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap",
             "totalBytes": 862,
             "wastedMs": 1044
           },
           {
-            "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+            "url": "https://fonts.googleapis.com/css2family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
             "totalBytes": 1060,
             "wastedMs": 218
           },
@@ -5947,7 +5947,7 @@
               "type": "subitems",
               "items": [
                 {
-                  "url": "https://api.visavo.in/api/countries/popular?limit=250",
+                  "url": "https://api.visavo.in/api/countries/popularlimit=250",
                   "mainThreadTime": 0.039000093936920166,
                   "transferSize": 0
                 },
@@ -6007,12 +6007,12 @@
                   "transferSize": 48464
                 },
                 {
-                  "url": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+                  "url": "https://fonts.googleapis.com/css2family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
                   "mainThreadTime": 0,
                   "transferSize": 1060
                 },
                 {
-                  "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+                  "url": "https://fonts.googleapis.com/css2family=Inter:wght@400;500;600;700&display=swap",
                   "mainThreadTime": 0,
                   "transferSize": 862
                 }
