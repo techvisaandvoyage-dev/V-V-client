@@ -15,7 +15,6 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
-import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 import {
   signInWithGooglePopup,
   signInWithFacebookPopup,
@@ -27,7 +26,9 @@ import { DEFAULT_PHONE_COUNTRY_CODE } from "../utils/phoneCountryCodes";
 
 const sanitizeAuthIdentifierInput = (value) => {
   const raw = String(value || "");
-  if (raw.includes("@")) return raw.trim();
+  if (/[a-zA-Z@.]/.test(raw)) {
+    return raw.trim();
+  }
   return raw.replace(/\D/g, "").slice(0, 10);
 };
 
@@ -707,17 +708,18 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                         >
                           <div className="p-4 pt-1 border-t border-border/30">
                             <form onSubmit={handleRequestOtp} className="space-y-3" noValidate>
-                              <PhoneCountryCodeSelect
-                                value={phoneCountryCode}
-                                onChange={setPhoneCountryCode}
-                                label="Country Code"
-                              />
                               <Input
                                 label=""
                                 type="text"
                                 inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
-                                placeholder="Enter mobile no."
+                                placeholder={
+                                  otpPhoneEnabled && otpEmailEnabled
+                                    ? "Enter mobile no. or email"
+                                    : otpEmailEnabled
+                                      ? "Enter email"
+                                      : "Enter mobile no."
+                                }
                                 value={otpIdentifier}
                                 onChange={(e) => setOtpIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
@@ -777,15 +779,16 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                         >
                           <div className="p-4 pt-1 border-t border-border/30">
                             <form onSubmit={handlePasswordSubmit} className="space-y-3" noValidate>
-                              <PhoneCountryCodeSelect
-                                value={phoneCountryCode}
-                                onChange={setPhoneCountryCode}
-                                label="Country Code"
-                              />
                               <Input
                                 label=""
                                 type="text"
-                                placeholder="Enter mobile no."
+                                placeholder={
+                                  otpPhoneEnabled && otpEmailEnabled
+                                    ? "Enter mobile no. or email"
+                                    : otpEmailEnabled
+                                      ? "Enter email"
+                                      : "Enter mobile no."
+                                }
                                 value={identifier}
                                 onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 autoComplete="username"
@@ -862,11 +865,6 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
 
                     {forgotStep === 1 ? (
                       <>
-                        <PhoneCountryCodeSelect
-                          value={phoneCountryCode}
-                          onChange={setPhoneCountryCode}
-                          label="Country Code"
-                        />
                         <Input
                           label=""
                           type="text"
@@ -874,7 +872,13 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                           autoComplete="username"
                           value={forgotEmail}
                           onChange={(e) => setForgotEmail(sanitizeAuthIdentifierInput(e.target.value))}
-                          placeholder="Enter mobile no."
+                          placeholder={
+                            otpPhoneEnabled && otpEmailEnabled
+                              ? "Enter mobile no. or email"
+                              : otpEmailEnabled
+                                ? "Enter email"
+                                : "Enter mobile no."
+                          }
                           className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                           required
                         />
@@ -1080,7 +1084,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                   disabled={otpDigits.join("").length !== otpLength || !otpSentValue}
                   className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium shadow-none border-none"
                 >
-                  {otpAuthMode === "signup" ? "Verify &amp; Continue" : "Verify &amp; Log In"}
+                  Verify
                 </Button>
               </form>
 

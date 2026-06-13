@@ -20,7 +20,6 @@ import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import OtpInput from "../components/ui/OtpInput";
-import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 import {
   signInWithGooglePopup,
   signInWithFacebookPopup,
@@ -77,7 +76,9 @@ const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value |
 
 const sanitizeAuthIdentifierInput = (value) => {
   const raw = String(value || "");
-  if (raw.includes("@")) return raw.trim();
+  if (/[a-zA-Z@.]/.test(raw)) {
+    return raw.trim();
+  }
   return raw.replace(/\D/g, "").slice(0, 10);
 };
 
@@ -207,6 +208,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const [completionContext, setCompletionContext] = useState(null);
   const [completionValues, setCompletionValues] = useState({ firstName: "", lastName: "", email: "" });
   const [completionErrors, setCompletionErrors] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
 
@@ -358,17 +360,18 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       showToast("Passwords do not match.", "error");
       return;
     }
-    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(
+    setFieldErrors({});
+    const otpResult = await register(
       nameTrim,
       contact,
       withPassword ? password : ""
     );
-    if (success) {
-      const nextLength = sentOtpLength === 4 ? 4 : 6;
+    if (otpResult.success) {
+      const nextLength = otpResult.otpLength === 4 ? 4 : 6;
       setOtpLength(nextLength);
-      setOtpChannel(channel || "");
+      setOtpChannel(otpResult.channel || "");
       setOtpDigits(Array.from({ length: nextLength }, () => ""));
-      setSignupDevOtp(devOtp && String(devOtp).length >= 4 ? String(devOtp) : "");
+      setSignupDevOtp(otpResult.devOtp && String(otpResult.devOtp).length >= 4 ? String(otpResult.devOtp) : "");
       setSignupUsesPassword(Boolean(withPassword));
       startTimer();
       setStep(2);
@@ -378,6 +381,10 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
           : "Verification code sent. Check your email to continue.",
         "success"
       );
+    } else {
+      if (otpResult.field) {
+        setFieldErrors({ [otpResult.field]: otpResult.message });
+      }
     }
   };
 
@@ -408,23 +415,27 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
         !((parsed.type === "phone" && otpPhoneEnabled) || (parsed.type === "email" && otpEmailEnabled)))
     ) return;
     const contact = parsed.value;
-    const { success, devOtp, otpLength: sentOtpLength, channel } = await register(
+    const otpResult = await register(
       nameTrim,
       contact,
       signupUsesPassword ? password : ""
     );
-    if (success) {
-      const nextLength = sentOtpLength === 4 ? 4 : 6;
+    if (otpResult.success) {
+      const nextLength = otpResult.otpLength === 4 ? 4 : 6;
       setOtpLength(nextLength);
-      setOtpChannel(channel || "");
+      setOtpChannel(otpResult.channel || "");
       setOtpDigits(Array.from({ length: nextLength }, () => ""));
       startTimer();
-      if (devOtp && String(devOtp).length >= 4) setSignupDevOtp(String(devOtp));
+      if (otpResult.devOtp && String(otpResult.devOtp).length >= 4) setSignupDevOtp(String(otpResult.devOtp));
       showToast(
         parsed.type === "phone"
           ? "A new code was sent to your phone."
           : "A new code was sent to " + contact
       );
+    } else {
+      if (otpResult.field) {
+        setFieldErrors({ [otpResult.field]: otpResult.message });
+      }
     }
   };
 
@@ -484,7 +495,13 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       email: completionContext?.showEmail ? email : "",
     });
     if (!result.success) {
-      setCompletionErrors({ form: result.message || "Could not complete profile" });
+      if (result.field === "email") {
+        setCompletionErrors({ email: result.message });
+      } else if (result.field === "phone") {
+        setCompletionErrors({ phone: result.message });
+      } else {
+        setCompletionErrors({ form: result.message || "Could not complete profile" });
+      }
       return;
     }
     showToast("Account created.");
@@ -494,6 +511,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const goBack = () => {
     setStep(1);
     clearError();
+    setFieldErrors({});
     setOtpDigits(Array.from({ length: otpLength }, () => ""));
     setSignupDevOtp("");
     setConfirmPasswordError("");
@@ -608,19 +626,25 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                             </AnimatePresence>
 
                             <div className="space-y-3">
-                              <PhoneCountryCodeSelect
-                                value={phoneCountryCode}
-                                onChange={setPhoneCountryCode}
-                                label="Country Code"
-                              />
                               <Input
                                 label=""
                                 type="text"
                                 inputMode={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "text"}
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
-                                placeholder="Enter mobile no."
+                                placeholder={
+                                  otpPhoneEnabled && otpEmailEnabled
+                                    ? "Enter mobile no. or email"
+                                    : otpEmailEnabled
+                                      ? "Enter email"
+                                      : "Enter mobile no."
+                                }
                                 value={identifier}
-                                onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
+                                onChange={(e) => {
+                                  setIdentifier(sanitizeAuthIdentifierInput(e.target.value));
+                                  setFieldErrors({});
+                                  clearError();
+                                }}
+                                error={fieldErrors.email || fieldErrors.phone || fieldErrors.both}
                                 className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                                 required
                               />
@@ -685,24 +709,34 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                   type="text"
                   placeholder="Full Name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setFieldErrors({});
+                    clearError();
+                  }}
                   className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                   required
                 />
 
                 <div className="space-y-3">
-                  <PhoneCountryCodeSelect
-                    value={phoneCountryCode}
-                    onChange={setPhoneCountryCode}
-                    label="Country Code"
-                  />
                   <Input
                     label=""
                     type="text"
                     autoComplete="username"
-                    placeholder="Enter mobile no."
+                    placeholder={
+                      otpPhoneEnabled && otpEmailEnabled
+                        ? "Enter mobile no. or email"
+                        : otpEmailEnabled
+                          ? "Enter email"
+                           : "Enter mobile no."
+                    }
                     value={identifier}
-                    onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
+                    onChange={(e) => {
+                      setIdentifier(sanitizeAuthIdentifierInput(e.target.value));
+                      setFieldErrors({});
+                      clearError();
+                    }}
+                    error={fieldErrors.email || fieldErrors.phone || fieldErrors.both}
                     className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                     required
                   />
@@ -733,7 +767,11 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                         type={showPass ? "text" : "password"}
                         placeholder="Create a password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setFieldErrors({});
+                          clearError();
+                        }}
                         autoComplete="new-password"
                         className="h-[52px] rounded-full border-border bg-surface px-5 pr-12 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                         rightIcon={
@@ -907,7 +945,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                   disabled={otpDigits.join("").length !== otpLength}
                   className="h-[52px] rounded-full bg-cyan text-white hover:bg-cyan-dim text-[15px] font-medium shadow-none border-none"
                 >
-                  Verify &amp; Create Account
+                  Verify
                 </Button>
               </form>
 

@@ -508,7 +508,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                       disabled={loading || otp.join("").length < otpLength}
                       className="h-[54px] w-full rounded-lg bg-[#0757F9] text-[20px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {loading ? "Verifying..." : "Verify OTP"}
+                      {loading ? "Verifying..." : "Verify"}
                     </button>
                   </div>
                 </div>

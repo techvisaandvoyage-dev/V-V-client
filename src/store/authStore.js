@@ -236,12 +236,14 @@ export const useAuthStore = create(
           }
 
           const message = data.message || "Could not complete signup";
+          const field = data.field;
           set({ isLoading: false, error: message });
-          return { success: false, message };
+          return { success: false, message, field };
         } catch (error) {
           const message = error.response?.data?.message || "Could not complete signup";
+          const field = error.response?.data?.field;
           set({ isLoading: false, error: message });
-          return { success: false, message };
+          return { success: false, message, field };
         }
       },
 
@@ -459,12 +461,14 @@ export const useAuthStore = create(
             };
           }
           const message = data.message || "Registration failed";
+          const field = data.field;
           set({ error: message, isLoading: false });
-          return { success: false };
+          return { success: false, message, field };
         } catch (error) {
           const message = error.response?.data?.message || "Registration failed";
+          const field = error.response?.data?.field;
           set({ error: message, isLoading: false });
-          return { success: false };
+          return { success: false, message, field };
         }
       },
 
@@ -748,8 +752,9 @@ export const useAuthStore = create(
           return { success: false };
         } catch (error) {
           const message = error.response?.data?.message || "Signup failed";
+          const field = error.response?.data?.field;
           set({ error: message, isLoading: false });
-          return { success: false, message };
+          return { success: false, message, field };
         }
       },
     }),
