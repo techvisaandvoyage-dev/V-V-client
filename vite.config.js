@@ -8,17 +8,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Core React runtime — rarely changes, gets long-lived cache
-          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'],
-          // Animation library — large but stable
-          'framer-motion': ['framer-motion'],
-          // Firebase — only loaded on auth pages
-          'firebase': ['firebase/app', 'firebase/auth'],
-          // Data fetching
-          'react-query': ['@tanstack/react-query'],
-          // PDF libraries (force separation so they don't get bundled into the entry chunk via fileValidation)
-          'pdf': ['pdf-lib', 'pdfjs-dist'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/framer-motion')) {
+            return 'framer-motion';
+          }
+          if (id.includes('node_modules/firebase')) {
+            return 'firebase';
+          }
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'react-query';
+          }
+          if (id.includes('node_modules/pdf-lib') || id.includes('node_modules/pdfjs-dist')) {
+            return 'pdf';
+          }
         },
       },
     },
