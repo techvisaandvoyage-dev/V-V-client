@@ -25,7 +25,7 @@ const withBlankImageUrl = (country) => ({
  * is instant — without it, mobile users open a link and see blank cards until the
  * Render API responds (cold start can take 30–60s on the free tier).
  */
-const COUNTRIES_CACHE_KEY = "vb_countries_api_v18";
+const COUNTRIES_CACHE_KEY = "vb_countries_api_v19";
 const COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_DISPLAY = Object.freeze({
@@ -71,7 +71,7 @@ function normalizeVisaInformation(raw, country = {}) {
   const data = raw && typeof raw === "object" ? raw : {};
   const getResolvedVisaInfoValue = (itemId) => {
     if (itemId === "lengthOfStay") {
-      return String(country.lengthOfStay || country.validity || "").trim();
+      return String(country.lengthOfStay || "").trim();
     }
     if (itemId === "validity") {
       return String(country.validity || "").trim();
