@@ -74,7 +74,7 @@ const DEFAULT_HERO_HIGHLIGHTS = [
 ];
 
 // ── Animation variants ─────────────────────────────────────
-const POPULAR_COUNTRIES_CACHE_KEY = "vb_popular_countries_home_v2";
+const POPULAR_COUNTRIES_CACHE_KEY = "vb_popular_countries_home_v3";
 const POPULAR_COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const loadPopularCountriesCache = () => {
@@ -210,7 +210,7 @@ const LandingPage = () => {
         setPopularCountriesLoading(true);
       }
       try {
-        const { data } = await api.get("/countries/popular", { params: { limit: 250 } });
+        const { data } = await api.get("/countries/popular", { params: { limit: 250, _ts: Date.now() } });
         if (!alive) return;
 
         const normalized = Array.isArray(data?.countries)

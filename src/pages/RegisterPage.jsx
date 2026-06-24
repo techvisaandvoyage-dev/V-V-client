@@ -248,14 +248,20 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   );
   const otpPhonePreview = contactParsedPreview?.type === "phone" ? contactParsedPreview : null;
   const otpEmailPreview = contactParsedPreview?.type === "email" ? contactParsedPreview : null;
-  const otpPhoneEnabled = authControls.phoneOtpEnabled !== false;
+  const isWhatsappOn = authControls.phoneOtpEnabled !== false;
+  const isSmsOn = authControls.smsOtpEnabled === true;
+  const otpPhoneEnabled = isWhatsappOn || isSmsOn;
   const otpEmailEnabled = authControls.emailOtpEnabled !== false;
   const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
+
+  const phoneStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS" : isWhatsappOn ? "WhatsApp" : "SMS";
+  const phoneNoStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS no." : isWhatsappOn ? "WhatsApp no." : "SMS no.";
+
   const otpSignupLabel =
     otpPhoneEnabled && otpEmailEnabled
-      ? "Sign up with phone/Email OTP"
+      ? `Sign up with ${phoneStr}/Email OTP`
       : otpPhoneEnabled
-        ? "Sign up with phone OTP"
+        ? `Sign up with ${phoneStr} OTP`
         : "Sign up with email OTP";
   const openProfileCompletion = ({ provider, user, fallbackName = "", email = "", phone = "" }) => {
     const fromName = splitDisplayName(user?.name || fallbackName);
@@ -633,10 +639,10 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
                                 placeholder={
                                   otpPhoneEnabled && otpEmailEnabled
-                                    ? "Enter mobile no. or email"
+                                    ? `Enter ${phoneNoStr} or email`
                                     : otpEmailEnabled
                                       ? "Enter email"
-                                      : "Enter mobile no."
+                                      : `Enter ${phoneNoStr}`
                                 }
                                 value={identifier}
                                 onChange={(e) => {
@@ -657,13 +663,13 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                                   }`}
                                 >
                                   {otpPhonePreview && otpPhoneEnabled
-                                    ? `We'll text a code to ...${otpPhonePreview.value.slice(-4)}`
+                                    ? `We'll send a code via ${phoneStr} ...${otpPhonePreview.value.slice(-4)}`
                                     : otpEmailPreview && otpEmailEnabled
                                       ? "We'll email a code to this address"
                                       : otpPhoneEnabled && otpEmailEnabled
-                                        ? "Enter a valid email or 10-digit mobile number"
+                                        ? `Enter a valid email or 10-digit ${phoneNoStr}`
                                         : otpPhoneEnabled
-                                          ? "Enter a valid 10-digit mobile number"
+                                          ? `Enter a valid 10-digit ${phoneNoStr}`
                                           : "Enter a valid email address"}
                                 </p>
                               )}
@@ -725,10 +731,10 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                     autoComplete="username"
                     placeholder={
                       otpPhoneEnabled && otpEmailEnabled
-                        ? "Enter mobile no. or email"
+                        ? `Enter ${phoneNoStr} or email`
                         : otpEmailEnabled
                           ? "Enter email"
-                           : "Enter mobile no."
+                           : `Enter ${phoneNoStr}`
                     }
                     value={identifier}
                     onChange={(e) => {

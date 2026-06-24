@@ -25,7 +25,7 @@ const withBlankImageUrl = (country) => ({
  * is instant — without it, mobile users open a link and see blank cards until the
  * Render API responds (cold start can take 30–60s on the free tier).
  */
-const COUNTRIES_CACHE_KEY = "vb_countries_api_v19";
+const COUNTRIES_CACHE_KEY = "vb_countries_api_v20";
 const COUNTRIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_DISPLAY = Object.freeze({
@@ -392,7 +392,9 @@ export function useMergedCountry(countryId, listCountry) {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await api.get(`/countries/${encodeURIComponent(countryId)}`);
+        const { data } = await api.get(`/countries/${encodeURIComponent(countryId)}`, {
+          params: { _ts: Date.now() },
+        });
         if (cancelled || !data?.success || !data.country) return;
         setFresh(normalizeCountryFromApi(data.country));
       } catch {
@@ -461,7 +463,7 @@ export function useCountries() {
     const fetchFromDB = async () => {
       try {
         const { data } = await api.get("/countries", {
-          params: { active: true },
+          params: { active: true, _ts: Date.now() },
         });
 
         if (!cancelled && data.success && data.countries?.length > 0) {

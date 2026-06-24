@@ -502,7 +502,7 @@ const CountryDetails = () => {
   useEffect(() => {
     let mounted = true;
     const countryId = country?._id || country?.slug || country?.id || "";
-    api.get("/visa-types/active", { params: countryId ? { countryId } : {} }).then(res => {
+    api.get("/visa-types/active", { params: countryId ? { countryId, _ts: Date.now() } : { _ts: Date.now() } }).then(res => {
       if (mounted && res.data?.success) {
         setActiveVisaTypes(res.data.visaTypes);
         setVisaOption(prev => {

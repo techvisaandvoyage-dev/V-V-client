@@ -256,14 +256,20 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
   }, [authControls.passwordEnabled, loginMethod, forgotMode]);
 
   const otpLoginIsEmail = otpSentKind === "email";
-  const otpPhoneEnabled = authControls.phoneOtpEnabled !== false;
+  const isWhatsappOn = authControls.phoneOtpEnabled !== false;
+  const isSmsOn = authControls.smsOtpEnabled === true;
+  const otpPhoneEnabled = isWhatsappOn || isSmsOn;
   const otpEmailEnabled = authControls.emailOtpEnabled !== false;
   const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
+  
+  const phoneStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS" : isWhatsappOn ? "WhatsApp" : "SMS";
+  const phoneNoStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS no." : isWhatsappOn ? "WhatsApp no." : "SMS no.";
+
   const otpMethodLabel =
     otpPhoneEnabled && otpEmailEnabled
-      ? "Log in with phone/Email OTP"
+      ? `Log in with ${phoneStr}/Email OTP`
       : otpPhoneEnabled
-        ? "Log in with phone OTP"
+        ? `Log in with ${phoneStr} OTP`
         : "Log in with email OTP";
   const otpStep2Display =
     otpSentKind === "phone" && otpSentValue
@@ -445,7 +451,12 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
       setOtpSentKind(kind);
       setOtpLength(nextLength);
       setOtpChannel(channel || "");
-      setOtpDigits(Array.from({ length: nextLength }, () => ""));
+      if (devOtp) {
+        const chars = String(devOtp).split("");
+        setOtpDigits(chars);
+      } else {
+        setOtpDigits(Array.from({ length: nextLength }, () => ""));
+      }
       if (otpStep === 1) setOtpIdentifier(displayValue || contact);
       setLoginTestOtp(devOtp ? String(devOtp) : "");
       startTimer();
@@ -715,10 +726,10 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 autoComplete={otpEmailEnabled && !otpPhoneEnabled ? "email" : otpPhoneEnabled && !otpEmailEnabled ? "tel" : "username"}
                                 placeholder={
                                   otpPhoneEnabled && otpEmailEnabled
-                                    ? "Enter mobile no. or email"
+                                    ? `Enter ${phoneNoStr} or email`
                                     : otpEmailEnabled
                                       ? "Enter email"
-                                      : "Enter mobile no."
+                                      : `Enter ${phoneNoStr}`
                                 }
                                 value={otpIdentifier}
                                 onChange={(e) => setOtpIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
@@ -728,13 +739,13 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                               {otpIdentifier.trim() && (
                                 <p className={`px-4 text-[12px] leading-snug ${(otpPhonePreview && otpPhoneEnabled) || (otpEmailPreview && otpEmailEnabled) ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                                   {otpPhonePreview && otpPhoneEnabled
-                                    ? `We'll text a code to mobile ...${otpPhonePreview.value.slice(-4)}`
+                                    ? `We'll send a code via ${phoneStr} ...${otpPhonePreview.value.slice(-4)}`
                                     : otpEmailPreview && otpEmailEnabled
                                       ? "We'll email a code to this address"
                                       : otpPhoneEnabled && otpEmailEnabled
-                                        ? "Enter a valid email or 10-digit mobile number"
+                                        ? `Enter a valid email or 10-digit ${phoneNoStr}`
                                         : otpPhoneEnabled
-                                          ? "Enter a valid 10-digit mobile number"
+                                          ? `Enter a valid 10-digit ${phoneNoStr}`
                                           : "Enter a valid email address"}
                                 </p>
                               )}
@@ -784,10 +795,10 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 type="text"
                                 placeholder={
                                   otpPhoneEnabled && otpEmailEnabled
-                                    ? "Enter mobile no. or email"
+                                    ? `Enter ${phoneNoStr} or email`
                                     : otpEmailEnabled
                                       ? "Enter email"
-                                      : "Enter mobile no."
+                                      : `Enter ${phoneNoStr}`
                                 }
                                 value={identifier}
                                 onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
@@ -874,10 +885,10 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                           onChange={(e) => setForgotEmail(sanitizeAuthIdentifierInput(e.target.value))}
                           placeholder={
                             otpPhoneEnabled && otpEmailEnabled
-                              ? "Enter mobile no. or email"
+                              ? `Enter ${phoneNoStr} or email`
                               : otpEmailEnabled
                                 ? "Enter email"
-                                : "Enter mobile no."
+                                : `Enter ${phoneNoStr}`
                           }
                           className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
                           required
@@ -892,11 +903,11 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                           >
                             {forgotContactPreview
                               ? forgotContactPreview.type === "phone"
-                                ? `We'll text a code — mobile …${forgotContactPreview.value.slice(-4)}`
+                                ? `We'll send a code via ${phoneStr} …${forgotContactPreview.value.slice(-4)}`
                                 : "We'll email a reset code to this address"
                               : forgotEmail.includes("@")
                                 ? "Enter a valid email address"
-                                : "Enter a valid 10-digit mobile number"}
+                                : `Enter a valid 10-digit ${phoneNoStr}`}
                           </p>
                         )}
                         <Button
