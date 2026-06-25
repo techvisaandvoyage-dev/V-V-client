@@ -1890,7 +1890,7 @@ const CountryDetails = () => {
     ? [{ id: "travel-details", label: "Travel Details" }]
     : [
         { id: "info", label: "Info" },
-        { id: "how-it-works", label: "How it works" },
+        ...(countryDisplay?.showHowItWorks !== false ? [{ id: "how-it-works", label: "How it works" }] : []),
         ...(destinationPageContent?.showVisaRequirements !== false
           ? [{ id: "visa-requirements", label: "Visa Requirements" }]
           : []),
@@ -1899,9 +1899,9 @@ const CountryDetails = () => {
         ...(countryDisplay?.showRequiredDocuments !== false
           ? [{ id: "document-requirements", label: "Document Requirements" }]
           : []),
-        { id: "why-book-now", label: "Why book now?" },
-        { id: "whats-included", label: "What's Included" },
-        { id: "faqs", label: "FAQs" },
+        ...(countryDisplay?.showWhyBookNow !== false ? [{ id: "why-book-now", label: "Why book now?" }] : []),
+        ...(countryDisplay?.showWhatsIncluded !== false ? [{ id: "whats-included", label: "What's Included" }] : []),
+        ...(countryDisplay?.showFaqs !== false ? [{ id: "faqs", label: "FAQs" }] : []),
       ], [showTravelDetails, countryDisplay?.showRequiredDocuments, destinationPageContent?.showVisaRequirements]);
 
   useEffect(() => {
@@ -2431,6 +2431,7 @@ const CountryDetails = () => {
 
   const destinationInfoSections = (
     <>
+      {countryDisplay?.showHowItWorks !== false && (
       <motion.section
         id="how-it-works"
         initial="initial"
@@ -2463,6 +2464,7 @@ const CountryDetails = () => {
           ))}
         </ol>
       </motion.section>
+      )}
 
       {destinationPageContent?.showVisaRequirements !== false && (
         <motion.section
@@ -2539,10 +2541,10 @@ const CountryDetails = () => {
               </div>
             </div>
           </div>
-        </motion.section>
+      </motion.section>
       )}
 
-      {countryDisplay?.showRequiredDocuments !== false && (
+      {countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && (
         <motion.section
           id="document-requirements"
           initial="initial"
@@ -2625,11 +2627,11 @@ const CountryDetails = () => {
               </p>
             )}
             </div>
-
           </div>
-        </motion.section>
+      </motion.section>
       )}
 
+      {countryDisplay?.showWhyBookNow !== false && (
       <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="mx-auto max-w-4xl rounded-[2rem] bg-white px-3 py-5 sm:px-6 sm:py-7 md:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="flex flex-col items-center gap-2 text-cyan mb-4">
@@ -2678,7 +2680,9 @@ const CountryDetails = () => {
             </div>
           </div>
       </motion.section>
+      )}
 
+      {countryDisplay?.showWhatsIncluded !== false && (
       <motion.section
         id="whats-included"
         initial="initial"
@@ -2781,7 +2785,9 @@ const CountryDetails = () => {
           })}
         </div>
       </motion.section>
+      )}
 
+      {countryDisplay?.showFaqs !== false && (
       <motion.section
         id="faqs"
         initial="initial"
@@ -2836,6 +2842,7 @@ const CountryDetails = () => {
           ))}
         </div>
       </motion.section>
+      )}
     </>
   );
 
@@ -3012,8 +3019,8 @@ const CountryDetails = () => {
                     display={countryDisplay}
                   />
                 </div>
-              </motion.section>
-            )}
+      </motion.section>
+      )}
 
             <div
               className={

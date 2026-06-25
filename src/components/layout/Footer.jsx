@@ -341,9 +341,11 @@ const Footer = () => {
 
         <div className="pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <p className="text-sm text-text-muted">
-              &copy; {currentYear} Visa & Voyage. All rights reserved.
-            </p>
+            <div className="text-sm text-text-muted space-y-1">
+              <p className="font-semibold text-text-primary">Visa & Voyage</p>
+              <p>Supported by Krishna Agarwal & Associates</p>
+              <p>&copy; 2015 Krishna Agarwal & Associates. All Rights Reserved</p>
+            </div>
 
             <div className="flex items-center gap-6">
               {trustBadges.map(({ icon: Icon, label }) => (
