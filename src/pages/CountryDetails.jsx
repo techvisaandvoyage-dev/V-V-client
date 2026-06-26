@@ -1449,6 +1449,7 @@ const CountryDetails = () => {
 
   const renderTravelDetailsDocumentSections = () => (
     <div className="space-y-6">
+      {countryDisplay?.showDestinationRequiredDocs !== false && (
       <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
         <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
           <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
@@ -1496,8 +1497,9 @@ const CountryDetails = () => {
           <p className="px-5 pb-6 text-sm text-slate-500 sm:px-7 sm:pb-7">No document requirements added yet.</p>
         )}
       </div>
+      )}
 
-      {travelDetailsOtherDocumentFields.length > 0 ? (
+      {countryDisplay?.showDestinationOptionalDocs !== false && travelDetailsOtherDocumentFields.length > 0 ? (
         <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
           <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
             <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
@@ -1893,12 +1895,12 @@ const CountryDetails = () => {
         { id: "info", label: "Info" },
         ...(countryDisplay?.showHowItWorks !== false ? [{ id: "how-it-works", label: "How it works" }] : []),
         ...(countryDisplay?.showWhyBookNow !== false ? [{ id: "why-book-now", label: "Why book now?" }] : []),
-        ...(countryDisplay?.showRequiredDocuments !== false
+        ...(countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && countryDisplay?.showDestinationRequiredDocs !== false
           ? [{ id: "document-requirements", label: "Document Requirements" }]
           : []),
         ...(countryDisplay?.showWhatsIncluded !== false ? [{ id: "whats-included", label: "What's Included" }] : []),
         ...(countryDisplay?.showFaqs !== false ? [{ id: "faqs", label: "FAQs" }] : []),
-      ], [showTravelDetails, countryDisplay?.showHowItWorks, countryDisplay?.showWhyBookNow, countryDisplay?.showRequiredDocuments, countryDisplay?.showWhatsIncluded, countryDisplay?.showFaqs]);
+      ], [showTravelDetails, countryDisplay?.showHowItWorks, countryDisplay?.showWhyBookNow, countryDisplay?.showRequiredDocuments, countryDisplay?.showDestinationDocuments, countryDisplay?.showDestinationRequiredDocs, countryDisplay?.showWhatsIncluded, countryDisplay?.showFaqs]);
 
   useEffect(() => {
     setActiveSubNav(SUB_NAV[0]?.id || "");
@@ -2587,7 +2589,7 @@ const CountryDetails = () => {
       </motion.section>
       )}
 
-      {countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && (
+      {countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && countryDisplay?.showDestinationRequiredDocs !== false && (
         <motion.section
           id="document-requirements"
           initial="initial"

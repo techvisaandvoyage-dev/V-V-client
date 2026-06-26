@@ -39,6 +39,8 @@ const DEFAULT_DISPLAY = Object.freeze({
   showHowItWorks: true,
   showWhyBookNow: true,
   showDestinationDocuments: true,
+  showDestinationRequiredDocs: true,
+  showDestinationOptionalDocs: true,
   showWhatsIncluded: true,
   showFaqs: true,
 });
@@ -155,6 +157,8 @@ function normalizeDisplay(raw) {
     showHowItWorks: raw.showHowItWorks !== false,
     showWhyBookNow: raw.showWhyBookNow !== false,
     showDestinationDocuments: raw.showDestinationDocuments !== false,
+    showDestinationRequiredDocs: raw.showDestinationRequiredDocs !== false,
+    showDestinationOptionalDocs: raw.showDestinationOptionalDocs !== false,
     showWhatsIncluded: raw.showWhatsIncluded !== false,
     showFaqs: raw.showFaqs !== false,
   };

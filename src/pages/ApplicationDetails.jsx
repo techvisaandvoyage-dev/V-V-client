@@ -302,7 +302,7 @@ const ApplicationDetails = () => {
   const { user } = useAuthStore();
   const { bookings, updateBookingDetails, fetchUserApplications } = useDataStore();
   const { showToast } = useUIStore();
-  const { documentCatalog } = useCountries();
+  const { documentCatalog, display } = useCountries();
 
   const [uploadingStates, setUploadingStates] = useState({});
   const [optimizingStates, setOptimizingStates] = useState({});
@@ -2117,7 +2117,7 @@ const ApplicationDetails = () => {
             </div>
           )}
 
-          {visibleRequiredDocFields.length > 0 && (
+          {visibleRequiredDocFields.length > 0 && display?.showDestinationRequiredDocs !== false && (
             <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
               <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
                 <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
@@ -2164,7 +2164,7 @@ const ApplicationDetails = () => {
             </div>
           )}
 
-          {visibleOtherDocFields.length > 0 && (
+          {visibleOtherDocFields.length > 0 && display?.showDestinationOptionalDocs !== false && (
             <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
               <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
                 <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
