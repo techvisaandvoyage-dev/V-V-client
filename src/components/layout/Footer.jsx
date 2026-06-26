@@ -8,19 +8,18 @@ import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from
 import { api, SERVER_URL } from "../../store/authStore";
 import { useSiteLogo } from "../../hooks/useSiteLogo";
 
-const FOOTER_SECTIONS = [
-  { key: "company", title: "Company" },
-  { key: "services", title: "Services" },
-  { key: "support", title: "Support" },
-  { key: "legal", title: "Legal" },
-];
-
 const FOOTER_CONTENT_FALLBACK = {
   logo: "",
   brandPrimaryText: "Visa &",
   brandAccentText: "Voyage",
   description:
     "Your trusted partner for seamless visa applications worldwide. Fast, secure, and professionally managed.",
+  sections: [
+    { key: "company", title: "Company" },
+    { key: "services", title: "Services" },
+    { key: "support", title: "Support" },
+    { key: "legal", title: "Legal" },
+  ],
 };
 
 const InstagramIcon = ({ size = 16, className = "" }) => (
@@ -121,6 +120,7 @@ const Footer = () => {
   const [pages, setPages] = useState([]);
   const [socialIcons, setSocialIcons] = useState([]);
   const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
+  const [footerSections, setFooterSections] = useState(FOOTER_CONTENT_FALLBACK.sections);
   const [activeCountryCount, setActiveCountryCount] = useState(0);
   useEffect(() => {
     let active = true;
@@ -159,8 +159,13 @@ const Footer = () => {
             description:
               String(config.description || "").trim() || FOOTER_CONTENT_FALLBACK.description,
           });
+          const sections = Array.isArray(config.sections)
+            ? config.sections.map((s) => ({ key: s.key, title: s.label }))
+            : FOOTER_CONTENT_FALLBACK.sections;
+          setFooterSections(sections);
         } else {
           setFooterContent(FOOTER_CONTENT_FALLBACK);
+          setFooterSections(FOOTER_CONTENT_FALLBACK.sections);
         }
 
         if (countriesRes?.data?.success && Array.isArray(countriesRes.data.countries)) {
@@ -173,6 +178,7 @@ const Footer = () => {
           setPages([]);
           setSocialIcons([]);
           setFooterContent(FOOTER_CONTENT_FALLBACK);
+          setFooterSections(FOOTER_CONTENT_FALLBACK.sections);
           setActiveCountryCount(0);
         }
       }
@@ -186,7 +192,7 @@ const Footer = () => {
 
   const columns = useMemo(
     () =>
-      FOOTER_SECTIONS.map((section) => ({
+      footerSections.map((section) => ({
         ...section,
         links: pages
           .filter((page) => (page.footerSection || "company") === section.key)
@@ -196,7 +202,7 @@ const Footer = () => {
             slug: page.slug,
           })),
       })),
-    [pages]
+    [pages, footerSections]
   );
 
   const trustBadges = [
@@ -211,7 +217,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12 mb-12">
           <div className="lg:col-span-2 lg:pr-12">
             <div className="flex max-w-sm flex-col items-start">
-              <Link to="/" replace className="flex h-16 items-center leading-none">
+              <Link to="/" replace className="flex h-16 items-center leading-none -ml-3">
                 <img
                   src={siteLogo}
                   alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
