@@ -15,10 +15,10 @@ const FOOTER_CONTENT_FALLBACK = {
   description:
     "Your trusted partner for seamless visa applications worldwide. Fast, secure, and professionally managed.",
   sections: [
-    { key: "company", title: "Company" },
-    { key: "services", title: "Services" },
-    { key: "support", title: "Support" },
-    { key: "legal", title: "Legal" },
+    { key: "Company", title: "Company" },
+    { key: "Services", title: "Services" },
+    { key: "Support", title: "Support" },
+    { key: "Legal", title: "Legal" },
   ],
 };
 
@@ -195,7 +195,7 @@ const Footer = () => {
       footerSections.map((section) => ({
         ...section,
         links: pages
-          .filter((page) => (page.footerSection || "company") === section.key)
+          .filter((page) => page.footerSection === section.key)
           .map((page) => ({
             page,
             label: page.title,
