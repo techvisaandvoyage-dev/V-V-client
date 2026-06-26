@@ -43,6 +43,7 @@ import ImageWithShimmer from "../components/ui/ImageWithShimmer";
 import DateRangePicker from "../components/ui/DateRangePicker";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore, api, SERVER_URL } from "../store/authStore";
+import { getAdminAppUrl } from "../utils/adminAppUrl";
 import AuthModal from "../components/auth/AuthModal";
 import { useUIStore } from "../store/uiStore";
 import { useCountries, useMergedCountry } from "../hooks/useCountries";
@@ -1891,18 +1892,13 @@ const CountryDetails = () => {
     : [
         { id: "info", label: "Info" },
         ...(countryDisplay?.showHowItWorks !== false ? [{ id: "how-it-works", label: "How it works" }] : []),
-        ...(destinationPageContent?.showVisaRequirements !== false
-          ? [{ id: "visa-requirements", label: "Visa Requirements" }]
-          : []),
-        // Skip the Document Requirements nav entry when the universal toggle hides
-        // the entire section — clicking it would scroll to nothing.
+        ...(countryDisplay?.showWhyBookNow !== false ? [{ id: "why-book-now", label: "Why book now?" }] : []),
         ...(countryDisplay?.showRequiredDocuments !== false
           ? [{ id: "document-requirements", label: "Document Requirements" }]
           : []),
-        ...(countryDisplay?.showWhyBookNow !== false ? [{ id: "why-book-now", label: "Why book now?" }] : []),
         ...(countryDisplay?.showWhatsIncluded !== false ? [{ id: "whats-included", label: "What's Included" }] : []),
         ...(countryDisplay?.showFaqs !== false ? [{ id: "faqs", label: "FAQs" }] : []),
-      ], [showTravelDetails, countryDisplay?.showRequiredDocuments, destinationPageContent?.showVisaRequirements]);
+      ], [showTravelDetails, countryDisplay?.showHowItWorks, countryDisplay?.showWhyBookNow, countryDisplay?.showRequiredDocuments, countryDisplay?.showWhatsIncluded, countryDisplay?.showFaqs]);
 
   useEffect(() => {
     setActiveSubNav(SUB_NAV[0]?.id || "");
@@ -2544,6 +2540,53 @@ const CountryDetails = () => {
       </motion.section>
       )}
 
+      {countryDisplay?.showWhyBookNow !== false && (
+      <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="mx-auto max-w-4xl rounded-[2rem] bg-white px-3 py-5 sm:px-6 sm:py-7 md:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
+            Why book now
+          </h2>
+        </div>
+
+          <div className="mt-6 overflow-hidden rounded-[1.5rem] bg-white">
+            <div className="grid grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px] items-end">
+              <div className="px-2 sm:px-5 py-2 sm:py-3" />
+              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
+                <span className="text-xs sm:text-sm md:text-xl font-bold tracking-tight text-cyan">We Provides</span>
+              </div>
+              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
+                <span className="text-xs sm:text-sm md:text-lg font-semibold text-text-muted">Others</span>
+              </div>
+            </div>
+
+            <div className="divide-y divide-slate-200/80">
+              {whyBookNow.map((item, idx) => (
+                <div
+                  key={`${item}-${idx}`}
+                  className="grid items-center grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px]"
+                >
+                  <div className="px-2 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm md:text-base font-medium text-text-primary">
+                    {item}
+                  </div>
+                  <div className="px-2 sm:px-4 py-2 sm:py-3">
+                    <div className="mx-auto flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-cyan text-background shadow-[0_10px_20px_rgba(34,211,238,0.18)]">
+                      <CircleCheck size={14} strokeWidth={2.4} className="sm:hidden" />
+                      <CircleCheck size={16} strokeWidth={2.4} className="hidden sm:block" />
+                    </div>
+                  </div>
+                  <div className="px-2 sm:px-5 py-3 sm:py-4">
+                    <div className="mx-auto flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-red-300/70 bg-red-100/70 text-red-400">
+                      <X size={14} strokeWidth={2.2} className="sm:hidden" />
+                      <X size={18} strokeWidth={2.2} className="hidden sm:block" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+      </motion.section>
+      )}
+
       {countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && (
         <motion.section
           id="document-requirements"
@@ -2626,57 +2669,6 @@ const CountryDetails = () => {
                 No requirements configured yet.
               </p>
             )}
-            </div>
-          </div>
-      </motion.section>
-      )}
-
-      {countryDisplay?.showWhyBookNow !== false && (
-      <motion.section id="why-book-now" initial="initial" animate="animate" variants={fadeUp} className="mx-auto max-w-4xl rounded-[2rem] bg-white px-3 py-5 sm:px-6 sm:py-7 md:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <div className="flex flex-col items-center gap-2 text-cyan mb-4">
-            <BadgeCheck size={18} />
-            <span className="text-xs font-semibold uppercase tracking-[0.24em]">Why book now</span>
-          </div>
-          <h2 className="font-playfair text-3xl sm:text-5xl font-bold tracking-tight text-text-primary">
-            Visa application made simple and reliable
-          </h2>
-        </div>
-
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] bg-white">
-            <div className="grid grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px] items-end">
-              <div className="px-2 sm:px-5 py-2 sm:py-3" />
-              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
-                <span className="text-xs sm:text-sm md:text-xl font-bold tracking-tight text-cyan">We Provides</span>
-              </div>
-              <div className="px-2 sm:px-5 py-2 sm:py-3 text-center">
-                <span className="text-xs sm:text-sm md:text-lg font-semibold text-text-muted">Others</span>
-              </div>
-            </div>
-
-            <div className="divide-y divide-slate-200/80">
-              {whyBookNow.map((item, idx) => (
-                <div
-                  key={`${item}-${idx}`}
-                  className="grid items-center grid-cols-[minmax(0,1fr)_70px_70px] sm:grid-cols-[minmax(0,1.2fr)_120px_120px] md:grid-cols-[minmax(0,1.5fr)_190px_160px]"
-                >
-                  <div className="px-2 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm md:text-base font-medium text-text-primary">
-                    {item}
-                  </div>
-                  <div className="px-2 sm:px-4 py-2 sm:py-3">
-                    <div className="mx-auto flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-cyan text-background shadow-[0_10px_20px_rgba(34,211,238,0.18)]">
-                      <CircleCheck size={14} strokeWidth={2.4} className="sm:hidden" />
-                      <CircleCheck size={16} strokeWidth={2.4} className="hidden sm:block" />
-                    </div>
-                  </div>
-                  <div className="px-2 sm:px-5 py-3 sm:py-4">
-                    <div className="mx-auto flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-red-300/70 bg-red-100/70 text-red-400">
-                      <X size={14} strokeWidth={2.2} className="sm:hidden" />
-                      <X size={18} strokeWidth={2.2} className="hidden sm:block" />
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
       </motion.section>

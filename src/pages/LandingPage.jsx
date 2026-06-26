@@ -124,7 +124,7 @@ const LandingPage = () => {
 
   // Global requirements for merging logic on cards
   const [globalRequirements, setGlobalRequirements] = useState([]);
-  const [showVisaRequirements, setShowVisaRequirements] = useState(true);
+  const [showVisaRequirements, setShowVisaRequirements] = useState(false);
   const [heroHighlights, setHeroHighlights] = useState(DEFAULT_HERO_HIGHLIGHTS);
   const [popularCountryCards, setPopularCountryCards] = useState(() => loadPopularCountriesCache());
   const [popularCountriesLoading, setPopularCountriesLoading] = useState(false);

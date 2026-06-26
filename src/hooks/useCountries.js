@@ -35,6 +35,12 @@ const DEFAULT_DISPLAY = Object.freeze({
   showEntryType: true,
   showProcessingDays: true,
   showRequiredDocuments: true,
+  showVisaRequirements: false,
+  showHowItWorks: true,
+  showWhyBookNow: true,
+  showDestinationDocuments: true,
+  showWhatsIncluded: true,
+  showFaqs: true,
 });
 
 const DEFAULT_VISA_INFORMATION_ITEMS = Object.freeze([
@@ -145,6 +151,12 @@ function normalizeDisplay(raw) {
     showEntryType: raw.showEntryType !== false,
     showProcessingDays: raw.showProcessingDays !== false,
     showRequiredDocuments: raw.showRequiredDocuments !== false,
+    showVisaRequirements: raw.showVisaRequirements !== false,
+    showHowItWorks: raw.showHowItWorks !== false,
+    showWhyBookNow: raw.showWhyBookNow !== false,
+    showDestinationDocuments: raw.showDestinationDocuments !== false,
+    showWhatsIncluded: raw.showWhatsIncluded !== false,
+    showFaqs: raw.showFaqs !== false,
   };
 }
 
