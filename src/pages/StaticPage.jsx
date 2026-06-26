@@ -176,7 +176,17 @@ const StaticPage = ({ slugOverride } = {}) => {
 
             <section className="rounded-[28px] border border-border bg-surface px-6 py-8 sm:px-10 sm:py-10">
               <article
-                className="prose prose-neutral max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-cyan [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-3 [&_th]:border [&_th]:border-border [&_th]:bg-surface-2 [&_th]:p-3 [&_ul]:pl-5"
+                className="text-base text-text-primary
+                  [&_a]:text-cyan [&_a]:underline
+                  [&_blockquote]:border-l-4 [&_blockquote]:border-cyan/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4
+                  [&_h1]:mt-6 [&_h1]:text-3xl [&_h1]:font-bold
+                  [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-semibold
+                  [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold
+                  [&_h4]:mt-4 [&_h4]:text-lg [&_h4]:font-semibold
+                  [&_li]:ml-5 [&_ul]:list-disc [&_ol]:list-decimal [&_p]:mb-3
+                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-4
+                  [&_th]:border [&_td]:border [&_th]:border-border [&_td]:border-border [&_th]:px-3 [&_td]:py-2 [&_th]:bg-surface-2 [&_th]:text-left
+                  [&_img]:max-w-full [&_img]:rounded-xl"
                 dangerouslySetInnerHTML={{ __html: page.content }}
               />
             </section>
