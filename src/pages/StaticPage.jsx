@@ -122,7 +122,7 @@ const StaticPage = ({ slugOverride } = {}) => {
         <button
           type="button"
           onClick={handleBack}
-          className="mb-8 inline-flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
+          className="mb-8 -ml-1.5 inline-flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
         >
           <ArrowLeft size={16} />
           Back
@@ -152,29 +152,8 @@ const StaticPage = ({ slugOverride } = {}) => {
             </div>
           </div>
         ) : (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <section className="overflow-hidden rounded-[28px] border border-border bg-surface">
-              {page.featuredImage && (
-                <ImageWithShimmer
-                  src={resolveAssetUrl(page.featuredImage)}
-                  alt={page.title}
-                  className="h-56 w-full sm:h-72"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                </ImageWithShimmer>
-              )}
-              <div className="px-6 py-8 sm:px-10 sm:py-10">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan">{page.template.replace("-", " ")}</p>
-                <h1 className="mt-3 text-3xl font-bold leading-tight text-text-primary sm:text-5xl">{page.title}</h1>
-                {(page.summary || page.seo?.metaDescription) && (
-                  <p className="mt-4 max-w-3xl text-sm leading-7 text-text-secondary sm:text-base">
-                    {page.summary || page.seo?.metaDescription}
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-border bg-surface px-6 py-8 sm:px-10 sm:py-10">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+            <section className="rounded-[28px] bg-surface px-6 py-8 sm:px-10 sm:py-10">
               <article
                 className="text-base text-text-primary
                   [&_a]:text-cyan [&_a]:underline
