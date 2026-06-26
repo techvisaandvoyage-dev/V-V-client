@@ -4,7 +4,7 @@
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send, X } from "lucide-react";
+import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
 import { api, SERVER_URL } from "../../store/authStore";
 import { useSiteLogo } from "../../hooks/useSiteLogo";
 
@@ -122,11 +122,6 @@ const Footer = () => {
   const [socialIcons, setSocialIcons] = useState([]);
   const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
   const [activeCountryCount, setActiveCountryCount] = useState(0);
-  const [pageModalOpen, setPageModalOpen] = useState(false);
-  const [modalPage, setModalPage] = useState(null);
-  const [modalPageLoading, setModalPageLoading] = useState(false);
-  const [modalPageError, setModalPageError] = useState("");
-
   useEffect(() => {
     let active = true;
 
@@ -188,48 +183,6 @@ const Footer = () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!pageModalOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setPageModalOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [pageModalOpen]);
-
-  const openPageModal = async (page) => {
-    const slug = page?.slug;
-    if (!slug) return;
-
-    setPageModalOpen(true);
-    setModalPage(page);
-    setModalPageError("");
-    setModalPageLoading(true);
-
-    try {
-      const { data } = await api.get(`/pages/${slug}`);
-      setModalPage(data?.page || page);
-    } catch (error) {
-      setModalPageError(error.response?.data?.message || "Could not load this page.");
-    } finally {
-      setModalPageLoading(false);
-    }
-  };
-
-  const closePageModal = () => {
-    setPageModalOpen(false);
-  };
 
   const columns = useMemo(
     () =>
@@ -322,13 +275,14 @@ const Footer = () => {
               <ul className="space-y-3">
                 {col.links.map((link) => (
                   <li key={link.slug}>
-                    <button
-                      type="button"
-                      onClick={() => openPageModal(link.page)}
-                      className="text-sm text-text-secondary hover:text-cyan transition-colors duration-200"
+                    <Link
+                      to={`/page/${link.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-text-secondary hover:text-cyan transition-colors duration-200 block"
                     >
                       {link.label}
-                    </button>
+                    </Link>
                   </li>
                 ))}
                 {col.links.length === 0 && (
@@ -358,74 +312,6 @@ const Footer = () => {
           </div>
         </div>
       </div>
-
-      {pageModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/45 px-4 py-6 backdrop-blur-md sm:px-6">
-          <button
-            type="button"
-            aria-label="Close page popup"
-            className="absolute inset-0 cursor-default"
-            onClick={closePageModal}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="footer-page-modal-title"
-            className="relative flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
-                  Visa & Voyage
-                </p>
-                <h2 id="footer-page-modal-title" className="mt-1 truncate text-xl font-bold text-text-primary sm:text-2xl">
-                  {modalPage?.title || "Page"}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={closePageModal}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-              {modalPageLoading ? (
-                <div className="flex min-h-[260px] flex-col items-center justify-center text-text-secondary">
-                  <Loader2 size={30} className="mb-3 animate-spin text-cyan" />
-                  <p className="text-sm font-medium">Loading page...</p>
-                </div>
-              ) : modalPageError ? (
-                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-5 text-sm font-medium text-red-600">
-                  {modalPageError}
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {modalPage?.featuredImage && (
-                    <img
-                      src={resolveAssetUrl(modalPage.featuredImage)}
-                      alt={modalPage.title || ""}
-                      className="max-h-64 w-full rounded-xl object-cover"
-                    />
-                  )}
-                  {(modalPage?.summary || modalPage?.seo?.metaDescription) && (
-                    <p className="text-sm leading-6 text-text-secondary">
-                      {modalPage.summary || modalPage.seo?.metaDescription}
-                    </p>
-                  )}
-                  <article
-                    className="prose prose-neutral max-w-none text-text-primary prose-headings:text-text-primary prose-p:text-text-secondary prose-li:text-text-secondary prose-strong:text-text-primary prose-a:text-cyan [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-3 [&_th]:border [&_th]:border-border [&_th]:bg-surface-2 [&_th]:p-3 [&_ul]:pl-5"
-                    dangerouslySetInnerHTML={{ __html: modalPage?.content || "" }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </footer>
   );
 };

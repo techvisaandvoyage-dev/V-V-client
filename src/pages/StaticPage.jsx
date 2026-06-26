@@ -108,7 +108,11 @@ const StaticPage = ({ slugOverride } = {}) => {
       navigate(from, { replace: true });
       return;
     }
-    navigate(-1);
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
   };
 
   return (
