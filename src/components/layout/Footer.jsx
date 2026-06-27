@@ -214,10 +214,10 @@ const Footer = () => {
   return (
     <footer className="bg-white" id="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12 mb-12">
-          <div className="lg:col-span-2 lg:pr-12">
-            <div className="flex max-w-sm flex-col items-start">
-              <Link to="/" replace className="flex h-16 items-center leading-none -ml-3">
+        <div className="flex flex-col lg:flex-row justify-between gap-8 lg:gap-12 mb-12">
+          <div className="w-full lg:w-[35%] lg:max-w-sm lg:pr-12 shrink-0">
+            <div className="flex flex-col items-start">
+              <Link to="/" replace className="flex h-[38px] items-center overflow-hidden leading-none -ml-3 mb-3">
                 <img
                   src={siteLogo}
                   alt={`${footerContent.brandPrimaryText} ${footerContent.brandAccentText}`}
@@ -225,10 +225,10 @@ const Footer = () => {
                   height="80"
                   loading="lazy"
                   decoding="async"
-                  className="block h-16 w-auto object-contain"
+                  className="block h-16 shrink-0 w-auto object-contain"
                 />
               </Link>
-              <p className="max-w-[20rem] text-sm leading-6 text-text-secondary">
+              <p className="max-w-[20rem] text-base leading-relaxed text-text-secondary">
                 {footerContent.description}
               </p>
 
@@ -275,43 +275,60 @@ const Footer = () => {
             </div>
           </div>
 
-          {columns.map((col) => (
-            <div key={col.key}>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">{col.title}</h3>
-              <ul className="space-y-3">
-                {col.links.map((link) => (
-                  <li key={link.slug}>
-                    <Link
-                      to={`/page/${link.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-text-secondary hover:text-cyan transition-colors duration-200 block"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-                {col.links.length === 0 && (
-                  <li className="text-sm text-text-muted">No pages yet</li>
-                )}
-              </ul>
-            </div>
-          ))}
+          <div className="flex flex-wrap lg:flex-nowrap justify-start lg:justify-end gap-8 lg:gap-12 xl:gap-16 w-full lg:w-auto flex-1">
+            {columns.map((col) => (
+              <div key={col.key} className="w-[calc(50%-1rem)] sm:w-auto sm:min-w-[140px]">
+                <h3 className="text-base font-semibold text-text-primary mb-4">{col.title}</h3>
+                <ul className="space-y-3">
+                  {col.links.map((link) => (
+                    <li key={link.slug}>
+                      <Link
+                        to={`/page/${link.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-base text-text-secondary hover:text-cyan transition-colors duration-200 block"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                  {col.links.length === 0 && (
+                    <li className="text-base text-text-muted">No pages yet</li>
+                  )}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="pt-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="text-sm text-text-muted space-y-1">
-              <p className="font-semibold text-text-primary">Visa & Voyage</p>
-              <p>Supported by Krishna Agarwal & Associates</p>
-              <p>&copy; 2015 Krishna Agarwal & Associates. All Rights Reserved</p>
+        <div className="pt-8 border-t border-slate-200">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="text-sm text-text-muted space-y-1.5 text-left">
+              <p className="font-semibold text-text-primary text-base mb-1">Visa &amp; Voyage</p>
+              <p>
+                Supported by{" "}
+                <a
+                  href="https://krishnaagarwalassociates.co.in/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-cyan transition-colors"
+                >
+                  Krishna Agarwal &amp; Associates
+                </a>
+              </p>
+              <p>&copy; 2026 Visa &amp; Voyage. All Rights Reserved.</p>
             </div>
 
-            <div className="flex items-center gap-6">
-              {trustBadges.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2 text-xs text-text-muted">
-                  <Icon size={14} className="text-cyan flex-shrink-0" />
-                  <span>{label}</span>
+            <div className="flex items-center flex-wrap gap-4 md:gap-6 md:pb-1">
+              {trustBadges.map(({ icon: Icon, label }, index) => (
+                <div key={label} className="flex items-center gap-4 md:gap-6">
+                  <div className="flex items-center gap-2 text-sm text-text-muted">
+                    <Icon size={20} strokeWidth={1.5} className="text-blue-600 flex-shrink-0" />
+                    <span>{label}</span>
+                  </div>
+                  {index < trustBadges.length - 1 && (
+                    <div className="h-4 w-px bg-slate-300" aria-hidden="true" />
+                  )}
                 </div>
               ))}
             </div>

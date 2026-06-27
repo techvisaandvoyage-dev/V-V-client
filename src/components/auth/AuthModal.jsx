@@ -80,9 +80,13 @@ const getConfiguredChannels = (config) => {
     "whatsapp",
     "sms",
   ].filter(Boolean);
+  const isTesting = config?.testing?.enabled;
   return [...new Set(ordered)]
     .filter((channel) => channel !== "none" && channel !== "email")
-    .filter((channel) => config.channels[channel]?.enabled && config.channels[channel]?.configured);
+    .filter((channel) => {
+      const c = config.channels[channel];
+      return c?.enabled && (c?.configured || isTesting);
+    });
 };
 
 const AuthModal = ({ isOpen, onClose, onComplete }) => {
@@ -456,25 +460,38 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                 </div>
 
                 {step === "phone" && (
-                  <div className="mt-2 space-y-2">
-                    <button
-                      onClick={() => handlePhoneSubmit(primaryPhoneChannel)}
-                      disabled={loading || phone.length < 10}
-                      className="h-[54px] w-full rounded-lg bg-[#0757F9] text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {loading ? "Sending..." : "Continue"}
-                    </button>
-                    {configuredPhoneChannels.map((channel) => (
+                  <div className="mt-2 space-y-3">
+                    {configuredPhoneChannels.length === 0 ? (
                       <button
-                        key={channel}
-                        type="button"
-                        onClick={() => handlePhoneSubmit(channel)}
+                        onClick={() => handlePhoneSubmit("auto")}
                         disabled={loading || phone.length < 10}
-                        className="h-11 w-full rounded-lg border border-[#d9e2f0] bg-white text-[14px] font-bold text-[#0757F9] transition-colors hover:bg-[#f6f9ff] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-[54px] w-full rounded-lg bg-[#0757F9] text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {channel === "sms" ? "Send SMS OTP instead" : `Use ${otpChannelLabel(channel)} OTP`}
+                        {loading ? "Sending..." : "Continue"}
                       </button>
-                    ))}
+                    ) : (
+                      configuredPhoneChannels.map((channel, index) => {
+                        const isPrimary = index === 0;
+                        return (
+                          <button
+                            key={channel}
+                            type="button"
+                            onClick={() => handlePhoneSubmit(channel)}
+                            disabled={loading || phone.length < 10}
+                            className={
+                              isPrimary
+                                ? "h-[54px] w-full rounded-lg bg-[#0757F9] text-[18px] font-bold text-white shadow-[0_12px_24px_rgba(7,87,249,0.18)] transition-colors hover:bg-[#0048e7] disabled:cursor-not-allowed disabled:opacity-50"
+                                : "h-[50px] w-full rounded-lg border border-[#d9e2f0] bg-white text-[15px] font-bold text-[#0757F9] transition-colors hover:bg-[#f6f9ff] disabled:cursor-not-allowed disabled:opacity-50"
+                            }
+                          >
+                            {loading 
+                              ? "Sending..." 
+                              : `Login with ${channel === "whatsapp" ? "WhatsApp" : "SMS"} OTP`
+                            }
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 )}
 

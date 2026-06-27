@@ -115,7 +115,7 @@ const Navbar = () => {
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="block h-11 w-auto object-contain sm:h-12"
+                className="block h-[53px] w-auto object-contain sm:h-[58px]"
               />
             </Link>
 
