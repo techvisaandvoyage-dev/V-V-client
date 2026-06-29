@@ -284,8 +284,8 @@ const ApplicationForm = () => {
   const country =
     useMergedCountry(countryId, listCountry) || getCountryById(countryId) || COUNTRIES[0];
   // Derive required document fields directly from country data — no effect needed.
-  // When useMergedCountry resolves with fresh API data, country.requiredDocuments
-  // updates and this memo recomputes automatically.
+  // When useMergedCountry resolves with fresh API data, country updates
+  // and this memo recomputes automatically.
   const docFields = useMemo(
     () => {
       const keys = Array.isArray(country?.requiredDocuments) && country.requiredDocuments.length
@@ -293,7 +293,7 @@ const ApplicationForm = () => {
         : ["passport"];
       return buildDocFields(keys, documentCatalog);
     },
-    [country?.requiredDocuments, documentCatalog]
+    [country, documentCatalog]
   );
   const requiredDocFields = useMemo(() => docFields, [docFields]);
   const [travelers, setTravelers] = useState([createTraveler()]);
