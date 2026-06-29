@@ -2703,13 +2703,9 @@ const CountryDetails = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+        <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-6 relative z-10 pb-4">
           {includedItems.map((item, idx) => {
             const Icon = item.Icon;
-            const isSingleItemLastRow =
-              includedItems.length > 1 &&
-              includedItems.length % 3 === 1 &&
-              idx === includedItems.length - 1;
             const colorClasses = {
               blue: {
                 bg: "bg-blue-50",
@@ -2740,9 +2736,7 @@ const CountryDetails = () => {
               <motion.div
                 key={`${item.title}-${idx}`}
                 whileHover={{ y: -8 }}
-                className={`relative flex flex-col items-center text-center p-8 rounded-[2rem] border border-border bg-white shadow-[0_10px_30px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden ${
-                  isSingleItemLastRow ? "md:col-start-2" : ""
-                }`}
+                className={`relative flex flex-col items-center text-center p-8 rounded-[2rem] border border-border bg-white shadow-[0_10px_30px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden w-full md:w-[calc(33.333%-16px)] shrink-0 snap-center`}
               >
                 {/* Dots pattern overlay */}
                 <div className="absolute bottom-0 right-0 w-24 h-24 opacity-[0.05] pointer-events-none">

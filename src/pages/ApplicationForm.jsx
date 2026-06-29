@@ -282,14 +282,12 @@ const ApplicationForm = () => {
   const listCountry = allCountries.find((c) => c.id === countryId);
   const country =
     useMergedCountry(countryId, listCountry) || getCountryById(countryId) || COUNTRIES[0];
-  const docFields = useMemo(
-    () => buildDocFields(country?.requiredDocuments, documentCatalog),
-    [country?.requiredDocuments, documentCatalog]
+  // docFields starts as passport-only; a dedicated API fetch below updates it
+  // with the fresh required documents for this country (same pattern as ApplicationDetails.jsx).
+  const [docFields, setDocFields] = useState(() =>
+    buildDocFields(country?.requiredDocuments, documentCatalog)
   );
-  const optionalDocFields = useMemo(
-    () => docFields.filter((field) => field.key !== "passport"),
-    [docFields]
-  );
+  const requiredDocFields = useMemo(() => docFields, [docFields]);
   const [travelers, setTravelers] = useState([createTraveler()]);
   const [savedTravelers, setSavedTravelers] = useState([]);
   const [savedTravelersLoading, setSavedTravelersLoading] = useState(false);
@@ -346,6 +344,27 @@ const ApplicationForm = () => {
     })();
     return () => { alive = false; };
   }, []);
+
+  // Fetch the latest required documents directly from the country API so that
+  // admin changes to required docs are reflected immediately (same approach as
+  // ApplicationDetails.jsx which already works correctly).
+  useEffect(() => {
+    if (!countryId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await api.get(`/countries/${encodeURIComponent(countryId)}`);
+        if (!alive || !data?.success || !data.country) return;
+        const keys = Array.isArray(data.country.requiredDocuments) && data.country.requiredDocuments.length
+          ? data.country.requiredDocuments
+          : ["passport"];
+        setDocFields(buildDocFields(keys, data.country.documentCatalog || documentCatalog));
+      } catch {
+        /* keep defaults — buildDocFields(["passport"]) already set */
+      }
+    })();
+    return () => { alive = false; };
+  }, [countryId, documentCatalog]);
 
   useEffect(() => {
     let alive = true;
@@ -1542,13 +1561,13 @@ const ApplicationForm = () => {
                   className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
                 />
               </div>
-{uploadSettings.enableFileUpload && optionalDocFields.length > 0 && (
+{uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
               <div className="flex w-full flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-                  Optional Documents
+                  Required Documents
                 </p>
-                {optionalDocFields.map((field) => {
-                  const file = traveler.documents[field.key];
+                {requiredDocFields.map((field) => {
+                  const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
                   const isDragging = draggingKey === zoneKey;
                   const Icon = field.Icon;

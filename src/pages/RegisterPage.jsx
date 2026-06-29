@@ -28,6 +28,7 @@ import {
 import { parseAuthContactInput } from "../utils/authIdentifier";
 import { useAuthControls } from "../hooks/useAuthControls";
 import { DEFAULT_PHONE_COUNTRY_CODE } from "../utils/phoneCountryCodes";
+import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 
 // ── Resend timer ──────────────────────────────────────────────
 const useResendTimer = (seconds = 30) => {
@@ -651,7 +652,8 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                                   clearError();
                                 }}
                                 error={fieldErrors.email || fieldErrors.phone || fieldErrors.both}
-                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                className={`h-[52px] w-full rounded-full border-border bg-surface pr-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary ${otpPhoneEnabled ? "pl-14" : "pl-5"}`}
+                                leftIcon={otpPhoneEnabled ? <span className="font-medium text-text-primary ml-1.5">{phoneCountryCode}</span> : null}
                                 required
                               />
                               {identifier.trim() && (
@@ -743,7 +745,8 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
                       clearError();
                     }}
                     error={fieldErrors.email || fieldErrors.phone || fieldErrors.both}
-                    className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                    className={`h-[52px] w-full rounded-full border-border bg-surface pr-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary ${otpPhoneEnabled ? "pl-14" : "pl-5"}`}
+                    leftIcon={otpPhoneEnabled ? <span className="font-medium text-text-primary ml-1.5">{phoneCountryCode}</span> : null}
                     required
                   />
                   {identifier.trim() && (

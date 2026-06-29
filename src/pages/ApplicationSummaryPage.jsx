@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle, CreditCard, Loader2, ShieldCheck, Info, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle, CreditCard, Loader2, ShieldCheck, Info, FileText, CreditCard as CreditCardIcon, ImageIcon } from "lucide-react";
 import SharedGoogleDriveLinkSection from "../components/application/SharedGoogleDriveLinkSection";
 import PassportUploadRow from "../components/application/PassportUploadRow";
 import Navbar from "../components/layout/Navbar";
@@ -21,9 +21,73 @@ import { getFileUrl } from "../utils/fileUrl";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 
 const SUMMARY_UPLOAD_MAX_BYTES = 300 * 1024;
-const ALLOWED_PASSPORT_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
-const INVALID_PASSPORT_TYPE_ERROR = "Only JPG, JPEG and PNG files are allowed.";
-const PASSPORT_FILE_SIZE_ERROR = "File size exceeds 300KB limit. Please upload a smaller file.";
+
+// ── Document metadata catalog (mirrors ApplicationForm.jsx) ──────────────────
+const DOCUMENT_META = {
+  passport: { label: "Passport Upload", Icon: FileText },
+  oldPassport: { label: "Old Passport Upload", Icon: FileText },
+  photo: { label: "Passport Photo Upload", Icon: ImageIcon },
+  idCard: { label: "Aadhaar / ID Card Upload", Icon: CreditCardIcon },
+  panCard: { label: "PAN Card Upload", Icon: CreditCardIcon },
+  drivingLicense: { label: "Driving License Upload", Icon: FileText },
+  birthCertificate: { label: "Birth Certificate Upload", Icon: FileText },
+  dobCertificate: { label: "DOB Certificate Upload", Icon: FileText },
+  marriageCertificate: { label: "Marriage Certificate Upload", Icon: FileText },
+  educationCertificate: { label: "Education / Academic Records Upload", Icon: FileText },
+  employmentLetter: { label: "Employment Letter Upload", Icon: FileText },
+  offerLetter: { label: "Offer Letter Upload", Icon: FileText },
+  salarySlip: { label: "Salary Slip / Pay Stub Upload", Icon: FileText },
+  bankStatement: { label: "Bank Statement Upload", Icon: FileText },
+  travelInsurance: { label: "Travel Insurance Upload", Icon: FileText },
+  flightTicket: { label: "Flight Ticket Upload", Icon: FileText },
+  hotelBooking: { label: "Hotel Booking Upload", Icon: FileText },
+  itinerary: { label: "Travel Itinerary Upload", Icon: FileText },
+  coverLetter: { label: "Cover Letter Upload", Icon: FileText },
+  invitationLetter: { label: "Invitation Letter Upload", Icon: FileText },
+  sponsorLetter: { label: "Sponsor / Affidavit Letter Upload", Icon: FileText },
+  policeClearance: { label: "Police Clearance Certificate Upload", Icon: FileText },
+  noObjectionCertificate: { label: "No Objection Certificate Upload", Icon: FileText },
+  visaApplicationForm: { label: "Visa Application Form Upload", Icon: FileText },
+  companyRegistration: { label: "Company Registration Certificate Upload", Icon: FileText },
+};
+
+/**
+ * Build a list of required document field descriptors from the country's requiredDocuments array.
+ * Always puts passport first; falls back to [passport] if the list is empty.
+ */
+const buildDocFields = (documentKeys = ["passport"], catalog = []) => {
+  const keys = Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"];
+  const seen = new Set();
+  const normalizedKeys = ["passport", ...keys.filter((key) => key !== "passport")];
+  const catalogByKey = new Map(
+    (Array.isArray(catalog) ? catalog : [])
+      .map((item) => ({
+        key: String(item?.key ?? "").trim(),
+        label: String(item?.label ?? "").trim(),
+        description: String(item?.description ?? "").trim(),
+      }))
+      .filter((item) => item.key && item.key !== "[object Object]")
+      .map((item) => [item.key, item])
+  );
+  const fields = normalizedKeys.reduce((acc, key, index) => {
+    if (!key || seen.has(key)) return acc;
+    seen.add(key);
+    const catalogItem = catalogByKey.get(key);
+    acc.push({
+      key,
+      label: catalogItem?.label || DOCUMENT_META[key]?.label || `${key.replace(/([A-Z])/g, " $1")} Upload`,
+      Icon: DOCUMENT_META[key]?.Icon || FileText,
+      required: index === 0,
+    });
+    return acc;
+  }, []);
+  return fields.length
+    ? fields
+    : [{ key: "passport", label: DOCUMENT_META.passport.label, Icon: FileText, required: true }];
+};
+
+const getDocumentDisplayName = (label = "") =>
+  String(label || "").replace(/\s*Upload\s*$/i, "").trim();
 const isReusableUnpaidApplication = (application) => {
   const paymentStatus = String(application?.paymentStatus || "").trim().toLowerCase();
   return ["pending_payment", "failed", "cancelled"].includes(paymentStatus);
@@ -114,16 +178,7 @@ const getTravelerPassportDetailForSummary = (application, summaryData, travelerN
   getTravelerPassportDetail(application, travelerNo) ||
   getTravelerPassportDetailFromSummaryData(summaryData, travelerNo);
 
-const hasUploadedPassport = (entry) => {
-  const docs = entry?.documents;
-  if (!docs) return false;
-  if (docs instanceof Map) return Boolean(docs.get("passport"));
-  if (typeof docs?.get === "function") return Boolean(docs.get("passport"));
-  if (typeof docs === "object") return Boolean(docs.passport);
-  return false;
-};
-
-const buildTravelerPassportSuccessMap = ({ application, summaryData, uploadSuccesses, travelerCount }) => {
+const buildTravelerDocSuccessMap = ({ application, summaryData, uploadSuccesses, travelerCount }) => {
   const applicationSuccesses = buildSuccessMapFromApplication(application);
   const summarySuccesses =
     !application && summaryData?.uploadedDocSuccesses && typeof summaryData.uploadedDocSuccesses === "object"
@@ -134,20 +189,11 @@ const buildTravelerPassportSuccessMap = ({ application, summaryData, uploadSucce
     ...uploadSuccesses,
     ...applicationSuccesses,
   };
-
-  Array.from({ length: travelerCount }).forEach((_, index) => {
-    const travelerNo = index + 1;
-    if (merged[`${travelerNo}-passport`]) return;
-    const travelerEntry = Array.isArray(application?.travellerDocuments)
-      ? application.travellerDocuments.find((entry) => Number(entry?.travelerNo) === travelerNo)
-      : null;
-    if (hasUploadedPassport(travelerEntry)) {
-      merged[`${travelerNo}-passport`] = true;
-    }
-  });
-
   return merged;
 };
+
+// Keep legacy alias for backward compat with syncPaymentSummarySource
+const buildTravelerPassportSuccessMap = buildTravelerDocSuccessMap;
 
 const buildTravelerPassportDetailsMap = (application, travelerCount) => {
   const details = {};
@@ -638,14 +684,12 @@ const ApplicationSummaryPage = () => {
    *   3. Otherwise inspect each traveler entry on the server record.
    */
   const docsUploaded = useMemo(() => {
-    const hasHiddenRequiredPassport = Array.from({ length: travelerCount }).some((_, index) =>
-      Boolean(hiddenUploadedPassportNos[index + 1])
+    // Docs are considered uploaded if every traveler has at least the passport (or first doc) stored
+    const firstDocKey = "passport";
+    const allFirstDocUploadsStored = Array.from({ length: travelerCount }).every((_, index) =>
+      Boolean(uploadSuccesses[`${index + 1}-${firstDocKey}`]) && !hiddenUploadedPassportNos[index + 1]
     );
-    if (hasHiddenRequiredPassport) return false;
-    const allPassportUploadsStored = Array.from({ length: travelerCount }).every((_, index) =>
-      Boolean(uploadSuccesses[`${index + 1}-passport`])
-    );
-    if (allPassportUploadsStored) return true;
+    if (allFirstDocUploadsStored) return true;
     const entries = Array.isArray(application?.travellerDocuments)
       ? application.travellerDocuments
       : [];
@@ -670,8 +714,14 @@ const ApplicationSummaryPage = () => {
     return false;
   }, [application, docsSkipped, summaryData, uploadSuccesses, application?.travellerDocuments, hiddenUploadedPassportNos, travelerCount]);
 
+  // Dynamic document fields computed from country required docs
+  const requiredDocFields = useMemo(
+    () => buildDocFields(country?.requiredDocuments, country?.documentCatalog),
+    [country?.requiredDocuments, country?.documentCatalog]
+  );
+
   const travelerPassportSuccesses = useMemo(
-    () => buildTravelerPassportSuccessMap({
+    () => buildTravelerDocSuccessMap({
       application,
       summaryData,
       uploadSuccesses,
@@ -752,9 +802,15 @@ const ApplicationSummaryPage = () => {
       Array.from({ length: travelerCount }).map((_, index) => ({
         id: index + 1,
         name: travelerNames[index] || `Traveler ${index + 1}`,
-        passportFile: null,
-        passportUploaded:
-          Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
+        // files is a map of docKey -> File (for files chosen but not yet uploaded)
+        files: {},
+        // uploadedDocs is a map of docKey -> bool (already uploaded to server)
+        uploadedDocs: Object.fromEntries(
+          (requiredDocFields || [{ key: "passport" }]).map((f) => [
+            f.key,
+            Boolean(travelerPassportSuccesses[`${index + 1}-${f.key}`]) && !hiddenUploadedPassportNos[index + 1],
+          ])
+        ),
       }))
     );
     setUploadModalDriveLink(
@@ -784,44 +840,44 @@ const ApplicationSummaryPage = () => {
     setPassportPreview(null);
   };
 
-  const removeUploadedPassport = async (travelerNo, index) => {
+  const removeUploadedDoc = async (travelerNo, travelerIndex, docKey) => {
     try {
       const { appId } = await ensureApplicationDraft();
       const { data } = await api.put(`/users/applications/${appId}`, {
         travelerUpdate: {
           travelerNo: String(travelerNo),
-          removeDocumentTypes: ["passport"],
+          removeDocumentTypes: [docKey],
         },
       });
       if (!data?.success || !data.application) {
-        throw new Error(data?.message || "Could not remove passport.");
+        throw new Error(data?.message || "Could not remove document.");
       }
 
       setApplication(data.application);
-      setHiddenUploadedPassportNos((prev) => {
-        const next = { ...prev };
-        delete next[travelerNo];
-        return next;
-      });
+      if (docKey === "passport") {
+        setHiddenUploadedPassportNos((prev) => { const n = { ...prev }; delete n[travelerNo]; return n; });
+        if (passportPreview) closePassportPreview();
+      }
       setUploadSuccesses((prev) => {
         const next = { ...prev };
-        delete next[`${travelerNo}-passport`];
+        delete next[`${travelerNo}-${docKey}`];
         setStoredApplicationDocSuccesses(appId, next);
         return next;
       });
       setUploadModalTravelers((prev) =>
-        prev.map((traveler, travelerIndex) => (
-          travelerIndex === index
-            ? { ...traveler, passportFile: null, passportUploaded: false }
+        prev.map((traveler, ti) => (
+          ti === travelerIndex
+            ? {
+                ...traveler,
+                files: { ...(traveler.files || {}), [docKey]: null },
+                uploadedDocs: { ...(traveler.uploadedDocs || {}), [docKey]: false },
+              }
             : traveler
         ))
       );
-      if (passportPreview) {
-        closePassportPreview();
-      }
-      showToast("Passport removed successfully.", "success");
+      showToast(`${getDocumentDisplayName(DOCUMENT_META[docKey]?.label || docKey)} removed successfully.`, "success");
     } catch (err) {
-      showToast(err?.response?.data?.message || err?.message || "Could not remove passport.", "error");
+      showToast(err?.response?.data?.message || err?.message || "Could not remove document.", "error");
     }
   };
 
@@ -832,128 +888,113 @@ const ApplicationSummaryPage = () => {
         ? prev.map((traveler, index) => ({
             ...traveler,
             name: travelerNames[index] || `Traveler ${index + 1}`,
-            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
+            uploadedDocs: Object.fromEntries(
+              (requiredDocFields || [{ key: "passport" }]).map((f) => [
+                f.key,
+                Boolean(travelerPassportSuccesses[`${index + 1}-${f.key}`]) && !hiddenUploadedPassportNos[index + 1],
+              ])
+            ),
           }))
         : Array.from({ length: travelerCount }).map((_, index) => ({
             id: index + 1,
             name: travelerNames[index] || `Traveler ${index + 1}`,
-            passportFile: null,
-            passportUploaded: Boolean(travelerPassportSuccesses[`${index + 1}-passport`]) && !hiddenUploadedPassportNos[index + 1],
+            files: {},
+            uploadedDocs: Object.fromEntries(
+              (requiredDocFields || [{ key: "passport" }]).map((f) => [
+                f.key,
+                Boolean(travelerPassportSuccesses[`${index + 1}-${f.key}`]) && !hiddenUploadedPassportNos[index + 1],
+              ])
+            ),
           }))
     ));
-  }, [uploadDocumentsModalOpen, travelerCount, travelerNames, travelerPassportSuccesses, hiddenUploadedPassportNos]);
+  }, [uploadDocumentsModalOpen, travelerCount, travelerNames, travelerPassportSuccesses, hiddenUploadedPassportNos, requiredDocFields]);
 
-  const handleUploadModalPassportChange = async (index, file) => {
+  /**
+   * Handle file selection + upload for any required document type.
+   * @param {number} travelerIndex - 0-based traveler index
+   * @param {string} docKey - e.g. "passport", "panCard", "idCard"
+   * @param {File} file
+   */
+  const handleUploadModalDocChange = async (travelerIndex, docKey, file) => {
     if (!file) return;
+    const zoneKey = `${travelerIndex}-${docKey}`;
     const rules = getFileValidationRules(uploadSettings?.allowedFileFormats);
     if (!rules.isValidFile(file)) {
       const err = `Only ${rules.displayLabel} files are allowed.`;
-      setUploadModalErrors((prev) => ({
-        ...prev,
-        [index]: err,
-      }));
+      setUploadModalErrors((prev) => ({ ...prev, [zoneKey]: err }));
       showToast(err, "error");
       return;
     }
-    setUploadModalUploading((prev) => ({ ...prev, [index]: true }));
-    setUploadModalOptimizing((prev) => ({ ...prev, [index]: true }));
-    const { file: optimizedFile, error } = await optimizeUploadFile(file, {
-      targetBytes: SUMMARY_UPLOAD_MAX_BYTES,
-    });
-    setUploadModalOptimizing((prev) => {
-      const next = { ...prev };
-      delete next[index];
-      return next;
-    });
+    setUploadModalUploading((prev) => ({ ...prev, [zoneKey]: true }));
+    setUploadModalOptimizing((prev) => ({ ...prev, [zoneKey]: true }));
+    const { file: optimizedFile, error } = await optimizeUploadFile(file, { targetBytes: SUMMARY_UPLOAD_MAX_BYTES });
+    setUploadModalOptimizing((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
     if (error || !optimizedFile) {
-      setUploadModalErrors((prev) => ({
-        ...prev,
-        [index]: error || "Could not prepare this passport file for upload.",
-      }));
-      showToast(error || "Could not prepare this passport file for upload.", "error");
-      setUploadModalUploading((prev) => {
-        const next = { ...prev };
-        delete next[index];
-        return next;
-      });
+      setUploadModalErrors((prev) => ({ ...prev, [zoneKey]: error || "Could not prepare this file for upload." }));
+      showToast(error || "Could not prepare this file for upload.", "error");
+      setUploadModalUploading((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
       return;
     }
     if (optimizedFile.size > SUMMARY_UPLOAD_MAX_BYTES) {
       const message = "Document is too large. Please upload a smaller file.";
-      setUploadModalErrors((prev) => ({
-        ...prev,
-        [index]: message,
-      }));
+      setUploadModalErrors((prev) => ({ ...prev, [zoneKey]: message }));
       showToast(message, "error");
-      setUploadModalUploading((prev) => {
-        const next = { ...prev };
-        delete next[index];
-        return next;
-      });
+      setUploadModalUploading((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
       return;
     }
-    setUploadModalErrors((prev) => {
-      const next = { ...prev };
-      delete next[index];
-      return next;
-    });
+    setUploadModalErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
     try {
       const { appId } = await ensureApplicationDraft();
-      const travelerNo = index + 1;
-      const travelerName = travelerNames[index] || `Traveler ${travelerNo}`;
+      const travelerNo = travelerIndex + 1;
+      const travelerName = travelerNames[travelerIndex] || `Traveler ${travelerNo}`;
       const formData = new FormData();
       const ext = (optimizedFile.name.split(".").pop() || "").toLowerCase();
       const safeExt = ext ? `.${ext}` : "";
       formData.append(
         "documents",
-        new File([optimizedFile], `traveler-${travelerNo}_passport${safeExt}`, { type: optimizedFile.type })
+        new File([optimizedFile], `traveler-${travelerNo}_${docKey}${safeExt}`, { type: optimizedFile.type })
       );
       formData.append("travelerNo", String(travelerNo));
       formData.append("travelerName", travelerName);
-      formData.append("documentsMeta", JSON.stringify([{ docType: "passport", kind: "required" }]));
+      formData.append("documentsMeta", JSON.stringify([{ docType: docKey, kind: "required" }]));
 
       const { data } = await api.post(`/users/applications/${appId}/documents`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (!data?.success || !data?.application) {
-        throw new Error(data?.message || "Could not upload passport.");
+        throw new Error(data?.message || "Could not upload document.");
       }
 
       setApplication(data.application);
-      setHiddenUploadedPassportNos((prev) => {
-        const next = { ...prev };
-        delete next[travelerNo];
-        return next;
-      });
+      // Remove from hidden list if it was the passport
+      if (docKey === "passport") {
+        setHiddenUploadedPassportNos((prev) => { const n = { ...prev }; delete n[travelerNo]; return n; });
+      }
       setUploadSuccesses((prev) => {
-        const next = { ...prev, [`${travelerNo}-passport`]: true };
+        const next = { ...prev, [`${travelerNo}-${docKey}`]: true };
         setStoredApplicationDocSuccesses(appId, next);
         return next;
       });
       setUploadModalTravelers((prev) =>
-        prev.map((traveler, travelerIndex) => (
-          travelerIndex === index
+        prev.map((traveler, ti) => (
+          ti === travelerIndex
             ? {
                 ...traveler,
-                passportFile: null,
-                passportUploaded: true,
+                files: { ...(traveler.files || {}), [docKey]: null },
+                uploadedDocs: { ...(traveler.uploadedDocs || {}), [docKey]: true },
               }
             : traveler
         ))
       );
-      showToast("Passport uploaded successfully.", "success");
+      showToast(`${getDocumentDisplayName(DOCUMENT_META[docKey]?.label || docKey)} uploaded successfully!`, "success");
     } catch (err) {
       setUploadModalErrors((prev) => ({
         ...prev,
-        [index]: err?.response?.data?.message || err?.message || "Could not upload passport.",
+        [zoneKey]: err?.response?.data?.message || err?.message || "Could not upload document.",
       }));
-      showToast(err?.response?.data?.message || err?.message || "Could not upload passport.", "error");
+      showToast(err?.response?.data?.message || err?.message || "Could not upload document.", "error");
     } finally {
-      setUploadModalUploading((prev) => {
-        const next = { ...prev };
-        delete next[index];
-        return next;
-      });
+      setUploadModalUploading((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
     }
   };
 
@@ -1501,92 +1542,101 @@ const ApplicationSummaryPage = () => {
           </div>
 
           <div className="space-y-4">
-            {uploadModalTravelers.map((traveler, index) => (
-              <div
-                key={`summary-upload-${traveler.id}`}
-                className="rounded-2xl border border-border bg-surface p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan/10 text-cyan font-bold">
-                    {String(traveler.id).padStart(2, "0")}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-lg font-semibold text-text-primary">Traveler {traveler.id}</h4>
-                      {traveler.passportUploaded ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                          <CheckCircle size={12} />
-                          Passport uploaded
-                        </span>
-                      ) : null}
+            {uploadModalTravelers.map((traveler, travelerIndex) => {
+              const allDocUploaded = (requiredDocFields || [{ key: "passport" }]).every(
+                (f) => Boolean((traveler.uploadedDocs || {})[f.key])
+              );
+              return (
+                <div
+                  key={`summary-upload-${traveler.id}`}
+                  className="rounded-2xl border border-border bg-surface p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan/10 text-cyan font-bold">
+                      {String(traveler.id).padStart(2, "0")}
                     </div>
-                    <p className="mt-1 text-sm text-text-secondary">
-                      {traveler.name || `Traveler ${traveler.id}`} (Name as on passport)
-                    </p>
-
-                    <div className="mt-5">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-text-primary">Passport Upload</p>
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                          Optional
-                        </span>
-                        <span className="group relative inline-flex align-middle">
-                          <span
-                            className="inline-flex rounded-full p-0.5 text-text-muted transition-all duration-150 hover:bg-cyan/10 hover:text-cyan"
-                            aria-label="Optional passport upload info"
-                          >
-                            <Info size={12} />
+                        <h4 className="text-lg font-semibold text-text-primary">Traveler {traveler.id}</h4>
+                        {allDocUploaded ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                            <CheckCircle size={12} />
+                            All documents uploaded
                           </span>
-                          <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] font-normal leading-relaxed text-text-secondary shadow-lg group-hover:block">
-                            You can continue without uploading a passport here and add it later if needed.
-                          </span>
-                        </span>
+                        ) : null}
                       </div>
-                      <p className="mt-1 text-sm text-text-secondary">Upload clear copy of passport</p>
+                      <p className="mt-1 text-sm text-text-secondary">
+                        {traveler.name || `Traveler ${traveler.id}`}
+                      </p>
 
-                      <PassportUploadRow
-                        className="mt-4"
-                        inputId={`summary-passport-upload-${traveler.id}`}
-                        label="Passport Upload"
-                        file={traveler.passportFile}
-                        error={uploadModalErrors[index]}
-                        uploading={Boolean(uploadModalUploading[index])}
-                        optimizing={Boolean(uploadModalOptimizing[index])}
-                        saved={Boolean(traveler.passportUploaded && !traveler.passportFile)}
-                        previewEnabled={Boolean(getTravelerPassportDetailForSummary(application, summaryData, traveler.id)?.url)}
-                        accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                        helperText={
-                          traveler.passportFile
-                            ? traveler.passportFile.name
-                            : getTravelerPassportDetailForSummary(application, summaryData, traveler.id)?.fileName
-                              ? `${getTravelerPassportDetailForSummary(application, summaryData, traveler.id).fileName} - ${formatFileSize(getTravelerPassportDetailForSummary(application, summaryData, traveler.id).fileSize)}`
-                            : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
-                        }
-                        fileSizeText={traveler.passportFile ? formatFileSize(traveler.passportFile.size) : ""}
-                        savedText="Passport uploaded"
-                        reuploadLabel="Replace File"
-                        removeLabel="Remove"
-                        onChange={(file) => handleUploadModalPassportChange(index, file)}
-                        onPreview={() => openPassportPreview(traveler.id)}
-                        onRemove={() => removeUploadedPassport(traveler.id, index)}
-                        onReupload={() => {
-                          setUploadModalErrors((prev) => {
-                            const next = { ...prev };
-                            delete next[index];
-                            return next;
-                          });
-                          setHiddenUploadedPassportNos((prev) => {
-                            const next = { ...prev };
-                            delete next[traveler.id];
-                            return next;
-                          });
-                        }}
-                      />
+                      {/* Dynamic document upload rows */}
+                      <div className="mt-5 space-y-4">
+                        {(requiredDocFields || [{ key: "passport", label: "Passport Upload", Icon: FileText }]).map((field) => {
+                          const zoneKey = `${travelerIndex}-${field.key}`;
+                          const isUploaded = Boolean((traveler.uploadedDocs || {})[field.key]);
+                          const localFile = (traveler.files || {})[field.key];
+                          const Icon = field.Icon || FileText;
+                          const isUploading = Boolean(uploadModalUploading[zoneKey]);
+                          const isOptimizing = Boolean(uploadModalOptimizing[zoneKey]);
+                          const fieldError = uploadModalErrors[zoneKey];
+                          const displayName = getDocumentDisplayName(field.label);
+
+                          // For passport, enable preview
+                          const passportDetail = field.key === "passport"
+                            ? getTravelerPassportDetailForSummary(application, summaryData, traveler.id)
+                            : null;
+
+                          return (
+                            <div key={field.key}>
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <p className="text-sm font-semibold text-text-primary">{displayName}</p>
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                  {isUploaded ? "Uploaded" : "Optional"}
+                                </span>
+                              </div>
+
+                              <PassportUploadRow
+                                inputId={`summary-${field.key}-upload-${traveler.id}`}
+                                label={field.label}
+                                file={localFile}
+                                error={fieldError}
+                                uploading={isUploading}
+                                optimizing={isOptimizing}
+                                saved={isUploaded && !localFile}
+                                previewEnabled={field.key === "passport" && Boolean(passportDetail?.url)}
+                                accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
+                                helperText={
+                                  localFile
+                                    ? localFile.name
+                                    : (field.key === "passport" && passportDetail?.fileName)
+                                      ? `${passportDetail.fileName} - ${formatFileSize(passportDetail.fileSize)}`
+                                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
+                                }
+                                fileSizeText={localFile ? formatFileSize(localFile.size) : ""}
+                                savedText={`${displayName} uploaded`}
+                                reuploadLabel="Replace File"
+                                removeLabel="Remove"
+                                onChange={(file) => handleUploadModalDocChange(travelerIndex, field.key, file)}
+                                onPreview={field.key === "passport" && passportDetail?.url
+                                  ? () => openPassportPreview(traveler.id)
+                                  : undefined}
+                                onRemove={() => removeUploadedDoc(traveler.id, travelerIndex, field.key)}
+                                onReupload={() => {
+                                  setUploadModalErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                  if (field.key === "passport") {
+                                    setHiddenUploadedPassportNos((prev) => { const n = { ...prev }; delete n[traveler.id]; return n; });
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <SharedGoogleDriveLinkSection

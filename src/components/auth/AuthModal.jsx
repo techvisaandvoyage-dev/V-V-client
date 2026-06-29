@@ -358,16 +358,8 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                 <div className="flex flex-col gap-2">
                   <label className="block text-[14px] font-extrabold text-[#05071d]">Enter Country Code</label>
                   <div ref={countryCodeDropdownRef} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (step === "phone") {
-                          setCountryCodeOpen((prev) => !prev);
-                          setCountryCodeSearch("");
-                        }
-                      }}
-                      disabled={step !== "phone"}
-                      className="flex h-[58px] w-full items-center justify-between gap-3 rounded-lg border border-[#d9e2f0] bg-white px-5 text-[15px] font-bold text-[#05071d] transition-all duration-200 hover:border-[#b8c8e3] focus:border-[#0757F9] focus:outline-none focus:ring-2 focus:ring-[#0757F9]/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    <div
+                      className="flex h-[58px] w-full items-center justify-between gap-3 rounded-lg border border-[#d9e2f0] bg-white px-5 text-[15px] font-bold text-[#05071d]"
                     >
                       <span className="min-w-0 flex flex-1 items-center gap-2 text-left">
                         {selectedCountryOption?.flagUrl ? (
@@ -380,56 +372,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                           <span className="min-w-0 flex-1 truncate font-semibold text-[#4f5878]">{selectedCountryName}</span>
                         ) : null}
                       </span>
-                      <ChevronDown size={18} className={`shrink-0 text-[#05071d] transition-transform ${countryCodeOpen ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {countryCodeOpen && (
-                      <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-[#d9e2f0] bg-white shadow-xl">
-                        <div className="relative border-b border-[#e8eef8] p-3">
-                          <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-[#5a6382]" />
-                          <input
-                            type="text"
-                            value={countryCodeSearch}
-                            onChange={(e) => setCountryCodeSearch(e.target.value)}
-                            placeholder="Search country"
-                            autoFocus
-                            className="w-full rounded-xl border border-[#d9e2f0] bg-white py-2 pl-9 pr-3 text-sm text-[#05071d] placeholder:text-[#7a839f] focus:border-[#0757F9] focus:outline-none focus:ring-2 focus:ring-[#0757F9]/15"
-                          />
-                        </div>
-                        <div className="max-h-56 overflow-y-auto py-2">
-                          {filteredCountryOptions.length ? (
-                            filteredCountryOptions.map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => {
-                                  setPhoneCountryCode(option.value);
-                                  setPhoneCountryLabel(option.label);
-                                  setCountryCodeOpen(false);
-                                  setCountryCodeSearch("");
-                                }}
-                                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
-                                  phoneCountryCode === option.value
-                                    ? "bg-[#edf3ff] text-[#0757F9] font-semibold"
-                                    : "text-[#4f5878] hover:bg-[#f6f9ff]"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {option.flagUrl ? (
-                                    <img src={option.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-[2px]" />
-                                  ) : option.flag ? (
-                                    <span className="text-lg leading-none">{option.flag}</span>
-                                  ) : null}
-                                  <span>{option.label}</span>
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <p className="px-4 py-3 text-sm text-[#7a839f]">No countries found.</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
@@ -451,7 +394,7 @@ const AuthModal = ({ isOpen, onClose, onComplete }) => {
                     <input 
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
                       placeholder="Enter mobile number"
                       disabled={step !== "phone"}
                       className="h-[58px] w-full rounded-lg border border-[#d9e2f0] bg-white px-5 pl-14 text-[15px] font-medium text-[#05071d] transition-all placeholder:text-[#4f5878] focus:border-[#0757F9] focus:outline-none focus:ring-2 focus:ring-[#0757F9]/15 disabled:bg-[#f7f9fd] disabled:opacity-60"

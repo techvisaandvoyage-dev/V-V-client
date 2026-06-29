@@ -1941,51 +1941,63 @@ const ApplicationDetails = () => {
                                   />
                                 </div>
 
-                                <PassportUploadRow
-                                  inputId={`file-${passportInputKey}`}
-                                  label="Passport Upload"
-                                  file={passportSelectedFile}
-                                  error={docErrors[passportInputKey]}
-                                  uploading={isAnyFileUploading}
-                                  optimizing={isPassportOptimizing}
-                                  saved={passportHasSuccessfulUpload}
-                                  disabled={isTravelerUploadLoading}
-                                  helperText={
-                                    passportSelectedFile
-                                      ? passportSelectedFile.name
-                                      : "JPG, JPEG, PNG - max 300 KB"
-                                  }
-                                  fileSizeText={passportSelectedFile ? formatFileSize(passportSelectedFile.size) : ""}
-                                  savedText="Passport uploaded"
-                                  onChange={(file) => handleDocFieldChange(travelerNo, "passport", file)}
-                                  onReupload={() => {
-                                    setUnlockedDocs((prev) => ({ ...prev, [passportInputKey]: true }));
-                                    setUploadedDocSuccesses((prev) => {
-                                      const next = { ...prev };
-                                      delete next[passportInputKey];
-                                      return next;
-                                    });
-                                  }}
-                                  onRemove={() => {
-                                    if (passportSelectedFile) {
-                                      handleDocFieldChange(travelerNo, "passport", null);
-                                    } else if (passportHasSuccessfulUpload) {
-                                      setUnlockedDocs((prev) => ({ ...prev, [passportInputKey]: true }));
-                                      setUploadedDocSuccesses((prev) => {
-                                        const next = { ...prev };
-                                        delete next[passportInputKey];
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  onPreview={(passportSelectedFile || passportSavedDocUrl) ? () => {
-                                    if (passportSelectedFile) {
-                                      setDocumentPreview({ url: URL.createObjectURL(passportSelectedFile), fileName: passportSelectedFile.name, mimeType: passportSelectedFile.type });
-                                    } else if (passportSavedDocUrl) {
-                                      setDocumentPreview({ url: getFileUrl(passportSavedDocUrl), fileName: "Passport Document", type: "application/pdf" });
-                                    }
-                                  } : undefined}
-                                />
+                                {docFields.map((field) => {
+                                  const inputKey = `${travelerNoStr}-${field.key}`;
+                                  const selectedFile = selectedDocs[inputKey];
+                                  const savedDocUrl = getEffectiveSavedTravelerDocumentValue(travelerNo, field.key, savedDocuments) || traveler[field.key + 'Url'] || traveler[field.key + 'File'];
+                                  const hasSuccessfulUpload = !selectedFile && hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments);
+                                  const isOptimizing = isOptimizingState(`traveler-prepare-${travelerNoStr}-${field.key}`);
+                                  const displayName = field.label || `${field.key.charAt(0).toUpperCase() + field.key.slice(1)} Upload`;
+
+                                  return (
+                                    <PassportUploadRow
+                                      key={field.key}
+                                      inputId={`file-${inputKey}`}
+                                      label={displayName}
+                                      file={selectedFile}
+                                      error={docErrors[inputKey]}
+                                      uploading={isAnyFileUploading}
+                                      optimizing={isOptimizing}
+                                      saved={hasSuccessfulUpload}
+                                      disabled={isTravelerUploadLoading}
+                                      helperText={
+                                        selectedFile
+                                          ? selectedFile.name
+                                          : field.description || "JPG, JPEG, PNG - max 300 KB"
+                                      }
+                                      fileSizeText={selectedFile ? formatFileSize(selectedFile.size) : ""}
+                                      savedText={`${displayName.replace(" Upload", "")} uploaded`}
+                                      onChange={(file) => handleDocFieldChange(travelerNo, field.key, file)}
+                                      onReupload={() => {
+                                        setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
+                                        setUploadedDocSuccesses((prev) => {
+                                          const next = { ...prev };
+                                          delete next[inputKey];
+                                          return next;
+                                        });
+                                      }}
+                                      onRemove={() => {
+                                        if (selectedFile) {
+                                          handleDocFieldChange(travelerNo, field.key, null);
+                                        } else if (hasSuccessfulUpload) {
+                                          setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
+                                          setUploadedDocSuccesses((prev) => {
+                                            const next = { ...prev };
+                                            delete next[inputKey];
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                      onPreview={(selectedFile || savedDocUrl) ? () => {
+                                        if (selectedFile) {
+                                          setDocumentPreview({ url: URL.createObjectURL(selectedFile), fileName: selectedFile.name, mimeType: selectedFile.type });
+                                        } else if (savedDocUrl) {
+                                          setDocumentPreview({ url: getFileUrl(savedDocUrl), fileName: `${displayName} Document`, type: "application/pdf" });
+                                        }
+                                      } : undefined}
+                                    />
+                                  );
+                                })}
                                 {uploadSettings.enableFileUpload && (
                                   <div className="space-y-2 rounded-2xl border border-border bg-white p-4">
                                     <div className="flex items-center gap-2 rounded-xl border border-border bg-white px-2.5 py-2">

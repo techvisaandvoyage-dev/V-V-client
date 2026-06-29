@@ -23,6 +23,7 @@ import {
 import { isValidEmail, parseAuthContactInput } from "../utils/authIdentifier";
 import { useAuthControls } from "../hooks/useAuthControls";
 import { DEFAULT_PHONE_COUNTRY_CODE } from "../utils/phoneCountryCodes";
+import PhoneCountryCodeSelect from "../components/auth/PhoneCountryCodeSelect";
 
 const sanitizeAuthIdentifierInput = (value) => {
   const raw = String(value || "");
@@ -733,7 +734,8 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 }
                                 value={otpIdentifier}
                                 onChange={(e) => setOtpIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
-                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                className={`h-[52px] w-full rounded-full border-border bg-surface pr-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary ${otpPhoneEnabled ? "pl-14" : "pl-5"}`}
+                                leftIcon={otpPhoneEnabled ? <span className="font-medium text-text-primary ml-1.5">{phoneCountryCode}</span> : null}
                                 required
                               />
                               {otpIdentifier.trim() && (
@@ -803,7 +805,8 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 value={identifier}
                                 onChange={(e) => setIdentifier(sanitizeAuthIdentifierInput(e.target.value))}
                                 autoComplete="username"
-                                className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                                className={`h-[52px] w-full rounded-full border-border bg-surface pr-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary ${otpPhoneEnabled ? "pl-14" : "pl-5"}`}
+                                leftIcon={otpPhoneEnabled ? <span className="font-medium text-text-primary ml-1.5">{phoneCountryCode}</span> : null}
                                 required
                               />
                               <Input
@@ -890,7 +893,8 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                                 ? "Enter email"
                                 : `Enter ${phoneNoStr}`
                           }
-                          className="h-[52px] rounded-full border-border bg-surface px-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary"
+                          className={`h-[52px] w-full rounded-full border-border bg-surface pr-5 text-[15px] placeholder:text-text-muted focus:ring-1 focus:ring-text-primary focus:border-text-primary ${otpPhoneEnabled ? "pl-14" : "pl-5"}`}
+                          leftIcon={otpPhoneEnabled ? <span className="font-medium text-text-primary ml-1.5">{phoneCountryCode}</span> : null}
                           required
                         />
                         {forgotEmail.trim() && (
