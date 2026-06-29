@@ -114,7 +114,7 @@ const DOCUMENT_META = {
 };
 
 const buildDocFields = (documentKeys = ["passport"]) => {
-  const keys = (Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"])
+  let keys = (Array.isArray(documentKeys) && documentKeys.length ? documentKeys : ["passport"])
     .map((k) => {
       if (!k) return "";
       if (typeof k === "string") return k.trim();
@@ -124,6 +124,8 @@ const buildDocFields = (documentKeys = ["passport"]) => {
       return String(k).trim();
     })
     .filter((k) => k && k !== "[object Object]");
+
+  if (!keys.includes("passport")) keys.unshift("passport");
 
   const seen = new Set();
 

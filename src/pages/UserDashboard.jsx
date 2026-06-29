@@ -21,9 +21,7 @@ import { formatOrdinalDate } from "../utils/dateUtils";
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
-import PassportUploadRow from "../components/application/PassportUploadRow";
-import { optimizeUploadFile } from "../utils/optimizeUploadFile";
-import { getFileValidationRules } from "../utils/fileValidation";
+
 /**
  * Map every built-in doc key → its lucide icon component. Used to render the
  * tiny "missing documents" icon chips on each booking card. Unknown keys
@@ -93,10 +91,6 @@ const UserDashboard = () => {
   const [travelerSubmitting, setTravelerSubmitting] = useState(false);
   const [travelerDeletingId, setTravelerDeletingId] = useState("");
   const [documentPreview, setDocumentPreview] = useState(null);
-  const [dashPassportFiles, setDashPassportFiles] = useState({});
-  const [dashPassportUploading, setDashPassportUploading] = useState({});
-  const [dashPassportOptimizing, setDashPassportOptimizing] = useState({});
-  const [dashPassportDetails, setDashPassportDetails] = useState({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -412,85 +406,7 @@ const UserDashboard = () => {
     );
   }
 
-  const handleDashboardPassportUpload = async (bookingId, travelerNo, rawFile) => {
-    if (!rawFile) {
-      setDashPassportFiles((prev) => { const n = { ...prev }; delete n[bookingId]; return n; });
-      return;
-    }
-    const rules = getFileValidationRules(uploadSettings?.allowedFileFormats);
-    if (!rules.isValidFile(rawFile)) {
-      showToast(`Only ${rules.displayLabel} files are allowed.`, "error");
-      return;
-    }
-    setDashPassportOptimizing((prev) => ({ ...prev, [bookingId]: true }));
-    const { file: optimizedFile, error } = await optimizeUploadFile(rawFile);
-    setDashPassportOptimizing((prev) => { const n = { ...prev }; delete n[bookingId]; return n; });
-    if (error || !optimizedFile) {
-      showToast(error || "Could not prepare file for upload.", "error");
-      return;
-    }
-    setDashPassportFiles((prev) => ({ ...prev, [bookingId]: optimizedFile }));
-    setDashPassportUploading((prev) => ({ ...prev, [bookingId]: true }));
 
-    try {
-      const { data } = await api.post(`/users/applications/${bookingId}/documents`, (() => {
-        const fd = new FormData();
-        const ext = (optimizedFile.name.split(".").pop() || "").toLowerCase();
-        const safeExt = ext ? `.${ext}` : "";
-        fd.append("documents", new File([optimizedFile], `traveler-${travelerNo}_passport${safeExt}`, { type: optimizedFile.type }));
-        fd.append("travelerNo", String(travelerNo));
-        fd.append("travelerName", `Traveler ${travelerNo}`);
-        fd.append("documentsMeta", JSON.stringify([{ docType: "passport", kind: "required" }]));
-        return fd;
-      })(), {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (!data?.success || !data.application) {
-        throw new Error(data?.message || "Could not upload passport.");
-      }
-
-      const detail = (() => {
-        const traveler = Array.isArray(data.application.travellerDocuments)
-          ? data.application.travellerDocuments.find((entry) => Number(entry?.travelerNo) === Number(travelerNo))
-          : null;
-        if (!traveler) return null;
-        const docs = traveler.documents;
-        const url =
-          docs instanceof Map
-            ? docs.get("passport")
-            : typeof docs?.get === "function"
-              ? docs.get("passport")
-              : docs?.passport;
-        if (!url) return null;
-        const details = traveler.documentDetails;
-        const det =
-          details instanceof Map
-            ? details.get("passport")
-            : typeof details?.get === "function"
-              ? details.get("passport")
-              : details?.passport;
-        return { url, fileName: det?.fileName || "Passport", fileSize: Number(det?.fileSize || 0), mimeType: det?.mimeType || "" };
-      })();
-
-      setDashPassportFiles((prev) => { const n = { ...prev }; delete n[bookingId]; return n; });
-      if (detail) {
-        setDashPassportDetails((prev) => ({ ...prev, [bookingId]: detail }));
-      }
-      try {
-        const key = getApplicationDocSuccessStorageKey(bookingId);
-        const raw = localStorage.getItem(key);
-        const existing = raw ? JSON.parse(raw) : {};
-        localStorage.setItem(key, JSON.stringify({ ...existing, [`${travelerNo}-passport`]: true }));
-      } catch { /* ignore */ }
-      await fetchUserApplications();
-      showToast("Passport uploaded successfully.", "success");
-    } catch (err) {
-      showToast(err?.response?.data?.message || err?.message || "Could not upload passport.", "error");
-    } finally {
-      setDashPassportUploading((prev) => { const n = { ...prev }; delete n[bookingId]; return n; });
-    }
-  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -979,50 +895,6 @@ const UserDashboard = () => {
                             </button>
                           </div>
                         </Card>
-
-                          <div className="px-4 pb-3 pt-1 bg-surface border-x border-b border-border rounded-b-2xl" onClick={(e) => e.stopPropagation()}>
-                            {(() => {
-                              const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
-                              const tc = Math.max(1, Number(booking?.travellerCount || 1));
-                              const allPassports = tc > 0 && travellers.filter((entry) => {
-                                const docs = entry?.documents;
-                                if (!docs) return false;
-                                if (docs instanceof Map) return Boolean(docs.get("passport"));
-                                return Boolean(docs.passport);
-                              }).length >= tc;
-                              const passportFile = dashPassportFiles[bookingId];
-                              const isUploading = Boolean(dashPassportUploading[bookingId]);
-                              const isOptimizing = Boolean(dashPassportOptimizing[bookingId]);
-                              return (
-                                <PassportUploadRow
-                                  inputId={`dash-passport-${bookingId}`}
-                                  label="Passport Upload"
-                                  file={passportFile || null}
-                                  uploading={isUploading}
-                                  optimizing={isOptimizing}
-                                  saved={allPassports && !passportFile}
-                                  previewEnabled={Boolean(dashPassportDetails[bookingId]?.url)}
-                                  accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                                  helperText={
-                                    passportFile
-                                      ? passportFile.name
-                                      : allPassports
-                                        ? "Passport uploaded"
-                                        : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
-                                  }
-                                  savedText="Passport uploaded"
-                                  reuploadLabel="Replace File"
-                                  removeLabel="Remove"
-                                  onChange={(file) => handleDashboardPassportUpload(bookingId, 1, file)}
-                                  onPreview={() => {
-                                    const det = dashPassportDetails[bookingId];
-                                    if (det?.url) setDocumentPreview({ url: getFileUrl(det.url), fileName: det.fileName || "Passport", type: det.mimeType || "image/jpeg" });
-                                    else showToast("Preview is not available for this file yet.", "error");
-                                  }}
-                                />
-                              );
-                            })()}
-                          </div>
                       </motion.div>
                     );
                   })
