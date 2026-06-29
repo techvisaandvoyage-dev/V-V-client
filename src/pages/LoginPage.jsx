@@ -263,7 +263,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
   const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
   
   const phoneStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS" : isWhatsappOn ? "WhatsApp" : "SMS";
-  const phoneNoStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS no." : isWhatsappOn ? "WhatsApp no." : "SMS no.";
+  const phoneNoStr = isWhatsappOn && isSmsOn ? "Phone No. / WhatsApp no." : isWhatsappOn ? "WhatsApp no." : "Phone no.";
 
   const otpMethodLabel =
     otpPhoneEnabled && otpEmailEnabled
@@ -676,7 +676,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
                       type="button"
                       onClick={handleGoogleLogin}
                       disabled={isLoading}
-                      className="w-full rounded-full border border-border bg-surface px-4 py-3.5 text-[15px] font-medium text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60 flex items-center justify-center gap-3"
+                      className="w-full h-[52px] rounded-full border border-border bg-surface text-[15px] font-medium text-text-primary hover:bg-surface-2 flex items-center justify-center gap-3 transition-colors"
                     >
                       <GoogleMark />
                       Continue with Google

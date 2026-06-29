@@ -159,7 +159,7 @@ const SectionRenderer = ({ section }) => {
               [&_a]:text-cyan [&_a]:underline
               [&_blockquote]:border-l-4 [&_blockquote]:border-cyan/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4
               [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold
-              [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:ml-5 [&_p]:mb-3
+              [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:ml-5 [&_p]:mb-1 [&_p]:leading-[1.4]
               [&_table]:w-full [&_table]:border-collapse [&_table]:my-4
               [&_th]:border [&_td]:border [&_th]:border-border [&_td]:border-border [&_th]:px-3 [&_td]:py-2 [&_th]:bg-surface-2 [&_th]:text-left
               [&_img]:max-w-full [&_img]:rounded-xl"

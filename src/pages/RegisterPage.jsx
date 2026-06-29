@@ -255,7 +255,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const otpAuthEnabled = otpPhoneEnabled || otpEmailEnabled;
 
   const phoneStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS" : isWhatsappOn ? "WhatsApp" : "SMS";
-  const phoneNoStr = isWhatsappOn && isSmsOn ? "WhatsApp/SMS no." : isWhatsappOn ? "WhatsApp no." : "SMS no.";
+  const phoneNoStr = isWhatsappOn && isSmsOn ? "Phone No. / WhatsApp no." : isWhatsappOn ? "WhatsApp no." : "Phone no.";
 
   const otpSignupLabel =
     otpPhoneEnabled && otpEmailEnabled

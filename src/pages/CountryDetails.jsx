@@ -1895,12 +1895,12 @@ const CountryDetails = () => {
         { id: "info", label: "Info" },
         ...(countryDisplay?.showHowItWorks !== false ? [{ id: "how-it-works", label: "How it works" }] : []),
         ...(countryDisplay?.showWhyBookNow !== false ? [{ id: "why-book-now", label: "Why book now?" }] : []),
-        ...(countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && countryDisplay?.showDestinationRequiredDocs !== false
+        ...(countryDisplay?.showDestinationDocuments !== false
           ? [{ id: "document-requirements", label: "Document Requirements" }]
           : []),
         ...(countryDisplay?.showWhatsIncluded !== false ? [{ id: "whats-included", label: "What's Included" }] : []),
         ...(countryDisplay?.showFaqs !== false ? [{ id: "faqs", label: "FAQs" }] : []),
-      ], [showTravelDetails, countryDisplay?.showHowItWorks, countryDisplay?.showWhyBookNow, countryDisplay?.showRequiredDocuments, countryDisplay?.showDestinationDocuments, countryDisplay?.showDestinationRequiredDocs, countryDisplay?.showWhatsIncluded, countryDisplay?.showFaqs]);
+      ], [showTravelDetails, countryDisplay?.showHowItWorks, countryDisplay?.showWhyBookNow, countryDisplay?.showDestinationDocuments, countryDisplay?.showWhatsIncluded, countryDisplay?.showFaqs]);
 
   useEffect(() => {
     setActiveSubNav(SUB_NAV[0]?.id || "");
@@ -2464,7 +2464,7 @@ const CountryDetails = () => {
       </motion.section>
       )}
 
-      {destinationPageContent?.showVisaRequirements !== false && (
+      {countryDisplay?.showVisaRequirements !== false && (
         <motion.section
           id="visa-requirements"
           initial="initial"
@@ -2589,7 +2589,7 @@ const CountryDetails = () => {
       </motion.section>
       )}
 
-      {countryDisplay?.showRequiredDocuments !== false && countryDisplay?.showDestinationDocuments !== false && countryDisplay?.showDestinationRequiredDocs !== false && (
+      {countryDisplay?.showDestinationDocuments !== false && (
         <motion.section
           id="document-requirements"
           initial="initial"

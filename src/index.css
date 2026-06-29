@@ -173,8 +173,9 @@
    smart heading rhythm. */
 .prose-blog p {
   font-size: 1.0625rem;
-  line-height: 1.85;
+  line-height: 1.4;
   color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
 }
 
 .prose-blog h2 {
@@ -196,6 +197,14 @@
   padding: 0.25rem 0.65rem 0 0;
   color: var(--color-cyan);
   font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Strip any accidental selection outlines saved by the CMS */
+.prose-blog img,
+.prose-blog table,
+.prose-blog .resizable-group,
+.prose-blog [data-type="shape"] {
+  outline: none !important;
 }
 
 /* ── CSS Custom Properties ───────────────────────────────── */
