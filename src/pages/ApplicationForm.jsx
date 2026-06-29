@@ -53,6 +53,7 @@ import {
 } from "../utils/optimizeUploadFile";
 import { getFileValidationRules } from "../utils/fileValidation";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
+import PassportUploadRow from "../components/application/PassportUploadRow";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -1562,88 +1563,68 @@ const ApplicationForm = () => {
                 />
               </div>
 {uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
-              <div className="flex w-full flex-col gap-2">
+              <div className="flex w-full flex-col gap-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
                   Required Documents
                 </p>
                 {requiredDocFields.map((field) => {
                   const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
+                  const travelerNo = index + 1;
+                  const successKey = `${travelerNo}-${field.key}`;
+                  const isSaved = Boolean(uploadedDocSuccesses[successKey]);
                   const isDragging = draggingKey === zoneKey;
-                  const Icon = field.Icon;
+                  const displayName = getDocumentDisplayName(field.label);
+
                   return (
-                    <div key={`${index}-${field.key}`} className="w-full space-y-1">
-                      <div
-                        role="presentation"
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setDraggingKey(zoneKey);
+                    <div
+                      key={`${index}-${field.key}`}
+                      onDragOver={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
+                      onDragEnter={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
+                      onDragLeave={() => setDraggingKey((prev) => (prev === zoneKey ? "" : prev))}
+                      onDrop={(e) => handleDrop(e, index, field.key)}
+                      className={`rounded-xl transition-colors ${isDragging ? "ring-2 ring-cyan/30 bg-cyan/5" : ""}`}
+                    >
+                      <PassportUploadRow
+                        inputId={`traveler-${index}-${field.key}`}
+                        label={field.label}
+                        file={file}
+                        error={docErrors[zoneKey]}
+                        uploading={Boolean(docUploading[zoneKey])}
+                        optimizing={Boolean(docOptimizing[zoneKey])}
+                        saved={isSaved && !file}
+                        accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
+                        helperText={
+                          file
+                            ? file.name
+                            : field.description || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
+                        }
+                        fileSizeText={file ? formatFileSize(file.size) : ""}
+                        savedText={`${displayName} uploaded`}
+                        reuploadLabel="Replace File"
+                        removeLabel="Remove"
+                        onChange={(newFile) => updateTravelerDoc(index, field.key, newFile)}
+                        onReupload={() => {
+                          setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                          setUploadedDocSuccesses((prev) => {
+                            const next = { ...prev };
+                            delete next[successKey];
+                            return next;
+                          });
                         }}
-                        onDragEnter={(e) => {
-                          e.preventDefault();
-                          setDraggingKey(zoneKey);
+                        onRemove={() => {
+                          if (file) {
+                            updateTravelerDoc(index, field.key, null);
+                          } else if (isSaved) {
+                            setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                            setUploadedDocSuccesses((prev) => {
+                              const next = { ...prev };
+                              delete next[successKey];
+                              return next;
+                            });
+                          }
                         }}
-                        onDragLeave={() => {
-                          setDraggingKey((prev) => (prev === zoneKey ? "" : prev));
-                        }}
-                        onDrop={(e) => handleDrop(e, index, field.key)}
-                        className={`flex w-full min-w-0 items-center gap-2 rounded-xl border bg-background px-2.5 py-2 transition-colors ${
-                          docErrors[zoneKey]
-                            ? "border-red-500/45"
-                            : isDragging
-                              ? "border-cyan bg-cyan/5 ring-1 ring-cyan/30"
-                              : "border-border"
-                        }`}
-                      >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan/10 text-cyan">
-                          <Icon size={14} strokeWidth={2} />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-text-primary">
-                            {getDocumentDisplayName(field.label)}
-                          </p>
-                          {field.description ? (
-                            <p className="truncate text-[10px] text-text-muted">
-                              {field.description}
-                            </p>
-                          ) : null}
-                          <p className="truncate text-[10px] text-text-muted">
-                            {file
-                              ? `${file.name} · ${formatFileSize(file.size)}`
-                              : rejectedFiles[zoneKey]
-                                ? `${rejectedFiles[zoneKey].name} · ${formatFileSize(rejectedFiles[zoneKey].size)}`
-                                : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} · max 300 KB`}
-                          </p>
-                        </div>
-                        <label
-                          htmlFor={`traveler-${index}-${field.key}`}
-                          className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-                            docOptimizing[zoneKey]
-                              ? "cursor-wait bg-cyan/5 text-cyan animate-pulse border border-cyan/20"
-                              : docUploading[zoneKey]
-                                ? "cursor-wait bg-cyan/10 text-cyan/80"
-                                : "cursor-pointer bg-cyan/15 text-cyan hover:bg-cyan/25"
-                          }`}
-                        >
-                          {docOptimizing[zoneKey] ? "Optimizing..." : docUploading[zoneKey] ? "Uploading..." : file ? "Replace" : "Upload"}
-                        </label>
-                        <input
-                          id={`traveler-${index}-${field.key}`}
-                          type="file"
-                          accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                          className="sr-only"
-                          disabled={Boolean(docUploading[zoneKey])}
-                          onChange={(e) => {
-                            updateTravelerDoc(index, field.key, e.target.files?.[0] || null);
-                            e.target.value = "";
-                          }}
-                        />
-                      </div>
-                      {docErrors[zoneKey] && (
-                        <p className="flex items-center gap-1 px-0.5 text-xs font-medium text-red-500">
-                          <AlertCircle size={12} /> {docErrors[zoneKey]}
-                        </p>
-                      )}
+                      />
                     </div>
                   );
                 })}
