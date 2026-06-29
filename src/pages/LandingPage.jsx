@@ -561,48 +561,52 @@ const LandingPage = () => {
             ref={searchAnchorRef}
             className={isSearchPinned ? "h-16" : ""}
           >
-          <div
-              className={
-                isSearchPinned
-                  ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
-                  : "relative z-[100] mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
-              }
-            >
-              <div className={isSearchPinned ? "pointer-events-auto mx-auto w-full max-w-[34rem] md:max-w-[36rem] lg:max-w-[38rem]" : ""}>
-            <form
-              onSubmit={handleSearch}
-              autoComplete="off"
-              className="relative h-16 rounded-full border border-slate-200 bg-white px-4 sm:px-5"
-              role="search"
-              aria-label="Search visa destinations"
-            >
-              <div className="flex h-full items-center gap-3">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  autoComplete="off"
-                  placeholder="Search country"
-                  value={searchDestination}
-                  onChange={(e) => setSearchDestination(e.target.value)}
-                  onFocus={() => setIsSearchFocused(true)}
-                  onBlur={(e) => {
-                    const nextFocused = e.relatedTarget;
-                    if (searchFormRef.current?.contains(nextFocused)) return;
-                    window.setTimeout(() => setIsSearchFocused(false), 120);
-                  }}
-                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-base leading-none text-text-primary placeholder:text-[#858da3] focus:outline-none sm:px-4 sm:text-lg"
-                  aria-label="Destination search"
-                  id="hero-destination-input"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-cyan text-white shadow-[0_12px_28px_rgba(2,132,199,0.26)] transition-all hover:scale-[1.03] hover:bg-cyan-dim sm:h-12 sm:w-12"
-                  aria-label="Search destinations"
-                >
-                  <Search className="h-5 w-5" />
-                </button>
-              </div>
+            <div
+                className={
+                  isSearchPinned
+                    ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
+                    : "relative z-[100] mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
+                }
+              >
+                <div className={isSearchPinned ? "pointer-events-auto mx-auto w-full max-w-[34rem] md:max-w-[36rem] lg:max-w-[38rem]" : ""}>
+              <form
+                onSubmit={handleSearch}
+                autoComplete="off"
+                className={`relative rounded-full border border-slate-200 bg-white px-4 sm:px-5 transition-all duration-200 ${
+                  isSearchPinned ? "h-11 sm:h-12" : "h-16"
+                }`}
+                role="search"
+                aria-label="Search visa destinations"
+              >
+                <div className="flex h-full items-center gap-3">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    autoComplete="off"
+                    placeholder="Search country"
+                    value={searchDestination}
+                    onChange={(e) => setSearchDestination(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={(e) => {
+                      const nextFocused = e.relatedTarget;
+                      if (searchFormRef.current?.contains(nextFocused)) return;
+                      window.setTimeout(() => setIsSearchFocused(false), 120);
+                    }}
+                    className="h-full min-w-0 flex-1 bg-transparent px-3 text-base leading-none text-text-primary placeholder:text-[#858da3] focus:outline-none sm:px-4 sm:text-lg"
+                    aria-label="Destination search"
+                    id="hero-destination-input"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className={`flex flex-shrink-0 items-center justify-center rounded-full bg-cyan text-white shadow-[0_12px_28px_rgba(2,132,199,0.26)] transition-all hover:scale-[1.03] hover:bg-cyan-dim ${
+                      isSearchPinned ? "h-8 w-8 sm:h-9 sm:w-9" : "h-11 w-11 sm:h-12 sm:w-12"
+                    }`}
+                    aria-label="Search destinations"
+                  >
+                    <Search className={isSearchPinned ? "h-4 w-4" : "h-5 w-5"} />
+                  </button>
+                </div>
 
               {searchTerm && isSearchFocused && (
                 <div className="absolute left-0 right-0 top-[calc(100%+14px)] z-30 text-left">

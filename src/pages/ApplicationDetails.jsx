@@ -59,6 +59,7 @@ import SharedGoogleDriveLinkSection from "../components/application/SharedGoogle
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
+import { saveTravelDraft } from "../utils/travelDraftStorage";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -333,6 +334,7 @@ const ApplicationDetails = () => {
   const [activeOtherDocsTravelerNo, setActiveOtherDocsTravelerNo] = useState(1);
   const [unlockedDocs, setUnlockedDocs] = useState({});
   const [uploadedDocSuccesses, setUploadedDocSuccesses] = useState({});
+  const [uploadedDocDetails, setUploadedDocDetails] = useState({});
   const [liveBooking, setLiveBooking] = useState(null);
   const [bookingLoaded, setBookingLoaded] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -551,6 +553,16 @@ const ApplicationDetails = () => {
       ...serverSuccesses,
       ...prev,
     }));
+    try {
+      const detailsKey = `application-doc-details:${applicationId}`;
+      const detailsRaw = localStorage.getItem(detailsKey);
+      if (detailsRaw) {
+        const parsed = JSON.parse(detailsRaw);
+        if (parsed && typeof parsed === "object") {
+          setUploadedDocDetails((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch { /* ignore */ }
   }, [booking?._id, booking?.id, booking?.travellerDocuments]);
 
   useEffect(() => {
@@ -562,10 +574,28 @@ const ApplicationDetails = () => {
         getApplicationDocSuccessStorageKey(applicationId),
         JSON.stringify(uploadedDocSuccesses)
       );
+      const detailsKey = `application-doc-details:${applicationId}`;
+      localStorage.setItem(detailsKey, JSON.stringify(uploadedDocDetails));
+
+      const countryId = booking?.countryId;
+      if (countryId && Object.keys(uploadedDocSuccesses).length) {
+        const existing = (() => {
+          try {
+            const raw = localStorage.getItem(`vb-travel-draft-${countryId}`);
+            return raw ? JSON.parse(raw) : {};
+          } catch { return {}; }
+        })();
+        saveTravelDraft(countryId, {
+          ...existing,
+          applicationId,
+          uploadedDocSuccesses,
+          uploadedDocDetails,
+        });
+      }
     } catch {
       /* ignore storage errors */
     }
-  }, [booking?._id, booking?.id, uploadedDocSuccesses]);
+  }, [booking?._id, booking?.id, booking?.countryId, uploadedDocSuccesses, uploadedDocDetails]);
 
   useEffect(() => {
     docFieldsRef.current = docFields;
@@ -709,6 +739,10 @@ const ApplicationDetails = () => {
     if (uploadedDocSuccesses[inputKey]) return true;
     if (unlockedDocs[inputKey]) return false;
     let savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    if (!savedValue) {
+      const fromDetails = uploadedDocDetails[inputKey];
+      if (fromDetails?.url) savedValue = fromDetails.url;
+    }
     if (!savedValue && docKey === "passport") {
       const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
       const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
@@ -725,6 +759,10 @@ const ApplicationDetails = () => {
     const inputKey = getTravelerDocInputKey(travelerNo, docKey);
     if (unlockedDocs[inputKey]) return "";
     let savedValue = getStoredDocumentValue(savedDocuments, docKey);
+    if (!savedValue) {
+      const fromDetails = uploadedDocDetails[inputKey];
+      if (fromDetails?.url) savedValue = fromDetails.url;
+    }
     if (!savedValue && docKey === "passport") {
       const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
       const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
@@ -738,6 +776,8 @@ const ApplicationDetails = () => {
     const uploadedTraveler = travellers.find((x) => String(x.travelerNo) === String(travelerNo));
     return Array.isArray(uploadedTraveler?.otherDocuments) ? uploadedTraveler.otherDocuments : [];
   };
+
+
 
   /** Saved-on-server completion only (never infer from unsaved text in the Drive link box). */
   const travelerServerComplete = (travelerNo) =>
@@ -938,8 +978,7 @@ const ApplicationDetails = () => {
       return { ...prev, [`${travelerNoStr}-otherDocuments`]: list };
     });
   };
-
-  const allTravelersComplete = progress.allDocumentsUploaded;
+  const allTravelersComplete = derivedApplicationProgress.isFullySubmitted;
   const summarySyncing = isUploadingState("summary-sync");
 
   const toggleTravelerUploadSection = (travelerNo) => {
@@ -1148,15 +1187,37 @@ const ApplicationDetails = () => {
         if (data.success && data.application) {
           setLiveBooking(data.application);
           updateBookingDetails(appId, data.application);
-          setUploadedDocSuccesses((prev) => {
-            const next = { ...prev };
-            files.forEach(({ field }) => {
-              if (field.key !== "otherDocument") {
-                next[`${travelerNoStr}-${field.key}`] = true;
-              }
-            });
-            return next;
+          const nextDocSuccesses = {};
+          files.forEach(({ field }) => {
+            if (field.key !== "otherDocument") {
+              nextDocSuccesses[`${travelerNoStr}-${field.key}`] = true;
+            }
           });
+          setUploadedDocSuccesses((prev) => ({ ...prev, ...nextDocSuccesses }));
+          const nextDocDetails = {};
+          files.forEach(({ field }) => {
+            if (field.key === "otherDocument") return;
+            const traveler = Array.isArray(data.application?.travellerDocuments)
+              ? data.application.travellerDocuments.find((e) => Number(e?.travelerNo) === Number(travelerNo))
+              : null;
+            if (traveler) {
+              const docs = traveler.documents;
+              const url = docs instanceof Map ? docs.get(field.key) : typeof docs?.get === "function" ? docs.get(field.key) : docs?.[field.key];
+              if (url) {
+                const details = traveler.documentDetails;
+                const detail = details instanceof Map ? details.get(field.key) : typeof details?.get === "function" ? details.get(field.key) : details?.[field.key];
+                nextDocDetails[`${travelerNoStr}-${field.key}`] = {
+                  url,
+                  fileName: detail?.fileName || String(url).split("/").pop() || field.label,
+                  fileSize: Number(detail?.fileSize || 0),
+                  mimeType: detail?.mimeType || "",
+                };
+              }
+            }
+          });
+          if (Object.keys(nextDocDetails).length) {
+            setUploadedDocDetails((prev) => ({ ...prev, ...nextDocDetails }));
+          }
           setSelectedDocs((prev) => {
             const next = { ...prev };
             docFields.forEach((f) => { delete next[`${travelerNoStr}-${f.key}`]; });
@@ -1218,6 +1279,44 @@ const ApplicationDetails = () => {
       showToast(err.response?.data?.message || "Could not save Google Drive link.", "error");
     } finally {
       setUploadingState(uploadStateKey, false);
+    }
+  };
+
+  const handleRemoveSavedDocument = async (travelerNo, docKey, inputKey) => {
+    const appId = booking?._id || booking?.id;
+    if (!appId) return;
+    setUploadingState(`traveler-upload-${travelerNo}`, true);
+    try {
+      const { data } = await api.put(`/users/applications/${appId}`, {
+        travelerUpdate: {
+          travelerNo: String(travelerNo),
+          removeDocumentTypes: [docKey],
+        }
+      });
+      if (data.success && data.application) {
+        setLiveBooking(data.application);
+        updateBookingDetails(appId, data.application);
+        setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
+        setUploadedDocSuccesses((prev) => {
+          const next = { ...prev };
+          delete next[inputKey];
+          return next;
+        });
+        setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[inputKey]; return n; });
+        try {
+          const key = getApplicationDocSuccessStorageKey(appId);
+          if (key) { const raw = localStorage.getItem(key); if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(key, JSON.stringify(p)); } }
+          const detailsKey = `application-doc-details:${appId}`;
+          const raw = localStorage.getItem(detailsKey);
+          if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(detailsKey, JSON.stringify(p)); }
+        } catch { /* ignore */ }
+        await fetchUserApplications();
+        showToast("Document removed successfully.", "success");
+      }
+    } catch (err) {
+      showToast("Could not remove document.", "error");
+    } finally {
+      setUploadingState(`traveler-upload-${travelerNo}`, false);
     }
   };
 
@@ -1434,13 +1533,34 @@ const ApplicationDetails = () => {
 
       if (data?.success && data.application) {
         nextApplication = data.application;
-        setUploadedDocSuccesses((prev) => {
-          const next = { ...prev };
-          requiredFiles.forEach(({ field }) => {
-            next[`${travelerNoStr}-${field.key}`] = true;
-          });
-          return next;
+        const nextDocSuccesses = {};
+        requiredFiles.forEach(({ field }) => {
+          nextDocSuccesses[`${travelerNoStr}-${field.key}`] = true;
         });
+        setUploadedDocSuccesses((prev) => ({ ...prev, ...nextDocSuccesses }));
+        const nextDocDetails = {};
+        requiredFiles.forEach(({ field }) => {
+          const traveler = Array.isArray(data.application?.travellerDocuments)
+            ? data.application.travellerDocuments.find((e) => Number(e?.travelerNo) === Number(travelerNo))
+            : null;
+          if (traveler) {
+            const docs = traveler.documents;
+            const url = docs instanceof Map ? docs.get(field.key) : typeof docs?.get === "function" ? docs.get(field.key) : docs?.[field.key];
+            if (url) {
+              const details = traveler.documentDetails;
+              const detail = details instanceof Map ? details.get(field.key) : typeof details?.get === "function" ? details.get(field.key) : details?.[field.key];
+              nextDocDetails[`${travelerNoStr}-${field.key}`] = {
+                url,
+                fileName: detail?.fileName || String(url).split("/").pop() || field.label,
+                fileSize: Number(detail?.fileSize || 0),
+                mimeType: detail?.mimeType || "",
+              };
+            }
+          }
+        });
+        if (Object.keys(nextDocDetails).length) {
+          setUploadedDocDetails((prev) => ({ ...prev, ...nextDocDetails }));
+        }
         setUnlockedDocs((prev) => {
           const next = { ...prev };
           requiredFiles.forEach(({ field }) => {
@@ -1814,6 +1934,17 @@ const ApplicationDetails = () => {
                   delete next[passportInputKey];
                   return next;
                 });
+                setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[passportInputKey]; return n; });
+                try {
+                  const appId = booking?._id || booking?.id;
+                  if (appId) {
+                    const key = getApplicationDocSuccessStorageKey(appId);
+                    if (key) { const raw = localStorage.getItem(key); if (raw) { const p = JSON.parse(raw); delete p[passportInputKey]; localStorage.setItem(key, JSON.stringify(p)); } }
+                    const detailsKey = `application-doc-details:${appId}`;
+                    const raw = localStorage.getItem(detailsKey);
+                    if (raw) { const p = JSON.parse(raw); delete p[passportInputKey]; localStorage.setItem(detailsKey, JSON.stringify(p)); }
+                  }
+                } catch { /* ignore */ }
               };
 
               const renderPassportUpload = (disabled = isPassportUploading) => (
@@ -1837,7 +1968,9 @@ const ApplicationDetails = () => {
                   onReupload={canUploadDocuments ? resetPassportUploadState : undefined}
                   onRemove={() => {
                     if (selectedFile) handleDocFieldChange(travelerNo, "passport", null);
-                    else if (hasSuccessfulUpload && canUploadDocuments) resetPassportUploadState();
+                    else if (hasSuccessfulUpload && canUploadDocuments) {
+                      handleRemoveSavedDocument(travelerNo, "passport", passportInputKey);
+                    }
                   }}
                   onPreview={(selectedFile || savedPassportUrl) ? () => {
                     const savedUrl = savedPassportUrl;
@@ -1867,7 +2000,12 @@ const ApplicationDetails = () => {
                     ) : null}
                   </div>
 
-                  {!canUploadDocuments && renderPassportUpload()}
+                  {!canUploadDocuments && (
+                    <>
+                      {renderPassportUpload()}
+
+                    </>
+                  )}
 
                   <div className="space-y-2 text-sm">
                     {uploadSettings.enableFileUpload && (
@@ -1943,7 +2081,7 @@ const ApplicationDetails = () => {
                                   />
                                 </div>
 
-                                {docFields.map((field) => {
+                                {(uploadSettings.enableFileUpload ? docFields : docFields.filter((f) => f.key === "passport")).map((field) => {
                                   const inputKey = `${travelerNoStr}-${field.key}`;
                                   const selectedFile = selectedDocs[inputKey];
                                   const savedDocUrl = getEffectiveSavedTravelerDocumentValue(travelerNo, field.key, savedDocuments) || traveler[field.key + 'Url'] || traveler[field.key + 'File'];
@@ -1952,6 +2090,7 @@ const ApplicationDetails = () => {
                                   const displayName = field.label || `${field.key.charAt(0).toUpperCase() + field.key.slice(1)} Upload`;
 
                                   return (
+                                    <>
                                     <PassportUploadRow
                                       key={field.key}
                                       inputId={`file-${inputKey}`}
@@ -1977,19 +2116,25 @@ const ApplicationDetails = () => {
                                           delete next[inputKey];
                                           return next;
                                         });
-                                      }}
-                                      onRemove={() => {
-                                        if (selectedFile) {
-                                          handleDocFieldChange(travelerNo, field.key, null);
-                                        } else if (hasSuccessfulUpload) {
-                                          setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
-                                          setUploadedDocSuccesses((prev) => {
-                                            const next = { ...prev };
-                                            delete next[inputKey];
-                                            return next;
-                                          });
-                                        }
-                                      }}
+                                          setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[inputKey]; return n; });
+                                          try {
+                                            const appId = booking?._id || booking?.id;
+                                            if (appId) {
+                                              const key = getApplicationDocSuccessStorageKey(appId);
+                                              if (key) { const raw = localStorage.getItem(key); if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(key, JSON.stringify(p)); } }
+                                              const detailsKey = `application-doc-details:${appId}`;
+                                              const raw = localStorage.getItem(detailsKey);
+                                              if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(detailsKey, JSON.stringify(p)); }
+                                            }
+                                          } catch { /* ignore */ }
+                                        }}
+                                        onRemove={() => {
+                                          if (selectedFile) {
+                                            handleDocFieldChange(travelerNo, field.key, null);
+                                          } else if (hasSuccessfulUpload) {
+                                            handleRemoveSavedDocument(travelerNo, field.key, inputKey);
+                                          }
+                                        }}
                                       onPreview={(selectedFile || savedDocUrl) ? () => {
                                         if (selectedFile) {
                                           setDocumentPreview({ url: URL.createObjectURL(selectedFile), fileName: selectedFile.name, mimeType: selectedFile.type });
@@ -1998,6 +2143,8 @@ const ApplicationDetails = () => {
                                         }
                                       } : undefined}
                                     />
+
+                                    </>
                                   );
                                 })}
                                 {uploadSettings.enableFileUpload && (
@@ -2563,13 +2710,6 @@ const ApplicationDetails = () => {
           allTravelersComplete ? (
             null
           ) : (
-          (!uploadSettings.enableFileUpload && !uploadSettings.enableGDriveUpload) ? (
-            <section id="document-upload-section" className="scroll-mt-28">
-              <div className="rounded-2xl border border-border bg-surface p-6 text-sm text-text-muted text-center">
-                Document uploads are currently disabled.
-              </div>
-            </section>
-          ) : (
             <section id="document-upload-section" className="space-y-4 scroll-mt-28 mt-8 pt-8 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
                 <Upload size={18} className="text-cyan shrink-0" />
@@ -2582,7 +2722,7 @@ const ApplicationDetails = () => {
                 <div className="rounded-2xl border border-border bg-surface-2 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-cyan mb-3">Required documents for this country</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                    {docFields.map((field) => {
+                    {(uploadSettings.enableFileUpload ? docFields : docFields.filter((f) => f.key === "passport")).map((field) => {
                       const Icon = field.Icon;
                       return (
                         <div
@@ -2696,10 +2836,10 @@ const ApplicationDetails = () => {
                   {/* Global GDrive link moved outside traveler loop */}
 
                   {/* Doc uploads ÃƒÂ¢Ã¢”šÂ¬Ã¢â‚¬Â compact rows below traveler header */}
-                  {uploadSettings.enableFileUpload && (
+                  {(uploadSettings.enableFileUpload || docFields.some((f) => f.key === "passport")) && (
                     <>
                     <div className="flex flex-col gap-2 mt-3">
-                    {docFields.map((field) => {
+                    {(uploadSettings.enableFileUpload ? docFields : docFields.filter((f) => f.key === "passport")).map((field) => {
                       const inputKey = `${travelerNoStr}-${field.key}`;
                       const selectedFile = selectedDocs[inputKey];
                       const savedDocuments = getSavedTravelerDocuments(travelerNo);
@@ -2707,6 +2847,7 @@ const ApplicationDetails = () => {
                       const isEffectivelySaved = hasEffectiveTravelerDocument(travelerNo, field.key, savedDocuments);
 
                       return (
+                        <>
                         <PassportUploadRow
                           key={inputKey}
                           inputId={`file-${inputKey}`}
@@ -2731,16 +2872,22 @@ const ApplicationDetails = () => {
                               delete next[inputKey];
                               return next;
                             });
+                            setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[inputKey]; return n; });
+                            try {
+                              const appId = booking?._id || booking?.id;
+                              if (appId) {
+                                const key = getApplicationDocSuccessStorageKey(appId);
+                                if (key) { const raw = localStorage.getItem(key); if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(key, JSON.stringify(p)); } }
+                                const detailsKey = `application-doc-details:${appId}`;
+                                const raw = localStorage.getItem(detailsKey);
+                                if (raw) { const p = JSON.parse(raw); delete p[inputKey]; localStorage.setItem(detailsKey, JSON.stringify(p)); }
+                              }
+                            } catch { /* ignore */ }
                           } : undefined}
                           onRemove={() => {
                             if (selectedFile) handleDocFieldChange(travelerNo, field.key, null);
                             else if (isEffectivelySaved) {
-                              setUnlockedDocs((prev) => ({ ...prev, [inputKey]: true }));
-                              setUploadedDocSuccesses((prev) => {
-                                const next = { ...prev };
-                                delete next[inputKey];
-                                return next;
-                              });
+                              handleRemoveSavedDocument(travelerNo, field.key, inputKey);
                             }
                           }}
                           onPreview={(selectedFile || savedUrl) ? () => {
@@ -2751,6 +2898,8 @@ const ApplicationDetails = () => {
                             }
                           } : undefined}
                         />
+
+                        </>
                       );
                     })}
                   </div>
@@ -2788,7 +2937,6 @@ const ApplicationDetails = () => {
               )}
 
             </section>
-          )
           )
         ) : null}
 

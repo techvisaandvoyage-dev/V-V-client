@@ -486,7 +486,7 @@ const UserDashboard = () => {
             </div>
           </motion.div>
 
-          {uploadSettings.showTravelerDetails !== false && (
+          {false && uploadSettings.showTravelerDetails !== false && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}

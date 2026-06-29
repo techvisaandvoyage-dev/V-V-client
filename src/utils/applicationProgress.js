@@ -54,7 +54,19 @@ const resolveVisibleRequiredDocuments = (rawRequiredDocuments = [], settings = {
   const incoming = Array.isArray(rawRequiredDocuments) && rawRequiredDocuments.length
     ? rawRequiredDocuments
     : ["passport"];
-  const normalized = incoming.map((key) => String(key || "").trim()).filter(Boolean);
+  const normalized = incoming.map((item) => {
+    let keyStr = "";
+    if (typeof item === "string") keyStr = item.trim();
+    else if (typeof item === "object" && item !== null) {
+      keyStr = String(item.key || item.name || item.id || "").trim();
+    } else {
+      keyStr = String(item || "").trim();
+    }
+    if (keyStr.toLowerCase() === "front page of passport" || keyStr.toLowerCase() === "passport") {
+      return "passport";
+    }
+    return keyStr;
+  }).filter(Boolean);
   const unique = Array.from(new Set(normalized));
   const optionalKeys = settings?.enableFileUpload === false
     ? []
@@ -183,11 +195,14 @@ export const getDerivedApplicationProgress = (
     totalMissingDocuments += missingCount;
   }
 
+  const isFullySubmitted = (totalMissingDocuments === 0) && (!settings?.enableGDriveUpload || hasDriveLink);
+
   return {
     allDocumentsUploaded: totalMissingDocuments === 0,
     allPassportsUploaded,
     totalMissingDocuments,
     hasDriveLink,
+    isFullySubmitted,
   };
 };
 
@@ -211,8 +226,9 @@ export const resolveApplicationStatus = (
     return isPaid ? "review" : "pending_payment";
   }
 
-  if (!derivedProgress.allPassportsUploaded) return "doc_pending";
-  if (!derivedProgress.hasDriveLink) return "drive_link_pending";
+  if (!derivedProgress.isFullySubmitted) {
+    return "doc_pending";
+  }
   
   return isPaid ? "review" : "pending_payment";
 };

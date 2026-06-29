@@ -601,7 +601,7 @@ const CountryDetails = () => {
   const [razorpayCheckLoading, setRazorpayCheckLoading] = useState(false);
   const [razorpayReadyMessage, setRazorpayReadyMessage] = useState("");
   const [currentApplicationId, setCurrentApplicationId] = useState("");
-  const [uploadSettings, setUploadSettings] = useState({ allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
+  const [uploadSettings, setUploadSettings] = useState({ enableFileUpload: true, enableGDriveUpload: true, allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
   const [draftCreating, setDraftCreating] = useState(false);
   const [travelValidationAttempted, setTravelValidationAttempted] = useState(false);
   const [passportUploading, setPassportUploading] = useState({});
@@ -1194,6 +1194,34 @@ const CountryDetails = () => {
   }, [countryId]);
 
   useEffect(() => {
+    const appId = currentApplicationId || localStorage.getItem(`lastAppId:${countryId}`) || "";
+    if (!appId) return;
+    try {
+      const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(appId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          setUploadedDocSuccesses((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+      const detailsKey = `application-doc-details:${appId}`;
+      const detailsRaw = localStorage.getItem(detailsKey);
+      if (detailsRaw) {
+        const parsed = JSON.parse(detailsRaw);
+        if (parsed && typeof parsed === "object") {
+          setUploadedDocDetails((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch { /* ignore storage errors */ }
+  }, [currentApplicationId, countryId]);
+
+  useEffect(() => {
+    if (currentApplicationId && countryId) {
+      localStorage.setItem(`lastAppId:${countryId}`, currentApplicationId);
+    }
+  }, [currentApplicationId, countryId]);
+
+  useEffect(() => {
     if (location.state?.restoreTravelDetails) {
       const restore = location.state.restoreTravelDetails;
       if (restore.travelDateFrom) setTravelDateFrom(restore.travelDateFrom);
@@ -1307,6 +1335,8 @@ const CountryDetails = () => {
           passportSuccesses: { ...passportSuccesses, ...nextSuccesses },
           passportDetails: { ...passportDetails, ...nextDetails },
           hiddenPassportTravelerNos,
+          uploadedDocSuccesses,
+          uploadedDocDetails,
           showTravelDetails: true,
         });
       } catch {
@@ -1433,9 +1463,12 @@ const CountryDetails = () => {
         })
         .filter((key) => key && key !== "[object Object]")
     : [];
-  const requiredDocumentKeys = countryRequiredDocumentKeys.length
+  const baseRequiredDocumentKeys = countryRequiredDocumentKeys.length
     ? countryRequiredDocumentKeys
     : ["passport"];
+  const requiredDocumentKeys = uploadSettings.enableFileUpload
+    ? baseRequiredDocumentKeys
+    : baseRequiredDocumentKeys.filter((k) => k === "passport");
   const requiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
     label: getDocumentLabel(key),
@@ -1462,6 +1495,7 @@ const CountryDetails = () => {
     Icon: getDocumentIcon(key),
   }));
   const travelDetailsOtherDocumentFields = (() => {
+    if (!uploadSettings.enableFileUpload) return [];
     const requiredKeys = new Set(requiredDocumentKeys);
     const hasConfiguredOptionalDocuments = Array.isArray(country?.optionalDocuments);
     const configuredOptionalKeys = hasConfiguredOptionalDocuments
@@ -1605,6 +1639,8 @@ const CountryDetails = () => {
         passportSuccesses,
         passportDetails,
         hiddenPassportTravelerNos,
+        uploadedDocSuccesses,
+        uploadedDocDetails,
         showTravelDetails: false,
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1764,8 +1800,16 @@ const CountryDetails = () => {
       };
       const nextPassportSuccesses = { ...passportSuccesses, [travelerNo]: true };
       const nextPassportDetails = { ...passportDetails, [travelerNo]: detail };
+      const zoneKey = `${travelerNo}-passport`;
+      const nextDocSuccesses = { ...uploadedDocSuccesses, [zoneKey]: true };
+      const nextDocDetails = {
+        ...uploadedDocDetails,
+        [zoneKey]: { fileName: detail.fileName, fileSize: detail.fileSize, mimeType: detail.mimeType, url: detail.url },
+      };
       setPassportSuccesses(nextPassportSuccesses);
       setPassportDetails(nextPassportDetails);
+      setUploadedDocSuccesses(nextDocSuccesses);
+      setUploadedDocDetails(nextDocDetails);
       updateTravelerPassportFile(index, null);
       saveTravelDraft(countryId, {
         applicationId: appId,
@@ -1780,6 +1824,8 @@ const CountryDetails = () => {
           ...hiddenPassportTravelerNos,
           [travelerNo]: false,
         },
+        uploadedDocSuccesses: nextDocSuccesses,
+        uploadedDocDetails: nextDocDetails,
         showTravelDetails: true,
       });
       // Sync to application doc successes local storage key used by summary page
@@ -1797,7 +1843,23 @@ const CountryDetails = () => {
           docSuccessKey,
           JSON.stringify({
             ...existingDocSuccesses,
-            [`${travelerNo}-passport`]: true,
+            [zoneKey]: true,
+          })
+        );
+        const docDetailsKey = `application-doc-details:${appId}`;
+        const existingDetails = (() => {
+          try {
+            const raw = localStorage.getItem(docDetailsKey);
+            return raw ? JSON.parse(raw) : {};
+          } catch {
+            return {};
+          }
+        })();
+        localStorage.setItem(
+          docDetailsKey,
+          JSON.stringify({
+            ...existingDetails,
+            [zoneKey]: { fileName: detail.fileName, fileSize: detail.fileSize, mimeType: detail.mimeType, url: detail.url },
           })
         );
       } catch (err) {
@@ -1898,6 +1960,16 @@ const CountryDetails = () => {
           const raw = localStorage.getItem(docSuccessKey);
           const existing = raw ? JSON.parse(raw) : {};
           localStorage.setItem(docSuccessKey, JSON.stringify({ ...existing, [zoneKey]: true }));
+          const docDetailsKey = `application-doc-details:${appId}`;
+          const detailsRaw = localStorage.getItem(docDetailsKey);
+          const existingDetails = detailsRaw ? JSON.parse(detailsRaw) : {};
+          localStorage.setItem(
+            docDetailsKey,
+            JSON.stringify({
+              ...existingDetails,
+              [zoneKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
+            })
+          );
         } catch { /* ignore */ }
         return next;
       });
@@ -2412,6 +2484,13 @@ const CountryDetails = () => {
           if (parsed && typeof parsed === "object") {
             delete parsed[`${travelerNo}-passport`];
             localStorage.setItem(key, JSON.stringify(parsed));
+          }
+          const detailsKey = `application-doc-details:${appId}`;
+          const rawDetails = localStorage.getItem(detailsKey);
+          if (rawDetails) {
+            const parsedDetails = JSON.parse(rawDetails);
+            delete parsedDetails[`${travelerNo}-passport`];
+            localStorage.setItem(detailsKey, JSON.stringify(parsedDetails));
           }
         } catch {
           /* ignore storage errors */
@@ -3440,7 +3519,7 @@ const CountryDetails = () => {
                         const file = (traveler.documents || {})[docKey] || null;
                         const isUploading = Boolean(docUploading[zoneKey]);
                         const isOptimizing = Boolean(docOptimizing[zoneKey]);
-                        const isSaved = Boolean(uploadedDocSuccesses[zoneKey] && !file);
+                        const isSaved = Boolean(uploadedDocSuccesses[zoneKey] && !file) || Boolean(uploadedDocDetails[zoneKey]?.url);
                         const error = docErrors[zoneKey];
                         const detail = uploadedDocDetails[zoneKey];
                         const displayName = field.label ? field.label.replace(/\s*Upload\s*$/i, "").trim() : docKey;
@@ -3475,11 +3554,49 @@ const CountryDetails = () => {
                                 } else if (isSaved) {
                                   setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
                                   setUploadedDocSuccesses((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                  setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                  try {
+                                    const key = getApplicationDocSuccessStorageKey(currentApplicationId);
+                                    if (key) {
+                                      const raw = localStorage.getItem(key);
+                                      const parsed = raw ? JSON.parse(raw) : {};
+                                      delete parsed[zoneKey];
+                                      localStorage.setItem(key, JSON.stringify(parsed));
+                                    }
+                                    if (currentApplicationId) {
+                                      const detailsKey = `application-doc-details:${currentApplicationId}`;
+                                      const raw = localStorage.getItem(detailsKey);
+                                      if (raw) {
+                                        const parsed = JSON.parse(raw);
+                                        delete parsed[zoneKey];
+                                        localStorage.setItem(detailsKey, JSON.stringify(parsed));
+                                      }
+                                    }
+                                  } catch { /* ignore */ }
                                 }
                               }}
                               onReupload={() => {
                                 setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
                                 setUploadedDocSuccesses((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                try {
+                                  const key = getApplicationDocSuccessStorageKey(currentApplicationId);
+                                  if (key) {
+                                    const raw = localStorage.getItem(key);
+                                    const parsed = raw ? JSON.parse(raw) : {};
+                                    delete parsed[zoneKey];
+                                    localStorage.setItem(key, JSON.stringify(parsed));
+                                  }
+                                  if (currentApplicationId) {
+                                    const detailsKey = `application-doc-details:${currentApplicationId}`;
+                                    const raw = localStorage.getItem(detailsKey);
+                                    if (raw) {
+                                      const parsed = JSON.parse(raw);
+                                      delete parsed[zoneKey];
+                                      localStorage.setItem(detailsKey, JSON.stringify(parsed));
+                                    }
+                                  }
+                                } catch { /* ignore */ }
                               }}
                             />
                           </div>
