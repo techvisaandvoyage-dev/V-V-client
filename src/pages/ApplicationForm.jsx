@@ -1360,6 +1360,10 @@ const ApplicationForm = () => {
               </div>
             </div>
 
+            <div style={{ background: "red", color: "white", padding: "12px", fontSize: "16px", fontWeight: "bold", borderRadius: "8px", marginBottom: "12px" }}>
+              HOT RELOAD TEST — If you can see this red banner, changes are working. Docs: {requiredDocFields.length}
+            </div>
+
             <section id="document-upload-section" className="space-y-4 scroll-mt-28">
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
