@@ -54,6 +54,8 @@ import {
 import { getFileValidationRules } from "../utils/fileValidation";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 import PassportUploadRow from "../components/application/PassportUploadRow";
+import FilePreviewModal from "../components/ui/FilePreviewModal";
+import { getFileUrl } from "../utils/fileUrl";
 
 const MAX_DOCUMENT_SIZE_BYTES = FINAL_UPLOAD_TARGET_BYTES;
 const FILE_SIZE_ERROR = "File must be below 8 MB before optimization.";
@@ -305,6 +307,7 @@ const ApplicationForm = () => {
   const [docOptimizing, setDocOptimizing] = useState({});
   const [uploadedDocSuccesses, setUploadedDocSuccesses] = useState({});
   const [uploadedDocDetails, setUploadedDocDetails] = useState({});
+  const [documentPreview, setDocumentPreview] = useState(null);
   const [applicationDraftId, setApplicationDraftId] = useState("");
   const [draftHydrated, setDraftHydrated] = useState(false);
   const [uploadSettings, setUploadSettings] = useState({
@@ -441,6 +444,12 @@ const ApplicationForm = () => {
     }
     if (draft.applicationId) {
       setApplicationDraftId(String(draft.applicationId));
+    }
+    if (draft.uploadedDocSuccesses && typeof draft.uploadedDocSuccesses === "object") {
+      setUploadedDocSuccesses(draft.uploadedDocSuccesses);
+    }
+    if (draft.uploadedDocDetails && typeof draft.uploadedDocDetails === "object") {
+      setUploadedDocDetails(draft.uploadedDocDetails);
     }
     setDraftHydrated(true);
   }, [country?.id, countryId, location.state]);
@@ -836,9 +845,35 @@ const ApplicationForm = () => {
         formData.append("gdriveFurtherInfoLink", gdriveFurtherInfoLink);
         formData.append("documentsMeta", JSON.stringify([{ docType: key, kind: "required" }]));
 
-        await api.post(`/users/applications/${appId}/documents`, formData, {
+        const { data: uploadRes } = await api.post(`/users/applications/${appId}/documents`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+
+        const docDetail = (() => {
+          if (!uploadRes?.application) return null;
+          const traveler = Array.isArray(uploadRes.application.travellerDocuments)
+            ? uploadRes.application.travellerDocuments.find(
+                (entry) => Number(entry?.travelerNo) === Number(travelerNo)
+              )
+            : null;
+          if (!traveler) return null;
+          const docs = traveler.documents;
+          const docUrl =
+            docs instanceof Map
+              ? docs.get(key)
+              : typeof docs?.get === "function"
+                ? docs.get(key)
+                : docs?.[key];
+          if (!docUrl) return null;
+          const details = traveler.documentDetails;
+          const det =
+            details instanceof Map
+              ? details.get(key)
+              : typeof details?.get === "function"
+                ? details.get(key)
+                : details?.[key];
+          return { url: docUrl, fileName: det?.fileName || optimizedFile.name, fileSize: Number(det?.fileSize || optimizedFile.size), mimeType: det?.mimeType || optimizedFile.type };
+        })() || { url: null, fileName: optimizedFile.name, fileSize: optimizedFile.size, mimeType: optimizedFile.type };
 
         setTravelers((prev) =>
           prev.map((t, i) =>
@@ -847,48 +882,36 @@ const ApplicationForm = () => {
               : t
           )
         );
-      setUploadedDocSuccesses((prev) => {
-          const next = { ...prev, [successKey]: true };
-          try {
-            const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(appId));
-            const existing = raw ? JSON.parse(raw) : {};
-            const merged = { ...existing, [successKey]: true };
-            localStorage.setItem(
-              getApplicationDocSuccessStorageKey(appId),
-              JSON.stringify(merged)
-            );
-            const cid = country?.id || countryId;
-            if (cid) {
-              saveTravelDraft(cid, {
-                applicationId: appId,
-                travelDateFrom: flowDateFrom ?? "",
-                travelDateTo: flowDateTo ?? "",
-                visaOption: flowVisaOption ?? country?.visaType ?? "e-Visa",
-                sharedDriveLink,
-                travelers: travelersSnapshot.map((travelerItem, travelerIndex) => ({
-                  ...travelerItem,
-                  documents:
-                    travelerIndex === index
-                      ? { ...travelerItem.documents, [key]: null }
-                      : travelerItem.documents,
-                  name: String(travelerItem.name || travelerItem.fullName || ""),
-                })),
-                showTravelDetails: true,
-              });
-            }
-          } catch {
-            /* ignore storage errors */
+        const nextDocSuccesses = { ...uploadedDocSuccesses, [successKey]: true };
+        const nextDocDetails = {
+          ...uploadedDocDetails,
+          [successKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
+        };
+        setUploadedDocSuccesses(nextDocSuccesses);
+        setUploadedDocDetails(nextDocDetails);
+        try {
+          const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(appId));
+          const existing = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(getApplicationDocSuccessStorageKey(appId), JSON.stringify({ ...existing, [successKey]: true }));
+          const cid = country?.id || countryId;
+          if (cid) {
+            saveTravelDraft(cid, {
+              applicationId: appId,
+              travelDateFrom: flowDateFrom ?? "",
+              travelDateTo: flowDateTo ?? "",
+              visaOption: flowVisaOption ?? country?.visaType ?? "e-Visa",
+              sharedDriveLink,
+              travelers: travelersSnapshot.map((travelerItem, travelerIndex) => ({
+                ...travelerItem,
+                documents: travelerIndex === index ? { ...travelerItem.documents, [key]: null } : travelerItem.documents,
+                name: String(travelerItem.name || travelerItem.fullName || ""),
+              })),
+              uploadedDocSuccesses: nextDocSuccesses,
+              uploadedDocDetails: nextDocDetails,
+              showTravelDetails: true,
+            });
           }
-          return next;
-        });
-        setUploadedDocDetails((prev) => ({
-          ...prev,
-          [successKey]: {
-            fileName: optimizedFile.name,
-            fileSize: optimizedFile.size,
-            mimeType: optimizedFile.type,
-          },
-        }));
+        } catch { /* ignore storage errors */ }
         showToast(`${key === "passport" ? "Passport" : "Document"} uploaded successfully!`, "success");
       } catch (err) {
         const message =
@@ -1284,6 +1307,25 @@ const ApplicationForm = () => {
     await proceedAfterContactGate();
   };
 
+  const openDocumentPreview = (travelerNo, docKey) => {
+    const zoneKey = `${travelerNo}-${docKey}`;
+    const detail = uploadedDocDetails?.[zoneKey];
+    const previewUrl = getFileUrl(detail?.url);
+    if (!detail || !previewUrl) {
+      showToast("Preview is not available for this file yet.", "error");
+      return;
+    }
+    setDocumentPreview({
+      url: previewUrl,
+      fileName: detail.fileName || `Traveler ${travelerNo} ${docKey}`,
+      mimeType: String(detail.mimeType || "").toLowerCase(),
+    });
+  };
+
+  const closeDocumentPreview = () => {
+    setDocumentPreview(null);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
       <Navbar />
@@ -1572,6 +1614,7 @@ const ApplicationForm = () => {
                       uploading={Boolean(docUploading[zoneKey])}
                       optimizing={Boolean(docOptimizing[zoneKey])}
                       saved={isSaved && !file}
+                      previewEnabled={Boolean(uploadedDocDetails[successKey]?.url)}
                       accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                       helperText={
                         file
@@ -1583,6 +1626,7 @@ const ApplicationForm = () => {
                       reuploadLabel="Replace File"
                       removeLabel="Remove"
                       onChange={(newFile) => updateTravelerDoc(index, field.key, newFile)}
+                      onPreview={() => openDocumentPreview(travelerNo, field.key)}
                       onReupload={() => {
                         setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
                         setUploadedDocSuccesses((prev) => {
@@ -1896,6 +1940,16 @@ const ApplicationForm = () => {
           </div>
         </div>
       </Modal>
+
+      <FilePreviewModal
+        isOpen={Boolean(documentPreview)}
+        onClose={closeDocumentPreview}
+        previewFile={documentPreview ? {
+          url: documentPreview.url,
+          name: documentPreview.fileName,
+          type: documentPreview.type || documentPreview.mimeType
+        } : null}
+      />
     </div>
   );
 };

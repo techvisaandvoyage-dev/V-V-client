@@ -27,6 +27,12 @@ export function saveTravelDraft(countryId, draft) {
       hiddenPassportTravelerNos: typeof draft.hiddenPassportTravelerNos === "object" && draft.hiddenPassportTravelerNos
         ? draft.hiddenPassportTravelerNos
         : {},
+      uploadedDocSuccesses: typeof draft.uploadedDocSuccesses === "object" && draft.uploadedDocSuccesses
+        ? draft.uploadedDocSuccesses
+        : {},
+      uploadedDocDetails: typeof draft.uploadedDocDetails === "object" && draft.uploadedDocDetails
+        ? draft.uploadedDocDetails
+        : {},
       showTravelDetails: draft.showTravelDetails !== false,
     });
     localStorage.setItem(travelDraftStorageKey(countryId), payload);

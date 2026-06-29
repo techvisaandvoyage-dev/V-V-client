@@ -1182,6 +1182,12 @@ const CountryDetails = () => {
     if (draft.hiddenPassportTravelerNos && typeof draft.hiddenPassportTravelerNos === "object") {
       setHiddenPassportTravelerNos(draft.hiddenPassportTravelerNos);
     }
+    if (draft.uploadedDocSuccesses && typeof draft.uploadedDocSuccesses === "object") {
+      setUploadedDocSuccesses(draft.uploadedDocSuccesses);
+    }
+    if (draft.uploadedDocDetails && typeof draft.uploadedDocDetails === "object") {
+      setUploadedDocDetails(draft.uploadedDocDetails);
+    }
     if (draft.showTravelDetails) {
       setShowTravelDetails(true);
     }
@@ -1899,6 +1905,27 @@ const CountryDetails = () => {
         ...prev,
         [zoneKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
       }));
+      const nextDocSuccesses = { ...uploadedDocSuccesses, [zoneKey]: true };
+      const nextDocDetails = {
+        ...uploadedDocDetails,
+        [zoneKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
+      };
+      setUploadedDocSuccesses(nextDocSuccesses);
+      setUploadedDocDetails(nextDocDetails);
+      saveTravelDraft(countryId, {
+        applicationId: appId,
+        travelDateFrom,
+        travelDateTo,
+        visaOption,
+        sharedDriveLink,
+        travelers: travelers.map((t) => ({ name: String(t.name || "") })),
+        passportSuccesses,
+        passportDetails,
+        hiddenPassportTravelerNos,
+        uploadedDocSuccesses: nextDocSuccesses,
+        uploadedDocDetails: nextDocDetails,
+        showTravelDetails: true,
+      });
       await fetchUserApplications();
       showToast("Document uploaded successfully.", "success");
     } catch (err) {
