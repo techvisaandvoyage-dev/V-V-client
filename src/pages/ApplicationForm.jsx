@@ -346,26 +346,15 @@ const ApplicationForm = () => {
     return () => { alive = false; };
   }, []);
 
-  // Fetch the latest required documents directly from the country API so that
-  // admin changes to required docs are reflected immediately (same approach as
-  // ApplicationDetails.jsx which already works correctly).
+  // Sync doc fields from country requiredDocuments whenever the resolved country
+  // data changes (useMergedCountry already fetches the fresh API data).
   useEffect(() => {
-    if (!countryId) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await api.get(`/countries/${encodeURIComponent(countryId)}`);
-        if (!alive || !data?.success || !data.country) return;
-        const keys = Array.isArray(data.country.requiredDocuments) && data.country.requiredDocuments.length
-          ? data.country.requiredDocuments
-          : ["passport"];
-        setDocFields(buildDocFields(keys, data.documentCatalog));
-      } catch {
-        /* keep defaults — buildDocFields(["passport"]) already set */
-      }
-    })();
-    return () => { alive = false; };
-  }, [countryId]);
+    if (!country) return;
+    const keys = Array.isArray(country.requiredDocuments) && country.requiredDocuments.length
+      ? country.requiredDocuments
+      : ["passport"];
+    setDocFields(buildDocFields(keys, documentCatalog));
+  }, [country, documentCatalog]);
 
   useEffect(() => {
     let alive = true;
