@@ -1565,9 +1565,6 @@ const ApplicationForm = () => {
                     <div key={`${index}-${field.key}`}>
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <p className="text-sm font-semibold text-text-primary">{displayName}</p>
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                          {isSaved ? "Uploaded" : "Optional"}
-                        </span>
                       </div>
                       <PassportUploadRow
                         className="w-full"
