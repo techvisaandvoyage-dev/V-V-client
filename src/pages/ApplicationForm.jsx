@@ -1549,10 +1549,11 @@ const ApplicationForm = () => {
                 />
               </div>
 {uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
-              <div className="flex w-full flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+              <div className="flex w-full flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted mb-1">
                   Required Documents
                 </p>
+                <div className="space-y-4">
                 {requiredDocFields.map((field) => {
                   const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
@@ -1563,57 +1564,65 @@ const ApplicationForm = () => {
                   const displayName = getDocumentDisplayName(field.label);
 
                   return (
-                    <div
-                      key={`${index}-${field.key}`}
-                      onDragOver={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
-                      onDragEnter={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
-                      onDragLeave={() => setDraggingKey((prev) => (prev === zoneKey ? "" : prev))}
-                      onDrop={(e) => handleDrop(e, index, field.key)}
-                      className={`rounded-xl transition-colors ${isDragging ? "ring-2 ring-cyan/30 bg-cyan/5" : ""}`}
-                    >
-                      <PassportUploadRow
-                        inputId={`traveler-${index}-${field.key}`}
-                        label={field.label}
-                        file={file}
-                        error={docErrors[zoneKey]}
-                        uploading={Boolean(docUploading[zoneKey])}
-                        optimizing={Boolean(docOptimizing[zoneKey])}
-                        saved={isSaved && !file}
-                        accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                        helperText={
-                          file
-                            ? file.name
-                            : field.description || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
-                        }
-                        fileSizeText={file ? formatFileSize(file.size) : ""}
-                        savedText={`${displayName} uploaded`}
-                        reuploadLabel="Replace File"
-                        removeLabel="Remove"
-                        onChange={(newFile) => updateTravelerDoc(index, field.key, newFile)}
-                        onReupload={() => {
-                          setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
-                          setUploadedDocSuccesses((prev) => {
-                            const next = { ...prev };
-                            delete next[successKey];
-                            return next;
-                          });
-                        }}
-                        onRemove={() => {
-                          if (file) {
-                            updateTravelerDoc(index, field.key, null);
-                          } else if (isSaved) {
+                    <div key={`${index}-${field.key}`}>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <p className="text-sm font-semibold text-text-primary">{displayName}</p>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                          {isSaved ? "Uploaded" : "Optional"}
+                        </span>
+                      </div>
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
+                        onDragEnter={(e) => { e.preventDefault(); setDraggingKey(zoneKey); }}
+                        onDragLeave={() => setDraggingKey((prev) => (prev === zoneKey ? "" : prev))}
+                        onDrop={(e) => handleDrop(e, index, field.key)}
+                        className={`rounded-xl transition-colors ${isDragging ? "ring-2 ring-cyan/30 bg-cyan/5" : ""}`}
+                      >
+                        <PassportUploadRow
+                          inputId={`traveler-${index}-${field.key}`}
+                          label={field.label}
+                          file={file}
+                          error={docErrors[zoneKey]}
+                          uploading={Boolean(docUploading[zoneKey])}
+                          optimizing={Boolean(docOptimizing[zoneKey])}
+                          saved={isSaved && !file}
+                          accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
+                          helperText={
+                            file
+                              ? file.name
+                              : field.description || `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
+                          }
+                          fileSizeText={file ? formatFileSize(file.size) : ""}
+                          savedText={`${displayName} uploaded`}
+                          reuploadLabel="Replace File"
+                          removeLabel="Remove"
+                          onChange={(newFile) => updateTravelerDoc(index, field.key, newFile)}
+                          onReupload={() => {
                             setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
                             setUploadedDocSuccesses((prev) => {
                               const next = { ...prev };
                               delete next[successKey];
                               return next;
                             });
-                          }
-                        }}
-                      />
+                          }}
+                          onRemove={() => {
+                            if (file) {
+                              updateTravelerDoc(index, field.key, null);
+                            } else if (isSaved) {
+                              setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                              setUploadedDocSuccesses((prev) => {
+                                const next = { ...prev };
+                                delete next[successKey];
+                                return next;
+                              });
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
                   );
                 })}
+                </div>
               </div>
               )}
 
