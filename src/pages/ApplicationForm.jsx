@@ -358,13 +358,13 @@ const ApplicationForm = () => {
         const keys = Array.isArray(data.country.requiredDocuments) && data.country.requiredDocuments.length
           ? data.country.requiredDocuments
           : ["passport"];
-        setDocFields(buildDocFields(keys, data.country.documentCatalog || documentCatalog));
+        setDocFields(buildDocFields(keys, data.documentCatalog));
       } catch {
         /* keep defaults — buildDocFields(["passport"]) already set */
       }
     })();
     return () => { alive = false; };
-  }, [countryId, documentCatalog]);
+  }, [countryId]);
 
   useEffect(() => {
     let alive = true;
