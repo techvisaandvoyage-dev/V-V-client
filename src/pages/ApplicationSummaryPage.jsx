@@ -363,7 +363,7 @@ const ApplicationSummaryPage = () => {
     }
   }, []);
   const summaryData = location.state?.summaryData || persistedSummarySource?.summaryData || null;
-  const docsSkipped = Boolean(location.state?.docsSkipped ?? persistedSummarySource?.docsSkipped);
+  const [docsSkipped, setDocsSkipped] = useState(() => Boolean(location.state?.docsSkipped ?? persistedSummarySource?.docsSkipped));
   const isDashboardSummaryRoute = location.pathname.startsWith("/dashboard/application/");
   const id = isDashboardSummaryRoute
     ? (
@@ -409,7 +409,7 @@ const ApplicationSummaryPage = () => {
   );
   const [passportPreview, setPassportPreview] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
-  const [uploadSettings, setUploadSettings] = useState({ allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
+  const [uploadSettings, setUploadSettings] = useState({ enableFileUpload: true, enableGDriveUpload: true, allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayMessage, setRazorpayMessage] = useState("");
 
@@ -712,37 +712,6 @@ const ApplicationSummaryPage = () => {
    *   2. If `summaryData.docsUploaded` is an explicit boolean → trust it.
    *   3. Otherwise inspect each traveler entry on the server record.
    */
-  const docsUploaded = useMemo(() => {
-    // Docs are considered uploaded if every traveler has at least the passport (or first doc) stored
-    const firstDocKey = "passport";
-    const allFirstDocUploadsStored = Array.from({ length: travelerCount }).every((_, index) =>
-      Boolean(uploadSuccesses[`${index + 1}-${firstDocKey}`]) && !hiddenUploadedPassportNos[index + 1]
-    );
-    if (allFirstDocUploadsStored) return true;
-    const entries = Array.isArray(application?.travellerDocuments)
-      ? application.travellerDocuments
-      : [];
-    if (entries.length < travelerCount) return false;
-    const entryHasUpload = (entry) => {
-      if (!entry || typeof entry !== "object") return false;
-      const docs = entry.documents;
-      if (docs) {
-        if (docs instanceof Map && docs.size > 0) return true;
-        if (typeof docs === "object" && Object.keys(docs).length > 0) return true;
-      }
-      if (Array.isArray(entry.otherDocuments) && entry.otherDocuments.length > 0) return true;
-      return false;
-    };
-    const allUploadsPresent = entries.length >= travelerCount
-      && entries.slice(0, travelerCount).every((entry, index) => !hiddenUploadedPassportNos[index + 1] && entryHasUpload(entry));
-    if (allUploadsPresent) return true;
-    if (docsSkipped) return false;
-    if (!application && summaryData && typeof summaryData.docsUploaded === "boolean") {
-      return summaryData.docsUploaded;
-    }
-    return false;
-  }, [application, docsSkipped, summaryData, uploadSuccesses, application?.travellerDocuments, hiddenUploadedPassportNos, travelerCount]);
-
   // Dynamic document fields computed from country required docs
   const requiredDocFields = useMemo(
     () => buildDocFields(country?.requiredDocuments, country?.documentCatalog),
@@ -759,13 +728,36 @@ const ApplicationSummaryPage = () => {
     [application, summaryData, uploadSuccesses, travelerCount]
   );
 
+  const allRequiredUploaded = useMemo(() => {
+    const visibleDocFields = uploadSettings.enableFileUpload
+      ? (requiredDocFields || [{ key: "passport" }])
+      : (requiredDocFields || [{ key: "passport" }]).filter((f) => f.key === "passport");
+
+    return Array.from({ length: travelerCount }).every((_, index) => {
+      const travelerNo = index + 1;
+      if (hiddenUploadedPassportNos[travelerNo]) return false;
+      return visibleDocFields.every(field => 
+        Boolean(travelerPassportSuccesses[`${travelerNo}-${field.key}`])
+      );
+    });
+  }, [requiredDocFields, uploadSettings.enableFileUpload, travelerCount, hiddenUploadedPassportNos, travelerPassportSuccesses]);
+
+  const hasGDriveLink = Boolean(uploadSettings.enableGDriveUpload && String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim());
+
+  const isFullySubmitted = allRequiredUploaded && (!uploadSettings.enableGDriveUpload || hasGDriveLink);
+
+  const docsUploaded = useMemo(() => {
+    if (docsSkipped) return false;
+    return isFullySubmitted;
+  }, [docsSkipped, isFullySubmitted]);
+
   const passportPreviewIsPdf = passportPreview?.mimeType.includes("pdf")
     || /\.pdf($|\?)/i.test(String(passportPreview?.url || ""));
   const passportPreviewIsImage = /^image\//i.test(String(passportPreview?.mimeType || ""))
     || /\.(png|jpe?g|gif|webp|bmp|svg)($|\?)/i.test(String(passportPreview?.url || ""));
 
   useEffect(() => {
-    if (!applicationIdForUploads || !Object.keys(travelerPassportSuccesses).length) return;
+    if (!application || !applicationIdForUploads || !Object.keys(travelerPassportSuccesses).length) return;
     setStoredApplicationDocSuccesses(applicationIdForUploads, travelerPassportSuccesses);
     setUploadSuccesses((prev) => {
       const missingEntries = Object.entries(travelerPassportSuccesses).filter(
@@ -848,7 +840,7 @@ const ApplicationSummaryPage = () => {
     setUploadModalErrors({});
     setUploadModalUploading({});
     setUploadModalOptimizing({});
-    setUploadDocumentsModalOpen(true);
+    setUploadDocumentsModalOpen(true); 
   };
 
   const openPassportPreview = (travelerNo) => {
@@ -870,7 +862,18 @@ const ApplicationSummaryPage = () => {
   };
 
   const openDocumentPreview = (travelerNo, docKey) => {
-    const detail = getTravelerDocumentDetail(application, travelerNo, docKey);
+    let detail = getTravelerDocumentDetail(application, travelerNo, docKey);
+    if (!detail) {
+      try {
+        const zoneKey = `${travelerNo}-${docKey}`;
+        const raw = localStorage.getItem(`application-doc-details:${applicationIdForUploads}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const entry = parsed?.[zoneKey];
+          if (entry?.url) detail = entry;
+        }
+      } catch { /* ignore */ }
+    }
     const previewUrl = getFileUrl(detail?.url);
     if (!detail || !previewUrl) {
       showToast("Preview is not available for this file yet.", "error");
@@ -909,6 +912,15 @@ const ApplicationSummaryPage = () => {
         const next = { ...prev };
         delete next[`${travelerNo}-${docKey}`];
         setStoredApplicationDocSuccesses(appId, next);
+        try {
+          const detailsKey = `application-doc-details:${appId}`;
+          const raw = localStorage.getItem(detailsKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            delete parsed[`${travelerNo}-${docKey}`];
+            localStorage.setItem(detailsKey, JSON.stringify(parsed));
+          }
+        } catch { /* ignore */ }
         return next;
       });
       setUploadModalTravelers((prev) =>
@@ -1013,15 +1025,47 @@ const ApplicationSummaryPage = () => {
       }
 
       setApplication(data.application);
+      // Extract document detail from server response
+      const docDetail = (() => {
+        const traveller = Array.isArray(data.application.travellerDocuments)
+          ? data.application.travellerDocuments.find((e) => Number(e?.travelerNo) === Number(travelerNo))
+          : null;
+        if (!traveller) return null;
+        const docs = traveller.documents;
+        const url =
+          docs instanceof Map
+            ? docs.get(docKey)
+            : typeof docs?.get === "function"
+              ? docs.get(docKey)
+              : docs?.[docKey];
+        if (!url) return null;
+        const dets = traveller.documentDetails;
+        const det =
+          dets instanceof Map
+            ? dets.get(docKey)
+            : typeof dets?.get === "function"
+              ? dets.get(docKey)
+              : dets?.[docKey];
+        return { url, fileName: det?.fileName || String(url).split("/").pop() || docKey, fileSize: Number(det?.fileSize || 0), mimeType: det?.mimeType || "" };
+      })();
       // Remove from hidden list if it was the passport
       if (docKey === "passport") {
         setHiddenUploadedPassportNos((prev) => { const n = { ...prev }; delete n[travelerNo]; return n; });
       }
       setUploadSuccesses((prev) => {
+        setDocsSkipped(false);
         const next = { ...prev, [`${travelerNo}-${docKey}`]: true };
         setStoredApplicationDocSuccesses(appId, next);
         return next;
       });
+      if (docDetail) {
+        try {
+          const detailsKey = `application-doc-details:${appId}`;
+          const raw = localStorage.getItem(detailsKey);
+          const existing = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(detailsKey, JSON.stringify({ ...existing, [`${travelerNo}-${docKey}`]: docDetail }));
+        } catch { /* ignore */ }
+      }
       setUploadModalTravelers((prev) =>
         prev.map((traveler, ti) => (
           ti === travelerIndex
@@ -1073,6 +1117,7 @@ const ApplicationSummaryPage = () => {
       const { appId } = await ensureApplicationDraft();
       const { data } = await api.put(`/users/applications/${appId}`, { gdriveLink: sharedLink });
       if (data?.success && data.application) {
+        setDocsSkipped(false);
         setApplication(data.application);
         showToast("Google Drive link saved.", "success");
       }
@@ -1111,6 +1156,38 @@ const ApplicationSummaryPage = () => {
         : {}),
       ...buildTravelerPassportDetailsMap(application, travelerCount),
     };
+
+    const uploadedDocDetails = (() => {
+      const details = {};
+      if (!application?.travellerDocuments) return details;
+      Array.from({ length: travelerCount }).forEach((_, idx) => {
+        const travelerNo = idx + 1;
+        const traveler = Array.isArray(application.travellerDocuments)
+          ? application.travellerDocuments.find((e) => Number(e?.travelerNo) === Number(travelerNo))
+          : null;
+        if (!traveler) return;
+        const docs = traveler.documents;
+        const dets = traveler.documentDetails;
+        if (!docs) return;
+        const docEntries = docs instanceof Map ? [...docs.entries()] : Object.entries(docs || {});
+        docEntries.forEach(([docKey, url]) => {
+          if (!url) return;
+          const det =
+            dets instanceof Map
+              ? dets.get(docKey)
+              : typeof dets?.get === "function"
+                ? dets.get(docKey)
+                : dets?.[docKey];
+          details[`${travelerNo}-${docKey}`] = {
+            url,
+            fileName: det?.fileName || String(url).split("/").pop() || docKey,
+            fileSize: Number(det?.fileSize || 0),
+            mimeType: det?.mimeType || "",
+          };
+        });
+      });
+      return details;
+    })();
 
     const restoreTravelDetails = {
       travelDateFrom: formatDateToYmd(summaryData?.travelDateFrom ?? application?.travelDate),
@@ -1188,6 +1265,8 @@ const ApplicationSummaryPage = () => {
             passportSuccesses: travelDetailsPassportSuccesses,
             passportDetails: travelDetailsPassportDetails,
             hiddenPassportTravelerNos: hiddenUploadedPassportNos,
+            uploadedDocSuccesses: travelerPassportSuccesses,
+            uploadedDocDetails,
             showTravelDetails: true,
           });
         }
@@ -1228,6 +1307,8 @@ const ApplicationSummaryPage = () => {
             passportSuccesses: travelDetailsPassportSuccesses,
             passportDetails: travelDetailsPassportDetails,
             hiddenPassportTravelerNos: hiddenUploadedPassportNos,
+            uploadedDocSuccesses: travelerPassportSuccesses,
+            uploadedDocDetails,
             showTravelDetails: true,
           });
         }
@@ -1373,8 +1454,7 @@ const ApplicationSummaryPage = () => {
           ))}
           </div>
         </div>
-
-        {!docsUploaded || !Boolean(String(application?.gdriveLink || summaryData?.sharedDriveLink || "").trim()) ? (
+        {!docsUploaded ? (
           <>
             <div className="rounded-2xl border border-border bg-white p-5">
           <Button
@@ -1418,42 +1498,6 @@ const ApplicationSummaryPage = () => {
               All documents submitted
             </div>
           </>
-        )}
-
-        {docsUploaded && (
-          <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
-            <h4 className="text-sm font-semibold text-text-primary">Uploaded Passport Documents</h4>
-            <div className="space-y-3">
-              {Array.from({ length: travelerCount }).map((_, index) => {
-                const travelerNo = index + 1;
-                const detail = getTravelerPassportDetailForSummary(application, summaryData, travelerNo);
-                if (!detail?.url) return null;
-                return (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white border border-border/60 hover:border-cyan/30 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-lg bg-cyan/10 flex items-center justify-center text-cyan shrink-0">
-                        <FileText size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-text-primary truncate">
-                          {travelerNames[index] || `Traveler ${travelerNo}`}
-                        </p>
-                        <p className="text-[10px] text-text-secondary truncate max-w-[180px] mt-0.5">
-                          {detail.fileName} • {formatFileSize(detail.fileSize)}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => openPassportPreview(travelerNo)}
-                      className="text-xs font-medium text-cyan hover:text-cyan-dark px-2.5 py-1.5 rounded-lg bg-cyan/5 hover:bg-cyan/10 transition-colors shrink-0"
-                    >
-                      Preview
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         )}
 
         {/* Billing */}
@@ -1564,7 +1608,16 @@ const ApplicationSummaryPage = () => {
         size="xl"
         closeOnBackdropClick={false}
         footer={
-          docsUploaded ? null : (
+          isFullySubmitted ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button variant="primary" size="md" onClick={() => {
+                setDocsSkipped(false);
+                closeUploadDocumentsModal();
+              }} className="min-w-[120px]">
+                Done
+              </Button>
+            </div>
+          ) : (
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button variant="secondary" size="md" onClick={closeUploadDocumentsModal}>
                 Skip, I'll upload later
@@ -1590,7 +1643,10 @@ const ApplicationSummaryPage = () => {
 
           <div className="space-y-4">
             {uploadModalTravelers.map((traveler, travelerIndex) => {
-              const allDocUploaded = (requiredDocFields || [{ key: "passport" }]).every(
+              const visibleDocFields = uploadSettings.enableFileUpload
+                ? (requiredDocFields || [{ key: "passport" }])
+                : (requiredDocFields || [{ key: "passport" }]).filter((f) => f.key === "passport");
+              const allDocUploaded = visibleDocFields.every(
                 (f) => Boolean((traveler.uploadedDocs || {})[f.key])
               );
               return (
@@ -1618,9 +1674,8 @@ const ApplicationSummaryPage = () => {
 
                       {/* Dynamic document upload rows */}
                       <div className="mt-5 space-y-4">
-                        {(requiredDocFields || [{ key: "passport", label: "Passport Upload", Icon: FileText }]).map((field) => {
+                        {visibleDocFields.map((field) => {
                           const zoneKey = `${travelerIndex}-${field.key}`;
-                          const isUploaded = Boolean((traveler.uploadedDocs || {})[field.key]);
                           const localFile = (traveler.files || {})[field.key];
                           const Icon = field.Icon || FileText;
                           const isUploading = Boolean(uploadModalUploading[zoneKey]);
@@ -1628,7 +1683,18 @@ const ApplicationSummaryPage = () => {
                           const fieldError = uploadModalErrors[zoneKey];
                           const displayName = getDocumentDisplayName(field.label);
 
-                          const docDetail = getTravelerDocumentDetail(application, traveler.id, field.key);
+                          let docDetail = getTravelerDocumentDetail(application, traveler.id, field.key);
+                          if (!docDetail) {
+                            try {
+                              const zoneKey = `${traveler.id}-${field.key}`;
+                              const raw = localStorage.getItem(`application-doc-details:${applicationIdForUploads}`);
+                              if (raw) {
+                                const parsed = JSON.parse(raw);
+                                const entry = parsed?.[zoneKey];
+                                if (entry?.url) docDetail = entry;
+                              }
+                            } catch { /* ignore */ }
+                          }
 
                           return (
                             <div key={field.key}>
@@ -1639,7 +1705,7 @@ const ApplicationSummaryPage = () => {
                                 error={fieldError}
                                 uploading={isUploading}
                                 optimizing={isOptimizing}
-                                saved={isUploaded && !localFile}
+                                saved={Boolean((traveler.uploadedDocs || {})[field.key] && !localFile) || Boolean(docDetail?.url)}
                                 previewEnabled={Boolean(docDetail?.url)}
                                 accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                                 helperText={

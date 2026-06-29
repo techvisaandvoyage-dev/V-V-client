@@ -445,9 +445,6 @@ const ApplicationForm = () => {
     if (draft.applicationId) {
       setApplicationDraftId(String(draft.applicationId));
     }
-    if (draft.uploadedDocSuccesses && typeof draft.uploadedDocSuccesses === "object") {
-      setUploadedDocSuccesses(draft.uploadedDocSuccesses);
-    }
     if (draft.uploadedDocDetails && typeof draft.uploadedDocDetails === "object") {
       setUploadedDocDetails(draft.uploadedDocDetails);
     }
@@ -473,6 +470,7 @@ const ApplicationForm = () => {
           ...traveler,
           name: String(traveler.name || traveler.fullName || ""),
         })),
+        uploadedDocDetails,
         showTravelDetails: true,
       });
     }, 280);
@@ -491,18 +489,36 @@ const ApplicationForm = () => {
   ]);
 
   useEffect(() => {
-    if (!applicationDraftId) return;
+    const cid = country?.id || countryId;
+    const appId = applicationDraftId || (cid ? localStorage.getItem(`lastAppId:${cid}`) : "") || "";
+    if (!appId) return;
     try {
-      const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(applicationDraftId));
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        setUploadedDocSuccesses((prev) => ({ ...prev, ...parsed }));
+      const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(appId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          setUploadedDocSuccesses((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+      const detailsKey = `application-doc-details:${appId}`;
+      const detailsRaw = localStorage.getItem(detailsKey);
+      if (detailsRaw) {
+        const parsed = JSON.parse(detailsRaw);
+        if (parsed && typeof parsed === "object") {
+          setUploadedDocDetails((prev) => ({ ...prev, ...parsed }));
+        }
       }
     } catch {
       /* ignore storage errors */
     }
-  }, [applicationDraftId]);
+  }, [applicationDraftId, country?.id, countryId]);
+
+  useEffect(() => {
+    const cid = country?.id || countryId;
+    if (applicationDraftId && cid) {
+      localStorage.setItem(`lastAppId:${cid}`, applicationDraftId);
+    }
+  }, [applicationDraftId, country?.id, countryId]);
 
   useEffect(() => {
     if (!applicationDraftId || !localStorage.getItem("token")) return;
@@ -893,6 +909,13 @@ const ApplicationForm = () => {
           const raw = localStorage.getItem(getApplicationDocSuccessStorageKey(appId));
           const existing = raw ? JSON.parse(raw) : {};
           localStorage.setItem(getApplicationDocSuccessStorageKey(appId), JSON.stringify({ ...existing, [successKey]: true }));
+          const detailsKey = `application-doc-details:${appId}`;
+          const detailsRaw = localStorage.getItem(detailsKey);
+          const existingDetails = detailsRaw ? JSON.parse(detailsRaw) : {};
+          localStorage.setItem(detailsKey, JSON.stringify({
+            ...existingDetails,
+            [successKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
+          }));
           const cid = country?.id || countryId;
           if (cid) {
             saveTravelDraft(cid, {
@@ -1169,6 +1192,8 @@ const ApplicationForm = () => {
           getApplicationDocSuccessStorageKey(appId),
           JSON.stringify(uploadedDocSuccessMap)
         );
+        const detailsKey = `application-doc-details:${appId}`;
+        localStorage.setItem(detailsKey, JSON.stringify(uploadedDocDetails));
       } catch {
         /* ignore storage errors */
       }
@@ -1349,6 +1374,8 @@ const ApplicationForm = () => {
                 ...traveler,
                 name: String(traveler.name || traveler.fullName || ""),
               })),
+              uploadedDocSuccesses,
+              uploadedDocDetails,
               showTravelDetails: true,
             });
             // Replace so history is not […, destination, apply, destination]; Back on country won't return to apply.
@@ -1590,17 +1617,21 @@ const ApplicationForm = () => {
                   className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-text-primary outline-none focus:border-cyan/50"
                 />
               </div>
-{uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
+{(() => {
+  const visibleDocFields = uploadSettings.enableFileUpload
+    ? requiredDocFields
+    : requiredDocFields.filter((f) => f.key === "passport");
+  return visibleDocFields.length > 0 && (
               <div className="space-y-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
                   Required Documents
                 </p>
-                {requiredDocFields.map((field) => {
+                {visibleDocFields.map((field) => {
                   const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
                   const travelerNo = index + 1;
                   const successKey = `${travelerNo}-${field.key}`;
-                  const isSaved = Boolean(uploadedDocSuccesses[successKey]);
+                  const isSaved = Boolean(uploadedDocSuccesses[successKey]) || Boolean(uploadedDocDetails[successKey]?.url);
                   const displayName = getDocumentDisplayName(field.label);
 
                   return (
@@ -1645,6 +1676,16 @@ const ApplicationForm = () => {
                             delete next[successKey];
                             return next;
                           });
+                          setUploadedDocDetails((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                          try {
+                            const detailsKey = `application-doc-details:${applicationDraftId}`;
+                            const raw = localStorage.getItem(detailsKey);
+                            if (raw) {
+                              const parsed = JSON.parse(raw);
+                              delete parsed[zoneKey];
+                              localStorage.setItem(detailsKey, JSON.stringify(parsed));
+                            }
+                          } catch { /* ignore */ }
                         }
                       }}
                     />
@@ -1652,7 +1693,8 @@ const ApplicationForm = () => {
                   );
                 })}
               </div>
-              )}
+  );
+})()}
 
               {uploadSettings.enableFileUpload && (
                 <div className="w-full space-y-2">
