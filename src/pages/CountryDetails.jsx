@@ -211,6 +211,36 @@ const getTravelerPassportDetail = (application, travelerNo) => {
   };
 };
 
+const getTravelerDocumentDetail = (application, travelerNo, docKey) => {
+  const traveler = Array.isArray(application?.travellerDocuments)
+    ? application.travellerDocuments.find((entry) => Number(entry?.travelerNo) === Number(travelerNo))
+    : null;
+  if (!traveler) return null;
+
+  const docs = traveler.documents;
+  const url =
+    docs instanceof Map
+      ? docs.get(docKey)
+      : typeof docs?.get === "function"
+        ? docs.get(docKey)
+        : docs?.[docKey];
+  if (!url) return null;
+
+  const details = traveler.documentDetails;
+  const detail =
+    details instanceof Map
+      ? details.get(docKey)
+      : typeof details?.get === "function"
+        ? details.get(docKey)
+        : details?.[docKey];
+  return {
+    url,
+    fileName: detail?.fileName || String(url).split("/").pop() || docKey,
+    fileSize: Number(detail?.fileSize || 0),
+    mimeType: detail?.mimeType || "",
+  };
+};
+
 /**
  * Per-document icon mapping shared with the admin Controls panel + the upload
  * pages. Any unknown key (e.g. an admin-added custom document) falls back to
@@ -586,6 +616,7 @@ const CountryDetails = () => {
   const [docErrors, setDocErrors] = useState({});
   const [uploadedDocSuccesses, setUploadedDocSuccesses] = useState({});
   const [uploadedDocDetails, setUploadedDocDetails] = useState({});
+  const [documentPreview, setDocumentPreview] = useState(null);
   const travelerNameInputRefs = useRef({});
   const sharedDriveLinkInputRef = useRef(null);
   const startApplicationCardRef = useRef(null);
@@ -1844,6 +1875,13 @@ const CountryDetails = () => {
         throw new Error(data?.message || "Could not upload document.");
       }
 
+      const docDetail = getTravelerDocumentDetail(data.application, travelerNo, docKey) || {
+        url: null,
+        fileName: optimizedFile.name,
+        fileSize: optimizedFile.size,
+        mimeType: optimizedFile.type,
+      };
+
       setTravelers((prev) =>
         prev.map((t, i) => (i === index ? { ...t, documents: { ...(t.documents || {}), [docKey]: null } } : t))
       );
@@ -1859,7 +1897,7 @@ const CountryDetails = () => {
       });
       setUploadedDocDetails((prev) => ({
         ...prev,
-        [zoneKey]: { fileName: optimizedFile.name, fileSize: optimizedFile.size, mimeType: optimizedFile.type },
+        [zoneKey]: { fileName: docDetail.fileName, fileSize: docDetail.fileSize, mimeType: docDetail.mimeType, url: docDetail.url },
       }));
       await fetchUserApplications();
       showToast("Document uploaded successfully.", "success");
@@ -2281,6 +2319,25 @@ const CountryDetails = () => {
 
   const closePassportPreview = () => {
     setPassportPreview(null);
+  };
+
+  const openDocumentPreview = (travelerNo, docKey) => {
+    const zoneKey = `${travelerNo}-${docKey}`;
+    const detail = uploadedDocDetails?.[zoneKey];
+    const previewUrl = getFileUrl(detail?.url);
+    if (!detail || !previewUrl) {
+      showToast("Preview is not available for this file yet.", "error");
+      return;
+    }
+    setDocumentPreview({
+      url: previewUrl,
+      fileName: detail.fileName || `Traveler ${travelerNo} ${docKey}`,
+      mimeType: String(detail.mimeType || "").toLowerCase(),
+    });
+  };
+
+  const closeDocumentPreview = () => {
+    setDocumentPreview(null);
   };
 
   const hideTravelerPassportLocally = (travelerNo, index) => {
@@ -3371,6 +3428,7 @@ const CountryDetails = () => {
                               uploading={isUploading}
                               optimizing={isOptimizing}
                               saved={isSaved}
+                              previewEnabled={Boolean(detail?.url)}
                               accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                               helperText={
                                 file
@@ -3383,6 +3441,7 @@ const CountryDetails = () => {
                               reuploadLabel="Replace File"
                               removeLabel="Remove"
                               onChange={(newFile) => handleTravelerDocumentFile(index, docKey, newFile)}
+                              onPreview={() => openDocumentPreview(travelerNo, docKey)}
                               onRemove={() => {
                                 if (file) {
                                   handleTravelerDocumentFile(index, docKey, null);
@@ -3853,6 +3912,16 @@ const CountryDetails = () => {
           url: passportPreview.url,
           name: passportPreview.fileName,
           type: passportPreview.type || passportPreview.mimeType
+        } : null}
+      />
+
+      <FilePreviewModal
+        isOpen={Boolean(documentPreview)}
+        onClose={closeDocumentPreview}
+        previewFile={documentPreview ? {
+          url: documentPreview.url,
+          name: documentPreview.fileName,
+          type: documentPreview.type || documentPreview.mimeType
         } : null}
       />
 
