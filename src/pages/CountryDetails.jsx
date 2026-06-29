@@ -428,6 +428,7 @@ const createTravelerState = () => ({
   id: `traveler-${Date.now()}-${travelerStateCounter += 1}`,
   name: "",
   passportFile: null,
+  documents: {},
 });
 
 const normalizeDriveLink = (value) => {
@@ -580,6 +581,12 @@ const CountryDetails = () => {
   const [passportDetails, setPassportDetails] = useState({});
   const [hiddenPassportTravelerNos, setHiddenPassportTravelerNos] = useState({});
   const [passportPreview, setPassportPreview] = useState(null);
+  const [docUploading, setDocUploading] = useState({});
+  const [docOptimizing, setDocOptimizing] = useState({});
+  const [docErrors, setDocErrors] = useState({});
+  const [uploadedDocSuccesses, setUploadedDocSuccesses] = useState({});
+  const [uploadedDocDetails, setUploadedDocDetails] = useState({});
+  const [documentPreview, setDocumentPreview] = useState(null);
   const travelerNameInputRefs = useRef({});
   const sharedDriveLinkInputRef = useRef(null);
   const startApplicationCardRef = useRef(null);
@@ -1773,6 +1780,96 @@ const CountryDetails = () => {
         delete next[travelerNo];
         return next;
       });
+    }
+  };
+
+  const handleTravelerDocumentFile = async (index, docKey, rawFile) => {
+    if (!isAuthenticated) {
+      requireAuth(() => handleTravelerDocumentFile(index, docKey, rawFile));
+      return;
+    }
+    const travelerNo = index + 1;
+    const zoneKey = `${travelerNo}-${docKey}`;
+    if (!rawFile) {
+      setTravelers((prev) =>
+        prev.map((t, i) => (i === index ? { ...t, documents: { ...(t.documents || {}), [docKey]: null } } : t))
+      );
+      setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+      return;
+    }
+    const rules = getFileValidationRules(uploadSettings?.allowedFileFormats);
+    if (!rules.isValidFile(rawFile)) {
+      const err = `Only ${rules.displayLabel} files are allowed.`;
+      setDocErrors((prev) => ({ ...prev, [zoneKey]: err }));
+      showToast(err, "error");
+      return;
+    }
+    setDocOptimizing((prev) => ({ ...prev, [zoneKey]: true }));
+    const { file: optimizedFile, error } = await optimizeUploadFile(rawFile);
+    setDocOptimizing((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+    if (error || !optimizedFile) {
+      const message = error || "Could not prepare file for upload.";
+      setDocErrors((prev) => ({ ...prev, [zoneKey]: message }));
+      showToast(message, "error");
+      return;
+    }
+    setTravelers((prev) =>
+      prev.map((t, i) => (i === index ? { ...t, documents: { ...(t.documents || {}), [docKey]: optimizedFile } } : t))
+    );
+    setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+    setDocUploading((prev) => ({ ...prev, [zoneKey]: true }));
+
+    try {
+      const appId = await createCheckoutDraftAndSetId();
+      if (!appId) throw new Error("Could not create application draft.");
+
+      const travelerName = String(travelers[index]?.name || "").trim() || `Traveler ${travelerNo}`;
+      const formData = new FormData();
+      const ext = (optimizedFile.name.split(".").pop() || "").toLowerCase();
+      const safeExt = ext ? `.${ext}` : "";
+      formData.append(
+        "documents",
+        new File([optimizedFile], `traveler-${travelerNo}_${docKey}${safeExt}`, { type: optimizedFile.type })
+      );
+      formData.append("travelerNo", String(travelerNo));
+      formData.append("travelerName", travelerName);
+      if (String(sharedDriveLink || "").trim()) {
+        formData.append("gdriveLink", String(sharedDriveLink || "").trim());
+      }
+      formData.append("documentsMeta", JSON.stringify([{ docType: docKey, kind: "required" }]));
+
+      const { data } = await api.post(`/users/applications/${appId}/documents`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (!data?.success || !data.application) {
+        throw new Error(data?.message || "Could not upload document.");
+      }
+
+      setTravelers((prev) =>
+        prev.map((t, i) => (i === index ? { ...t, documents: { ...(t.documents || {}), [docKey]: null } } : t))
+      );
+      setUploadedDocSuccesses((prev) => {
+        const next = { ...prev, [zoneKey]: true };
+        try {
+          const docSuccessKey = `application-doc-successes:${appId}`;
+          const raw = localStorage.getItem(docSuccessKey);
+          const existing = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(docSuccessKey, JSON.stringify({ ...existing, [zoneKey]: true }));
+        } catch { /* ignore */ }
+        return next;
+      });
+      setUploadedDocDetails((prev) => ({
+        ...prev,
+        [zoneKey]: { fileName: optimizedFile.name, fileSize: optimizedFile.size, mimeType: optimizedFile.type },
+      }));
+      await fetchUserApplications();
+      showToast("Document uploaded successfully.", "success");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || "Could not upload document.";
+      setDocErrors((prev) => ({ ...prev, [zoneKey]: message }));
+      showToast(message, "error");
+    } finally {
+      setDocUploading((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
     }
   };
 
@@ -3216,42 +3313,92 @@ const CountryDetails = () => {
                         )}
                       </div>
 
-                      <PassportUploadRow
-                        inputId={`traveler-passport-${index}`}
-                        label="Passport Upload"
-                        file={traveler.passportFile}
-                        error={passportErrors[index + 1]}
-                        uploading={Boolean(passportUploading[index + 1])}
-                        optimizing={Boolean(passportOptimizing[index + 1])}
-                        saved={Boolean(passportSuccesses[index + 1] && !traveler.passportFile)}
-                        previewEnabled={Boolean(passportDetails[index + 1]?.url)}
-                        accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                        helperText={
-                          traveler.passportFile
-                            ? `${traveler.passportFile.name} - ${formatFileSize(traveler.passportFile.size)}`
-                            : passportDetails[index + 1]?.fileName
-                              ? `${passportDetails[index + 1].fileName} - ${formatFileSize(passportDetails[index + 1].fileSize)}`
-                              : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
-                        }
-                        savedText="Passport uploaded"
-                        reuploadLabel="Replace File"
-                        removeLabel="Remove"
-                        onChange={(file) => handleTravelerPassportFile(index, file)}
-                        onPreview={() => openPassportPreview(index + 1)}
-                        onRemove={() => hideTravelerPassportLocally(index + 1, index)}
-                        onReupload={() => {
-                          setPassportErrors((prev) => {
-                            const next = { ...prev };
-                            delete next[index + 1];
-                            return next;
-                          });
-                          setHiddenPassportTravelerNos((prev) => {
-                            const next = { ...prev };
-                            delete next[index + 1];
-                            return next;
-                          });
-                        }}
-                      />
+                      <div className="space-y-4">
+                        {requiredDocumentFields.map((field) => {
+                          const docKey = field.key;
+                          const isPassport = docKey === "passport";
+                          const travelerNo = index + 1;
+                          const zoneKey = `${travelerNo}-${docKey}`;
+                          const file = isPassport
+                            ? traveler.passportFile
+                            : ((traveler.documents || {})[docKey] || null);
+                          const isUploading = isPassport
+                            ? Boolean(passportUploading[travelerNo])
+                            : Boolean(docUploading[zoneKey]);
+                          const isOptimizing = isPassport
+                            ? Boolean(passportOptimizing[travelerNo])
+                            : Boolean(docOptimizing[zoneKey]);
+                          const isSaved = isPassport
+                            ? Boolean(passportSuccesses[travelerNo] && !traveler.passportFile)
+                            : Boolean(uploadedDocSuccesses[zoneKey] && !((traveler.documents || {})[docKey]));
+                          const error = isPassport
+                            ? passportErrors[travelerNo]
+                            : docErrors[zoneKey];
+                          const detail = isPassport ? passportDetails[travelerNo] : uploadedDocDetails[zoneKey];
+                          const displayName = field.label ? field.label.replace(/\s*Upload\s*$/i, "").trim() : docKey;
+
+                          return (
+                            <div key={`${index}-${docKey}`}>
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <p className="text-sm font-semibold text-text-primary">{displayName}</p>
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                  {isSaved ? "Uploaded" : "Optional"}
+                                </span>
+                              </div>
+                              <PassportUploadRow
+                                inputId={`traveler-${docKey}-${index}`}
+                                label={field.label}
+                                file={file}
+                                error={error}
+                                uploading={isUploading}
+                                optimizing={isOptimizing}
+                                saved={isSaved}
+                                previewEnabled={isPassport && Boolean(detail?.url)}
+                                accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
+                                helperText={
+                                  file
+                                    ? `${file.name} - ${formatFileSize(file.size)}`
+                                    : detail?.fileName
+                                      ? `${detail.fileName} - ${formatFileSize(detail.fileSize)}`
+                                      : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
+                                }
+                                savedText={`${displayName} uploaded`}
+                                reuploadLabel="Replace File"
+                                removeLabel="Remove"
+                                onChange={(newFile) => {
+                                  if (isPassport) {
+                                    handleTravelerPassportFile(index, newFile);
+                                  } else {
+                                    handleTravelerDocumentFile(index, docKey, newFile);
+                                  }
+                                }}
+                                onPreview={isPassport ? () => openPassportPreview(travelerNo) : undefined}
+                                onRemove={() => {
+                                  if (isPassport) {
+                                    hideTravelerPassportLocally(travelerNo, index);
+                                  } else {
+                                    if (file) {
+                                      handleTravelerDocumentFile(index, docKey, null);
+                                    } else if (isSaved) {
+                                      setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                      setUploadedDocSuccesses((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                    }
+                                  }
+                                }}
+                                onReupload={() => {
+                                  if (isPassport) {
+                                    setPassportErrors((prev) => { const n = { ...prev }; delete n[travelerNo]; return n; });
+                                    setHiddenPassportTravelerNos((prev) => { const n = { ...prev }; delete n[travelerNo]; return n; });
+                                  } else {
+                                    setDocErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                    setUploadedDocSuccesses((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
 
                     </div>
                   ))}
