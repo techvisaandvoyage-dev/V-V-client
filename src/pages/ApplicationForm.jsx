@@ -1549,10 +1549,7 @@ const ApplicationForm = () => {
                 />
               </div>
 {uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
-              <div className="flex w-full flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
-                  Required Documents ({requiredDocFields.length})
-                </p>
+              <div className="space-y-4">
                 {requiredDocFields.map((field) => {
                   const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
@@ -1562,9 +1559,15 @@ const ApplicationForm = () => {
                   const displayName = getDocumentDisplayName(field.label);
 
                   return (
-                    <PassportUploadRow
-                      key={`${index}-${field.key}`}
-                      className="w-full"
+                    <div key={`${index}-${field.key}`}>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <p className="text-sm font-semibold text-text-primary">{displayName}</p>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                          {isSaved ? "Uploaded" : "Optional"}
+                        </span>
+                      </div>
+                      <PassportUploadRow
+                        className="w-full"
                       inputId={`traveler-${index}-${field.key}`}
                       label={field.label}
                       file={file}
@@ -1604,6 +1607,7 @@ const ApplicationForm = () => {
                         }
                       }}
                     />
+                    </div>
                   );
                 })}
               </div>
