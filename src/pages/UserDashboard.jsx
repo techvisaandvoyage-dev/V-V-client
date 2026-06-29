@@ -881,7 +881,7 @@ const UserDashboard = () => {
                                   </span>
                                 </div>
                               )}
-                              <div className="mt-2 space-y-2">
+                              <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                                 {(() => {
                                   const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
                                   const tc = Math.max(1, Number(booking?.travellerCount || 1));
