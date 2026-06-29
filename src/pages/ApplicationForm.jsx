@@ -283,10 +283,17 @@ const ApplicationForm = () => {
   const listCountry = allCountries.find((c) => c.id === countryId);
   const country =
     useMergedCountry(countryId, listCountry) || getCountryById(countryId) || COUNTRIES[0];
-  // docFields starts as passport-only; a dedicated API fetch below updates it
-  // with the fresh required documents for this country (same pattern as ApplicationDetails.jsx).
-  const [docFields, setDocFields] = useState(() =>
-    buildDocFields(country?.requiredDocuments, documentCatalog)
+  // Derive required document fields directly from country data — no effect needed.
+  // When useMergedCountry resolves with fresh API data, country.requiredDocuments
+  // updates and this memo recomputes automatically.
+  const docFields = useMemo(
+    () => {
+      const keys = Array.isArray(country?.requiredDocuments) && country.requiredDocuments.length
+        ? country.requiredDocuments
+        : ["passport"];
+      return buildDocFields(keys, documentCatalog);
+    },
+    [country?.requiredDocuments, documentCatalog]
   );
   const requiredDocFields = useMemo(() => docFields, [docFields]);
   const [travelers, setTravelers] = useState([createTraveler()]);
@@ -345,16 +352,6 @@ const ApplicationForm = () => {
     })();
     return () => { alive = false; };
   }, []);
-
-  // Sync doc fields from country requiredDocuments whenever the resolved country
-  // data changes (useMergedCountry already fetches the fresh API data).
-  useEffect(() => {
-    if (!country) return;
-    const keys = Array.isArray(country.requiredDocuments) && country.requiredDocuments.length
-      ? country.requiredDocuments
-      : ["passport"];
-    setDocFields(buildDocFields(keys, documentCatalog));
-  }, [country, documentCatalog]);
 
   useEffect(() => {
     let alive = true;
