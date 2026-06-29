@@ -3363,9 +3363,6 @@ const CountryDetails = () => {
 
                         return (
                           <div key={`${index}-${docKey}`}>
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <p className="text-sm font-semibold text-text-primary">{displayName}</p>
-                            </div>
                             <PassportUploadRow
                               inputId={`traveler-${docKey}-${index}`}
                               label={field.label}

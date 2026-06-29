@@ -1588,10 +1588,6 @@ const ApplicationSummaryPage = () => {
 
                           return (
                             <div key={field.key}>
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <p className="text-sm font-semibold text-text-primary">{displayName}</p>
-                              </div>
-
                               <PassportUploadRow
                                 inputId={`summary-${field.key}-upload-${traveler.id}`}
                                 label={field.label}

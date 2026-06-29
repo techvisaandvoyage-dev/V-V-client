@@ -1563,9 +1563,6 @@ const ApplicationForm = () => {
 
                   return (
                     <div key={`${index}-${field.key}`}>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <p className="text-sm font-semibold text-text-primary">{displayName}</p>
-                      </div>
                       <PassportUploadRow
                         className="w-full"
                       inputId={`traveler-${index}-${field.key}`}
