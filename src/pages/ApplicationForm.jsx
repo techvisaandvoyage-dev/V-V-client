@@ -1550,6 +1550,9 @@ const ApplicationForm = () => {
               </div>
 {uploadSettings.enableFileUpload && requiredDocFields.length > 0 && (
               <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+                  Required Documents ({requiredDocFields.length})
+                </p>
                 {requiredDocFields.map((field) => {
                   const file = (traveler.documents || {})[field.key];
                   const zoneKey = `${index}-${field.key}`;
