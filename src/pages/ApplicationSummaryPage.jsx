@@ -178,6 +178,34 @@ const getTravelerPassportDetailForSummary = (application, summaryData, travelerN
   getTravelerPassportDetail(application, travelerNo) ||
   getTravelerPassportDetailFromSummaryData(summaryData, travelerNo);
 
+const getTravelerDocumentDetail = (application, travelerNo, docKey) => {
+  const traveler = Array.isArray(application?.travellerDocuments)
+    ? application.travellerDocuments.find((entry) => Number(entry?.travelerNo) === Number(travelerNo))
+    : null;
+  if (!traveler) return null;
+  const docs = traveler.documents;
+  const url =
+    docs instanceof Map
+      ? docs.get(docKey)
+      : typeof docs?.get === "function"
+        ? docs.get(docKey)
+        : docs?.[docKey];
+  if (!url) return null;
+  const details = traveler.documentDetails;
+  const detail =
+    details instanceof Map
+      ? details.get(docKey)
+      : typeof details?.get === "function"
+        ? details.get(docKey)
+        : details?.[docKey];
+  return {
+    url,
+    fileName: detail?.fileName || String(url).split("/").pop() || docKey,
+    fileSize: Number(detail?.fileSize || 0),
+    mimeType: detail?.mimeType || "",
+  };
+};
+
 const buildTravelerDocSuccessMap = ({ application, summaryData, uploadSuccesses, travelerCount }) => {
   const applicationSuccesses = buildSuccessMapFromApplication(application);
   const summarySuccesses =
@@ -380,6 +408,7 @@ const ApplicationSummaryPage = () => {
     )
   );
   const [passportPreview, setPassportPreview] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
   const [uploadSettings, setUploadSettings] = useState({ allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
   const [razorpayReady, setRazorpayReady] = useState(false);
   const [razorpayMessage, setRazorpayMessage] = useState("");
@@ -838,6 +867,24 @@ const ApplicationSummaryPage = () => {
 
   const closePassportPreview = () => {
     setPassportPreview(null);
+  };
+
+  const openDocumentPreview = (travelerNo, docKey) => {
+    const detail = getTravelerDocumentDetail(application, travelerNo, docKey);
+    const previewUrl = getFileUrl(detail?.url);
+    if (!detail || !previewUrl) {
+      showToast("Preview is not available for this file yet.", "error");
+      return;
+    }
+    setDocumentPreview({
+      url: previewUrl,
+      fileName: detail.fileName || `Traveler ${travelerNo} ${docKey}`,
+      mimeType: String(detail.mimeType || "").toLowerCase(),
+    });
+  };
+
+  const closeDocumentPreview = () => {
+    setDocumentPreview(null);
   };
 
   const removeUploadedDoc = async (travelerNo, travelerIndex, docKey) => {
@@ -1581,10 +1628,7 @@ const ApplicationSummaryPage = () => {
                           const fieldError = uploadModalErrors[zoneKey];
                           const displayName = getDocumentDisplayName(field.label);
 
-                          // For passport, enable preview
-                          const passportDetail = field.key === "passport"
-                            ? getTravelerPassportDetailForSummary(application, summaryData, traveler.id)
-                            : null;
+                          const docDetail = getTravelerDocumentDetail(application, traveler.id, field.key);
 
                           return (
                             <div key={field.key}>
@@ -1596,13 +1640,13 @@ const ApplicationSummaryPage = () => {
                                 uploading={isUploading}
                                 optimizing={isOptimizing}
                                 saved={isUploaded && !localFile}
-                                previewEnabled={field.key === "passport" && Boolean(passportDetail?.url)}
+                                previewEnabled={Boolean(docDetail?.url)}
                                 accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
                                 helperText={
                                   localFile
                                     ? localFile.name
-                                    : (field.key === "passport" && passportDetail?.fileName)
-                                      ? `${passportDetail.fileName} - ${formatFileSize(passportDetail.fileSize)}`
+                                    : docDetail?.fileName
+                                      ? `${docDetail.fileName} - ${formatFileSize(docDetail.fileSize)}`
                                       : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
                                 }
                                 fileSizeText={localFile ? formatFileSize(localFile.size) : ""}
@@ -1610,9 +1654,7 @@ const ApplicationSummaryPage = () => {
                                 reuploadLabel="Replace File"
                                 removeLabel="Remove"
                                 onChange={(file) => handleUploadModalDocChange(travelerIndex, field.key, file)}
-                                onPreview={field.key === "passport" && passportDetail?.url
-                                  ? () => openPassportPreview(traveler.id)
-                                  : undefined}
+                                onPreview={() => openDocumentPreview(traveler.id, field.key)}
                                 onRemove={() => removeUploadedDoc(traveler.id, travelerIndex, field.key)}
                                 onReupload={() => {
                                   setUploadModalErrors((prev) => { const n = { ...prev }; delete n[zoneKey]; return n; });
@@ -1699,6 +1741,16 @@ const ApplicationSummaryPage = () => {
           )}
         </div>
       </Modal>
+
+      <FilePreviewModal
+        isOpen={Boolean(documentPreview)}
+        onClose={closeDocumentPreview}
+        previewFile={documentPreview ? {
+          url: documentPreview.url,
+          name: documentPreview.fileName,
+          type: documentPreview.type || documentPreview.mimeType
+        } : null}
+      />
 
       <Modal
         isOpen={termsModalOpen}
