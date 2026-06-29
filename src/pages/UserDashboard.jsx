@@ -692,8 +692,52 @@ const UserDashboard = () => {
                     <div className="text-2xl font-bold text-text-primary">{value}</div>
                     <div className="text-xs text-text-muted">{label}</div>
                   </div>
-                </Card>
-              </motion.div>
+                          </Card>
+
+                          <div className="px-4 pb-3 pt-1" onClick={(e) => e.stopPropagation()}>
+                            {(() => {
+                              const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
+                              const tc = Math.max(1, Number(booking?.travellerCount || 1));
+                              const allPassports = tc > 0 && travellers.filter((entry) => {
+                                const docs = entry?.documents;
+                                if (!docs) return false;
+                                if (docs instanceof Map) return Boolean(docs.get("passport"));
+                                return Boolean(docs.passport);
+                              }).length >= tc;
+                              const passportFile = dashPassportFiles[bookingId];
+                              const isUploading = Boolean(dashPassportUploading[bookingId]);
+                              const isOptimizing = Boolean(dashPassportOptimizing[bookingId]);
+                              return (
+                                <PassportUploadRow
+                                  inputId={`dash-passport-${bookingId}`}
+                                  label="Passport Upload"
+                                  file={passportFile || null}
+                                  uploading={isUploading}
+                                  optimizing={isOptimizing}
+                                  saved={allPassports && !passportFile}
+                                  previewEnabled={Boolean(dashPassportDetails[bookingId]?.url)}
+                                  accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
+                                  helperText={
+                                    passportFile
+                                      ? passportFile.name
+                                      : allPassports
+                                        ? "Passport uploaded"
+                                        : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
+                                  }
+                                  savedText="Passport uploaded"
+                                  reuploadLabel="Replace File"
+                                  removeLabel="Remove"
+                                  onChange={(file) => handleDashboardPassportUpload(bookingId, 1, file)}
+                                  onPreview={() => {
+                                    const det = dashPassportDetails[bookingId];
+                                    if (det?.url) setDocumentPreview({ url: getFileUrl(det.url), fileName: det.fileName || "Passport", type: det.mimeType || "image/jpeg" });
+                                    else showToast("Preview is not available for this file yet.", "error");
+                                  }}
+                                />
+                              );
+                            })()}
+                          </div>
+                        </motion.div>
             ))}
           </div>
 
@@ -881,7 +925,7 @@ const UserDashboard = () => {
                                   </span>
                                 </div>
                               )}
-                              <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
                                 {(() => {
                                   const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
                                   const tc = Math.max(1, Number(booking?.travellerCount || 1));
@@ -891,36 +935,17 @@ const UserDashboard = () => {
                                     if (docs instanceof Map) return Boolean(docs.get("passport"));
                                     return Boolean(docs.passport);
                                   }).length >= tc;
-                                  const passportFile = dashPassportFiles[bookingId];
-                                  const isUploading = Boolean(dashPassportUploading[bookingId]);
-                                  const isOptimizing = Boolean(dashPassportOptimizing[bookingId]);
+                                  if (allPassports) {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                                        <CheckCircle size={11} /> Passport uploaded
+                                      </span>
+                                    );
+                                  }
                                   return (
-                                    <PassportUploadRow
-                                      inputId={`dash-passport-${bookingId}`}
-                                      label="Passport Upload"
-                                      file={passportFile || null}
-                                      uploading={isUploading}
-                                      optimizing={isOptimizing}
-                                      saved={allPassports && !passportFile}
-                                      previewEnabled={Boolean(dashPassportDetails[bookingId]?.url)}
-                                      accept={getFileValidationRules(uploadSettings?.allowedFileFormats).acceptString}
-                                      helperText={
-                                        passportFile
-                                          ? passportFile.name
-                                          : allPassports
-                                            ? "Passport uploaded"
-                                            : `${getFileValidationRules(uploadSettings?.allowedFileFormats).displayLabel} - max 300 KB`
-                                      }
-                                      savedText="Passport uploaded"
-                                      reuploadLabel="Replace File"
-                                      removeLabel="Remove"
-                                      onChange={(file) => handleDashboardPassportUpload(bookingId, 1, file)}
-                                      onPreview={() => {
-                                        const det = dashPassportDetails[bookingId];
-                                        if (det?.url) setDocumentPreview({ url: getFileUrl(det.url), fileName: det.fileName || "Passport", type: det.mimeType || "image/jpeg" });
-                                        else showToast("Preview is not available for this file yet.", "error");
-                                      }}
-                                    />
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
+                                      <Upload size={11} /> No passport
+                                    </span>
                                   );
                                 })()}
                                 {(() => {
