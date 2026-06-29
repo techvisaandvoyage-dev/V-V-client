@@ -1564,6 +1564,7 @@ const ApplicationForm = () => {
                   return (
                     <PassportUploadRow
                       key={`${index}-${field.key}`}
+                      className="w-full"
                       inputId={`traveler-${index}-${field.key}`}
                       label={field.label}
                       file={file}
