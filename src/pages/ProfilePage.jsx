@@ -195,7 +195,7 @@ const ProfilePage = () => {
       const parsedPhone = parsePhoneWithCountryCode(user.phone, phoneCountryOptions);
       setFormData({
         name: user.name || "",
-        age: user.age || "",
+        age: user.age !== undefined && user.age !== null ? user.age : "",
         gender: user.gender || "Other",
         email: user.email || "",
         phone: parsedPhone.phone,
@@ -230,8 +230,8 @@ const ProfilePage = () => {
   const handleSave = async () => {
     const updates = {
       name: formData.name,
-      age: formData.age ? Number(formData.age) : undefined,
-      gender: formData.gender,
+      age: formData.age !== "" && formData.age != null ? Number(formData.age) : null,
+      gender: formData.gender || "Other",
     };
 
     const { success } = await updateProfile(updates);
@@ -249,7 +249,7 @@ const ProfilePage = () => {
       const parsedPhone = parsePhoneWithCountryCode(user.phone, phoneCountryOptions);
       setFormData({
         name: user.name || "",
-        age: user.age || "",
+        age: user.age !== undefined && user.age !== null ? user.age : "",
         gender: user.gender || "Other",
         email: user.email || "",
         phone: parsedPhone.phone,

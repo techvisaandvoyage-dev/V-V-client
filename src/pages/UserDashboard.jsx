@@ -3,14 +3,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   PlusCircle, Clock, CheckCircle, FileText, ChevronRight, Calendar, Search, Filter,
   TrendingUp, Globe, ArrowLeft, User, Mail, Smartphone, Download, Users, Star, Pencil, Trash2, ShieldCheck,
-  Upload, ExternalLink,
+  Upload, ExternalLink, LogOut,
 } from "lucide-react";
 import { StatusBadge } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Modal from "../components/ui/Modal";
 import { motion } from "framer-motion";
-import Sidebar from "../components/layout/Sidebar";
 import { api, useAuthStore, SERVER_URL } from "../store/authStore";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
@@ -68,7 +67,7 @@ const getStoredUploadSuccesses = (booking) => {
 const UserDashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, sessionAuthMethod } = useAuthStore();
+  const { user, sessionAuthMethod, logout } = useAuthStore();
   const { bookings, fetchUserApplications } = useDataStore();
   const { showToast } = useUIStore();
 
@@ -165,7 +164,6 @@ const UserDashboard = () => {
       new Set(
         (Array.isArray(bookings) ? bookings : [])
           .filter((booking) => booking && typeof booking === "object")
-          .filter((booking) => !Array.isArray(booking.requiredDocuments) || !booking.requiredDocuments.length)
           .map((booking) => String(booking.countryId || "").trim())
           .filter(Boolean)
       )
@@ -397,7 +395,6 @@ const UserDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Sidebar />
         <div className="flex-1 flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-cyan/20 border-t-cyan rounded-full animate-spin" />
           <p className="text-text-secondary animate-pulse">Loading your dashboard...</p>
@@ -409,9 +406,20 @@ const UserDashboard = () => {
 
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-
+    <div className="flex min-h-screen bg-background relative">
+      <div className="fixed bottom-6 left-6 z-50">
+        <button
+          onClick={() => {
+            logout();
+            navigate("/", { replace: true });
+          }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface shadow-lg border border-border text-red-400 hover:bg-red-500/10 transition-colors"
+          title="Sign Out"
+        >
+          <LogOut size={18} />
+          Sign Out
+        </button>
+      </div>
       <main className="flex-1 min-w-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           <motion.div
@@ -688,7 +696,7 @@ const UserDashboard = () => {
                   >
                     <option value="all">All Status</option>
                     <option value="doc_pending">Doc Pending</option>
-                    <option value="drive_link_pending">Upload Drive Link</option>
+                    {uploadSettings.enableGDriveUpload && <option value="drive_link_pending">Upload Drive Link</option>}
                     <option value="review">Under Review</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
@@ -768,11 +776,11 @@ const UserDashboard = () => {
                               <h3 className="font-semibold text-text-primary truncate">
                                 {booking.countryName || "Unknown Country"}
                               </h3>
-                              <StatusBadge status={resolvedStatus} />
-                              {resolvedStatus !== "pending_payment" && (
-                                <span className={`hidden sm:inline-block text-2xs font-medium rounded-full px-2 py-0.5 border ${paymentClass}`}>
-                                  {paymentLabel}
-                                </span>
+                              {resolvedStatus !== "doc_pending" && resolvedStatus !== "pending_payment" && (
+                                <StatusBadge status={resolvedStatus} />
+                              )}
+                              {booking.paymentStatus !== "completed" && (
+                                <StatusBadge status={booking.paymentStatus === "failed" ? "cancelled" : "pending_payment"} />
                               )}
                             </div>
                             <p className="text-[11px] font-mono text-text-muted mb-1">
@@ -797,46 +805,57 @@ const UserDashboard = () => {
                                   </span>
                                 </div>
                               )}
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {(() => {
-                                  const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
-                                  const tc = Math.max(1, Number(booking?.travellerCount || 1));
-                                  const allPassports = tc > 0 && travellers.filter((entry) => {
-                                    const docs = entry?.documents;
-                                    if (!docs) return false;
-                                    if (docs instanceof Map) return Boolean(docs.get("passport"));
-                                    return Boolean(docs.passport);
-                                  }).length >= tc;
-                                  if (allPassports) {
-                                    return (
-                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                        <CheckCircle size={11} /> Passport uploaded
-                                      </span>
-                                    );
-                                  }
-                                  return (
+                              {!uploadSettings.enableFileUpload && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  {derivedProgress.allPassportsUploaded ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                                      <CheckCircle size={11} /> Passport uploaded
+                                    </span>
+                                  ) : (
                                     <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
                                       <Upload size={11} /> No passport
                                     </span>
-                                  );
-                                })()}
-                                {(() => {
-                                  const rootDrive = String(booking?.gdriveLink || "").trim();
-                                  const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
-                                  const hasDrive = Boolean(rootDrive) || travellers.some((entry) => String(entry?.gdriveLink || "").trim());
-                                  if (hasDrive) {
+                                  )}
+                                  {(() => {
+                                    if (!uploadSettings.enableGDriveUpload) return null;
+                                    const rootDrive = String(booking?.gdriveLink || "").trim();
+                                    const travellers = Array.isArray(booking?.travellerDocuments) ? booking.travellerDocuments : [];
+                                    const hasDrive = Boolean(rootDrive) || travellers.some((entry) => String(entry?.gdriveLink || "").trim());
+                                    if (hasDrive) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                                          <ExternalLink size={11} /> Drive link added
+                                        </span>
+                                      );
+                                    }
                                     return (
-                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                        <ExternalLink size={11} /> Drive link added
+                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
+                                        <ExternalLink size={11} /> Drive link not added
                                       </span>
                                     );
-                                  }
-                                  return (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
-                                      <ExternalLink size={11} /> Drive link not added
-                                    </span>
-                                  );
-                                })()}
+                                  })()}
+                                </div>
+                              )}
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {uploadSettings.enableFileUpload && (
+                                  (() => {
+                                    if (derivedProgress.allDocumentsUploaded) {
+                                      return (
+                                        <span className="hidden sm:inline-flex items-center gap-1 text-2xs font-medium text-emerald-400">
+                                          <CheckCircle size={12} />
+                                          Documents
+                                        </span>
+                                      );
+                                    } else {
+                                      return (
+                                        <span className="hidden sm:inline-flex items-center gap-1 text-2xs font-medium text-zinc-400">
+                                          <Upload size={12} />
+                                          Documents
+                                        </span>
+                                      );
+                                    }
+                                  })()
+                                )}
                               </div>
                             </div>
                           </div>

@@ -68,9 +68,7 @@ const resolveVisibleRequiredDocuments = (rawRequiredDocuments = [], settings = {
     return keyStr;
   }).filter(Boolean);
   const unique = Array.from(new Set(normalized));
-  const optionalKeys = settings?.enableFileUpload === false
-    ? []
-    : unique.filter((key) => key !== "passport");
+  const optionalKeys = unique.filter((key) => key !== "passport");
   return ["passport", ...optionalKeys];
 };
 

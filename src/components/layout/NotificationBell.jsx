@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api, useAuthStore } from "../../store/authStore";
 import {
   buildNotificationKey,
@@ -17,6 +17,7 @@ import {
 
 const NotificationBell = ({ className = "" }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -142,7 +143,6 @@ const NotificationBell = ({ className = "" }) => {
       if (notification?.blogSlug) {
         navigate(`/blog/${notification.blogSlug}`);
       } else if (notification?.openSupportChat) {
-        navigate("/dashboard/profile");
         window.dispatchEvent(new CustomEvent("open-support-chat"));
       } else if (notification?.route) {
         navigate(notification.route);

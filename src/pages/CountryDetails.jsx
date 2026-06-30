@@ -601,7 +601,16 @@ const CountryDetails = () => {
   const [razorpayCheckLoading, setRazorpayCheckLoading] = useState(false);
   const [razorpayReadyMessage, setRazorpayReadyMessage] = useState("");
   const [currentApplicationId, setCurrentApplicationId] = useState("");
-  const [uploadSettings, setUploadSettings] = useState({ enableFileUpload: true, enableGDriveUpload: true, allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] });
+  const [uploadSettings, setUploadSettings] = useState(() => {
+    try {
+      const raw = localStorage.getItem("vb-upload-settings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") return parsed;
+      }
+    } catch { /* ignore */ }
+    return { enableFileUpload: true, enableGDriveUpload: true, allowedFileFormats: ["pdf", "jpg", "jpeg", "png"] };
+  });
   const [draftCreating, setDraftCreating] = useState(false);
   const [travelValidationAttempted, setTravelValidationAttempted] = useState(false);
   const [passportUploading, setPassportUploading] = useState({});
@@ -677,6 +686,9 @@ const CountryDetails = () => {
         const { data } = await api.get("/config/upload-settings");
         if (alive && data?.success && data.config) {
           setUploadSettings(data.config);
+          try {
+            localStorage.setItem("vb-upload-settings", JSON.stringify(data.config));
+          } catch { /* ignore */ }
         }
       } catch {
         /* ignore */
@@ -1466,9 +1478,7 @@ const CountryDetails = () => {
   const baseRequiredDocumentKeys = countryRequiredDocumentKeys.length
     ? countryRequiredDocumentKeys
     : ["passport"];
-  const requiredDocumentKeys = uploadSettings.enableFileUpload
-    ? baseRequiredDocumentKeys
-    : baseRequiredDocumentKeys.filter((k) => k === "passport");
+  const requiredDocumentKeys = baseRequiredDocumentKeys;
   const requiredDocumentFields = requiredDocumentKeys.map((key) => ({
     key,
     label: getDocumentLabel(key),
@@ -1495,7 +1505,6 @@ const CountryDetails = () => {
     Icon: getDocumentIcon(key),
   }));
   const travelDetailsOtherDocumentFields = (() => {
-    if (!uploadSettings.enableFileUpload) return [];
     const requiredKeys = new Set(requiredDocumentKeys);
     const hasConfiguredOptionalDocuments = Array.isArray(country?.optionalDocuments);
     const configuredOptionalKeys = hasConfiguredOptionalDocuments
@@ -3512,7 +3521,7 @@ const CountryDetails = () => {
                         }}
                       />
 
-                      {requiredDocumentFields.filter((f) => f.key !== "passport").map((field) => {
+                      {(uploadSettings.enableFileUpload ? requiredDocumentFields : requiredDocumentFields.filter((f) => f.key === "passport")).filter((f) => f.key !== "passport").map((field) => {
                         const docKey = field.key;
                         const travelerNo = index + 1;
                         const zoneKey = `${travelerNo}-${docKey}`;
@@ -3618,10 +3627,12 @@ const CountryDetails = () => {
                 </div>
 
                 <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="flex items-start gap-4">
-                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-[#4285F4] shadow-inner">
-                      <Link2 size={22} />
-                    </span>
+                  {uploadSettings.enableGDriveUpload && (
+                    <>
+                      <div className="flex items-start gap-4">
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-[#4285F4] shadow-inner">
+                          <Link2 size={22} />
+                        </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h4 className="text-lg font-semibold text-slate-950">
@@ -3703,12 +3714,13 @@ const CountryDetails = () => {
                             : "border-slate-200 focus:border-cyan"
                         }`}
                       />
+                      </div>
                     </div>
+                  </>
+                )}
 
-                    <div className="mt-4">
-                      {renderTravelDetailsDocumentSections()}
-                    </div>
-
+                  <div className={uploadSettings.enableGDriveUpload ? "mt-4" : ""}>
+                    {renderTravelDetailsDocumentSections()}
                   </div>
 
                 </div>

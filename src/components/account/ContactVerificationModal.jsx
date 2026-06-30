@@ -42,7 +42,7 @@ const ContactVerificationModal = ({
   const { showToast } = useUIStore();
   const countryCodeDropdownRef = useRef(null);
   const [value, setValue] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY_CODE);
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+91");
   const [countryCodeOpen, setCountryCodeOpen] = useState(false);
   const [countryCodeSearch, setCountryCodeSearch] = useState("");
   const [phoneCountryOptions, setPhoneCountryOptions] = useState(() => getPhoneCountryOptions());
@@ -70,7 +70,7 @@ const ContactVerificationModal = ({
     if (mode === "phone") {
       const parsedPhone = parsePhoneWithCountryCode(user?.phone, phoneCountryOptions);
       setValue(parsedPhone.phone);
-      setPhoneCountryCode(parsedPhone.countryCode);
+      setPhoneCountryCode("+91");
       setPhoneError("");
       setCountryCodeOpen(false);
       setCountryCodeSearch("");
@@ -174,10 +174,7 @@ const ContactVerificationModal = ({
   };
 
   const title = mode === "phone" ? "Add your mobile number" : "Add your email address";
-  const subtitle =
-    mode === "phone"
-      ? "We use this for SMS updates and to reach you about your visa application. Verify it with OTP to continue."
-      : "We use this for receipts and important updates about your application. You can change it later in Profile.";
+
   const filteredCountryOptions = filterPhoneCountryOptions(countryCodeSearch, phoneCountryOptions);
   const selectedCountryOption = findPhoneCountryOption(phoneCountryCode, phoneCountryOptions);
   const footerActionLabel = mode === "phone" ? (phoneOtpSent ? "Verify & continue" : "Send OTP") : "Save & continue";
@@ -205,68 +202,17 @@ const ContactVerificationModal = ({
         </div>
       }
     >
-      <p className="text-sm text-text-secondary mb-4">{subtitle}</p>
+
       {mode === "phone" ? (
         <div className="space-y-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">
               Country code
             </label>
-            <div ref={countryCodeDropdownRef} className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  if (phoneOtpSent) return;
-                  setCountryCodeOpen((prev) => !prev);
-                  setCountryCodeSearch("");
-                }}
-                className={`w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-text-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan/20 ${
-                  phoneOtpSent ? "cursor-default opacity-80" : "hover:border-cyan/40"
-                }`}
-              >
-                <span className="truncate text-left">{selectedCountryOption.label}</span>
-                <ChevronDown size={16} className={`shrink-0 transition-transform ${countryCodeOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {countryCodeOpen && (
-                <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-surface shadow-xl overflow-hidden">
-                  <div className="relative border-b border-border p-3">
-                    <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted" />
-                    <input
-                      type="text"
-                      value={countryCodeSearch}
-                      onChange={(e) => setCountryCodeSearch(e.target.value)}
-                      placeholder="Search country"
-                      autoFocus
-                      className="w-full rounded-xl border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cyan/20 focus:border-cyan"
-                    />
-                  </div>
-                  <div className="max-h-56 overflow-y-auto py-2">
-                    {filteredCountryOptions.length ? (
-                      filteredCountryOptions.map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          onClick={() => {
-                            setPhoneCountryCode(option.value);
-                            setCountryCodeOpen(false);
-                            setCountryCodeSearch("");
-                          }}
-                          className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                            phoneCountryCode === option.value
-                              ? "bg-cyan/10 text-cyan"
-                              : "text-text-primary hover:bg-surface-2"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="px-4 py-3 text-sm text-text-muted">No countries found.</p>
-                    )}
-                  </div>
-                </div>
-              )}
+            <div className="relative">
+              <div className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm text-text-primary cursor-default opacity-90">
+                <span className="truncate text-left">🇮🇳 India (+91)</span>
+              </div>
             </div>
           </div>
           <Input

@@ -304,6 +304,7 @@ const ApplicationDetails = () => {
   const location = useLocation();
   const { user } = useAuthStore();
   const { bookings, updateBookingDetails, fetchUserApplications } = useDataStore();
+  const storeBooking = bookings.find((b) => String(b._id || b.id) === String(id));
   const { showToast } = useUIStore();
   const { documentCatalog, display } = useCountries();
 
@@ -314,7 +315,7 @@ const ApplicationDetails = () => {
   const [sharedDriveLink, setSharedDriveLink] = useState("");
   const [travelerGdriveFurtherInfoLinks, setTravelerGdriveFurtherInfoLinks] = useState({});
   const [loading, setLoading] = useState(true);
-  const [docFields, setDocFields] = useState(buildDocFields());
+  const [docFields, setDocFields] = useState(() => buildDocFields(storeBooking?.requiredDocuments));
   const [countryOptionalDocuments, setCountryOptionalDocuments] = useState(null);
   const [documentSectionCopy, setDocumentSectionCopy] = useState({
     requiredHeading: "Documents Required",
@@ -322,10 +323,19 @@ const ApplicationDetails = () => {
     optionalHeading: "Optional Documents",
     optionalDescription: "You can also attach other documents in the same Drive link.",
   });
-  const [uploadSettings, setUploadSettings] = useState({
-    enableGDriveUpload: true,
-    enableFileUpload: true,
-    allowedFileFormats: ["pdf", "jpg", "jpeg", "png"],
+  const [uploadSettings, setUploadSettings] = useState(() => {
+    try {
+      const raw = localStorage.getItem("vb-upload-settings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") return parsed;
+      }
+    } catch { /* ignore */ }
+    return {
+      enableGDriveUpload: true,
+      enableFileUpload: true,
+      allowedFileFormats: ["pdf", "jpg", "jpeg", "png"],
+    };
   });
   const [docErrors, setDocErrors] = useState({});
   const [applicantNotesDraft, setApplicantNotesDraft] = useState("");
@@ -393,6 +403,9 @@ const ApplicationDetails = () => {
         const { data } = await api.get("/config/upload-settings");
         if (data?.success && data.config) {
           setUploadSettings(data.config);
+          try {
+            localStorage.setItem("vb-upload-settings", JSON.stringify(data.config));
+          } catch { /* ignore */ }
         }
       } catch (err) {
         console.error("Failed to load upload settings:", err);
@@ -462,7 +475,6 @@ const ApplicationDetails = () => {
     };
   }, [termsModalOpen, termsPage]);
 
-  const storeBooking = bookings.find((b) => String(b._id || b.id) === String(id));
   const booking = bookingLoaded ? liveBooking : storeBooking;
 
   const getSharedDriveLink = () => {
@@ -1276,7 +1288,7 @@ const ApplicationDetails = () => {
         showToast("Google Drive link saved successfully!", "success");
       }
     } catch (err) {
-      showToast(err.response?.data?.message || "Could not save Google Drive link.", "error");
+       showToast(err.response?.data?.message || "Could not save Google Drive link.", "error");
     } finally {
       setUploadingState(uploadStateKey, false);
     }
@@ -2278,7 +2290,7 @@ const ApplicationDetails = () => {
             </div>
           )}
 
-          {visibleRequiredDocFields.length > 0 && display?.showDestinationRequiredDocs !== false && (
+          {visibleRequiredDocFields.filter((field) => field.key !== "passport").length > 0 && display?.showDestinationRequiredDocs !== false && (
             <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
               <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
                 <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
@@ -2293,7 +2305,7 @@ const ApplicationDetails = () => {
               </div>
 
               <div className="grid gap-3 px-5 pb-6 sm:grid-cols-2 sm:px-7 sm:pb-7 xl:grid-cols-3">
-                {visibleRequiredDocFields.map((field) => {
+                {visibleRequiredDocFields.filter((field) => field.key !== "passport").map((field) => {
                   const Icon = field.Icon;
 
                   return (
