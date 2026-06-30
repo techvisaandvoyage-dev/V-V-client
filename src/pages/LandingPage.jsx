@@ -371,8 +371,8 @@ const LandingPage = () => {
           const fresh = freshById.get(getCountryRouteId(country));
           if (!fresh) return country;
           return {
-            ...fresh,
             ...country,
+            ...fresh,
             imageUrl: fresh.imageUrl || country.imageUrl || "",
           };
         });
