@@ -69,6 +69,7 @@ const resolveVisibleRequiredDocuments = (rawRequiredDocuments = [], settings = {
   }).filter(Boolean);
   const unique = Array.from(new Set(normalized));
   const optionalKeys = unique.filter((key) => key !== "passport");
+  if (settings.enableFileUpload === false) return ["passport"];
   return ["passport", ...optionalKeys];
 };
 
@@ -193,7 +194,8 @@ export const getDerivedApplicationProgress = (
     totalMissingDocuments += missingCount;
   }
 
-  const isFullySubmitted = (totalMissingDocuments === 0) && (!settings?.enableGDriveUpload || hasDriveLink);
+  const allFilesUploaded = totalMissingDocuments === 0;
+  const isFullySubmitted = settings?.enableFileUpload ? allFilesUploaded : allFilesUploaded && (!settings?.enableGDriveUpload || hasDriveLink);
 
   return {
     allDocumentsUploaded: totalMissingDocuments === 0,
@@ -206,7 +208,7 @@ export const getDerivedApplicationProgress = (
 
 export const resolveApplicationStatus = (
   application,
-  derivedProgress = { allDocumentsUploaded: false }
+  derivedProgress = { allDocumentsUploaded: false, isFullySubmitted: false }
 ) => {
   if (!application || typeof application !== "object") return "pending";
 
@@ -224,9 +226,13 @@ export const resolveApplicationStatus = (
     return isPaid ? "review" : "pending_payment";
   }
 
-  if (!derivedProgress.isFullySubmitted) {
-    return "doc_pending";
+  if (derivedProgress.isFullySubmitted) {
+    return isPaid ? "review" : "pending_payment";
   }
-  
-  return isPaid ? "review" : "pending_payment";
+
+  if (derivedProgress.allDocumentsUploaded) {
+    return "drive_link_pending";
+  }
+
+  return "doc_pending";
 };

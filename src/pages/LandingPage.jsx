@@ -564,7 +564,7 @@ const LandingPage = () => {
             <div
                 className={
                   isSearchPinned
-                    ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-16 items-center px-4 sm:px-6 lg:px-8"
+                    ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-[72px] items-center px-4 sm:px-6 lg:px-8"
                     : "relative z-[100] mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
                 }
               >

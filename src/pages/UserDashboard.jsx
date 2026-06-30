@@ -20,6 +20,7 @@ import { formatOrdinalDate } from "../utils/dateUtils";
 import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
+import Footer from "../components/layout/Footer";
 
 /**
  * Map every built-in doc key → its lucide icon component. Used to render the
@@ -406,7 +407,7 @@ const UserDashboard = () => {
 
 
   return (
-    <div className="flex min-h-screen bg-background relative">
+    <div className="flex flex-col min-h-screen bg-background relative">
       <div className="fixed bottom-6 left-6 z-50">
         <button
           onClick={() => {
@@ -1058,6 +1059,7 @@ const UserDashboard = () => {
         onClose={() => setDocumentPreview(null)}
         previewFile={documentPreview}
       />
+      <Footer />
     </div>
   );
 };

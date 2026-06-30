@@ -98,13 +98,13 @@ const Navbar = () => {
         `}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-[72px]">
             {/* ── Logo ── */}
             <Link
               to="/"
               replace
               onClick={handleLogoClick}
-              className="flex h-16 items-center"
+              className="flex h-[72px] items-center"
               aria-label="VISAANDVOYAGE Home"
             >
               <img
@@ -115,7 +115,7 @@ const Navbar = () => {
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="block h-[53px] w-auto object-contain sm:h-[58px]"
+                className="block h-[63px] w-auto object-contain sm:h-[68px]"
               />
             </Link>
 

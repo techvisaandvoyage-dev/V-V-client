@@ -33,6 +33,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
 import PassportUploadRow from "../components/application/PassportUploadRow";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -3074,6 +3075,7 @@ const ApplicationDetails = () => {
           type: documentPreview.type || documentPreview.mimeType
         } : null}
       />
+      <Footer />
     </div>
   );
 };
