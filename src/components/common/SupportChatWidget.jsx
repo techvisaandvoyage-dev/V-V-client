@@ -108,8 +108,14 @@ export default function SupportChatWidget() {
   const [isTyping, setIsTyping] = useState(false);
   const [adminIsTyping, setAdminIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [chatConfig, setChatConfig] = useState(DEFAULT_CHAT_CONFIG);
-  const [chatLoading, setChatLoading] = useState(true);
+  const [chatConfig, setChatConfig] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("customer_chat_config");
+      return cached ? JSON.parse(cached) : DEFAULT_CHAT_CONFIG;
+    } catch {
+      return DEFAULT_CHAT_CONFIG;
+    }
+  });
 
   // Live Chat sync states
   const [guestUser, setGuestUser] = useState(() => {
@@ -236,11 +242,21 @@ export default function SupportChatWidget() {
 
   const generateWhatsAppMessage = (template, values) => {
     let msg = template || "";
-    msg = msg.replace(/\{\{userName\}\}/g, values.userName || "Not selected");
-    msg = msg.replace(/\{\{country\}\}/g, values.country || "Not selected");
-    msg = msg.replace(/\{\{visaType\}\}/g, values.visaType || "Not selected");
-    msg = msg.replace(/\{\{travelDate\}\}/g, values.travelDate || "Not selected");
-    msg = msg.replace(/\{\{applicationId\}\}/g, values.applicationId || "Not selected");
+    msg = msg.replace(/\{\{userName\}\}/gi, values.userName || "Not selected");
+    msg = msg.replace(/\{\{country\}\}/gi, values.country || "Not selected");
+    
+    // Support {{visaType}} and {{type}}
+    msg = msg.replace(/\{\{visaType\}\}/gi, values.visaType || "Not selected");
+    msg = msg.replace(/\{\{type\}\}/gi, values.visaType || "Not selected");
+    
+    // Support {{travelDate}} and {{date}}
+    msg = msg.replace(/\{\{travelDate\}\}/gi, values.travelDate || "Not selected");
+    msg = msg.replace(/\{\{date\}\}/gi, values.travelDate || "Not selected");
+    
+    // Support {{applicationId}}, {{application_id}}, and {{application id}}
+    msg = msg.replace(/\{\{applicationId\}\}/gi, values.applicationId || "Not selected");
+    msg = msg.replace(/\{\{application[ _]?id\}\}/gi, values.applicationId || "Not selected");
+    
     return msg;
   };
 
@@ -254,18 +270,17 @@ export default function SupportChatWidget() {
         const { data } = await api.get("/config/customer-chat");
         if (cancelled) return;
         if (data?.success && data?.config) {
-          setChatConfig({
+          const newConfig = {
             ...DEFAULT_CHAT_CONFIG,
             ...data.config,
-          });
+          };
+          setChatConfig(newConfig);
+          sessionStorage.setItem("customer_chat_config", JSON.stringify(newConfig));
         }
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to load customer chat config:", error);
-          setChatConfig(DEFAULT_CHAT_CONFIG);
         }
-      } finally {
-        if (!cancelled) setChatLoading(false);
       }
     };
 
@@ -409,15 +424,7 @@ export default function SupportChatWidget() {
     setShowEmojiPicker(false);
   };
 
-  if (chatLoading) {
-    return (
-      <div className="fixed bottom-6 right-6 z-[9999]">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-cyan text-background shadow-[0_20px_50px_rgba(2,82,213,0.28)]">
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </div>
-      </div>
-    );
-  }
+
 
   const handleGuestSubmit = (e) => {
     e.preventDefault();

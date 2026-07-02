@@ -61,9 +61,7 @@ const NotFound = () => (
 // ── Routes Map ──────────────────────────────────────────────
 const AppRoutes = () => {
   const location = useLocation();
-  const shouldShowChat = 
-    location.pathname.startsWith("/destination/") ||
-    location.pathname.startsWith("/dashboard/application/");
+  const shouldShowChat = !location.pathname.startsWith("/admin");
   const [siteStateLoading, setSiteStateLoading] = useState(false);
   const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
 
