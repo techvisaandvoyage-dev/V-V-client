@@ -261,6 +261,7 @@ export default function SupportChatWidget() {
   };
 
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,10 +292,24 @@ export default function SupportChatWidget() {
   }, []);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (!messagesEndRef.current || !scrollContainerRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    // Check if user is scrolled near bottom (within 150px)
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    
+    if (isNearBottom || isTyping) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isTyping]);
+  }, [messages.length, isTyping, adminIsTyping]);
+
+  useEffect(() => {
+    if (isOpen && view === "chat") {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, [isOpen, view]);
 
   useEffect(() => {
     const handleOpenSupportChat = () => {
@@ -696,7 +711,7 @@ export default function SupportChatWidget() {
                   )}
                 </div>
 
-                <div className="h-[430px] overflow-y-auto bg-[linear-gradient(180deg,#FFFEFC_0%,#F9FBFF_100%)] p-4 space-y-3.5">
+                <div ref={scrollContainerRef} className="h-[430px] overflow-y-auto bg-[linear-gradient(180deg,#FFFEFC_0%,#F9FBFF_100%)] p-4 space-y-3.5">
                   <div className="flex justify-center">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                       Today
