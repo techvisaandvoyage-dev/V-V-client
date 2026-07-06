@@ -14,6 +14,9 @@ const FOOTER_CONTENT_FALLBACK = {
   brandAccentText: "Voyage",
   description:
     "Your trusted partner for seamless visa applications worldwide. Fast, secure, and professionally managed.",
+  supportedByShow: false,
+  supportedByText: "",
+  supportedByLink: "",
   sections: [
     { key: "Company", title: "Company" },
     { key: "Services", title: "Services" },
@@ -158,6 +161,9 @@ const Footer = () => {
               String(config.brandAccentText || "").trim() || FOOTER_CONTENT_FALLBACK.brandAccentText,
             description:
               String(config.description || "").trim() || FOOTER_CONTENT_FALLBACK.description,
+            supportedByShow: config.supportedByShow !== undefined ? config.supportedByShow : FOOTER_CONTENT_FALLBACK.supportedByShow,
+            supportedByText: config.supportedByText || FOOTER_CONTENT_FALLBACK.supportedByText,
+            supportedByLink: config.supportedByLink !== undefined ? config.supportedByLink : FOOTER_CONTENT_FALLBACK.supportedByLink,
           });
           const sections = Array.isArray(config.sections)
             ? config.sections.map((s) => ({ key: s.key, title: s.label }))
@@ -304,18 +310,23 @@ const Footer = () => {
         <div className="pt-8 border-t border-slate-200">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="text-sm text-text-muted space-y-1.5 text-left">
-              <p className="font-semibold text-text-primary text-base mb-1">Visa &amp; Voyage</p>
-              <p>
-                Supported by{" "}
-                <a
-                  href="https://krishnaagarwalassociates.co.in/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-cyan transition-colors"
-                >
-                  Krishna Agarwal &amp; Associates
-                </a>
-              </p>
+              
+              {footerContent.supportedByShow && footerContent.supportedByText && (
+                <p>
+                  {footerContent.supportedByLink ? (
+                    <a
+                      href={footerContent.supportedByLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-cyan transition-colors"
+                    >
+                      {footerContent.supportedByText}
+                    </a>
+                  ) : (
+                    <span>{footerContent.supportedByText}</span>
+                  )}
+                </p>
+              )}
               <p>&copy; 2026 Visa &amp; Voyage. All Rights Reserved.</p>
             </div>
 
