@@ -506,7 +506,19 @@ export function useCountries() {
     };
 
     fetchFromDB();
-    return () => { cancelled = true; };
+
+    const handleFocus = () => {
+      if (!cancelled) {
+        fetchFromDB();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => { 
+      cancelled = true; 
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   return { countries, trendingCountries: countries, display, documentCatalog, loading };
