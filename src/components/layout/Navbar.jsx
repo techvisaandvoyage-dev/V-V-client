@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
@@ -24,6 +24,8 @@ const Navbar = () => {
 
   const [scrolled, setScrolled] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const siteLogo = useSiteLogo();
 
   // ── Detect scroll to toggle navbar style ─────────────────
@@ -31,6 +33,16 @@ const Navbar = () => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -63,7 +75,7 @@ const Navbar = () => {
 
   const handleProfileIconClick = () => {
     if (isAuthenticated) {
-      handleDashboardOpen();
+      setProfileDropdownOpen((prev) => !prev);
     } else {
       closeMobileMenu();
       setAuthModalOpen(true);
@@ -90,7 +102,7 @@ const Navbar = () => {
     <>
       <header
         className={`
-          fixed top-0 left-0 right-0 z-40 transition-all duration-300
+          fixed top-0 left-0 right-0 z-[999] transition-all duration-300
           ${!isLanding
             ? "bg-white border-b border-border shadow-card"
             : "bg-white"
@@ -134,7 +146,7 @@ const Navbar = () => {
                 Blog
               </Link>
               <NotificationBell className="ml-2" />
-              <div className="group relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   id="user-dashboard-btn"
                   onClick={handleProfileIconClick}
@@ -147,36 +159,66 @@ const Navbar = () => {
 
                 {isAuthenticated && (
                   <div
-                    className="invisible absolute right-0 top-full z-50 w-44 translate-y-3 rounded-lg border border-border bg-white py-2 opacity-0 shadow-card transition-all duration-150 group-hover:visible group-hover:translate-y-2 group-hover:opacity-100"
+                    className={`absolute right-0 top-full z-50 w-64 rounded-xl border border-border bg-white shadow-card transition-all duration-150 overflow-hidden ${
+                      profileDropdownOpen
+                        ? "visible translate-y-2 opacity-100"
+                        : "invisible translate-y-3 opacity-0"
+                    }`}
                     role="menu"
                   >
-                    <button
-                      type="button"
-                      onClick={() => navigate("/dashboard/profile", { replace: isTransientPage })}
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
-                      role="menuitem"
-                    >
-                      <User size={15} />
-                      Profile
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDashboardOpen}
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
-                      role="menuitem"
-                    >
-                      <LayoutDashboard size={15} />
-                      Dashboard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
-                      role="menuitem"
-                    >
-                      <LogOut size={15} />
-                      Sign Out
-                    </button>
+                    <div className="px-4 py-3 border-b border-border bg-slate-50/50">
+                      <p className="text-sm font-semibold text-text-primary truncate">
+                        {user?.name || "User"}
+                      </p>
+                      {user?.email && (
+                        <p className="text-xs text-text-secondary truncate mt-1">
+                          {user?.email}
+                        </p>
+                      )}
+                      {user?.phone && (
+                        <p className="text-xs text-text-secondary truncate mt-0.5">
+                          {user?.phone}
+                        </p>
+                      )}
+                    </div>
+                    <div className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          navigate("/dashboard/profile", { replace: isTransientPage });
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                        role="menuitem"
+                      >
+                        <User size={15} />
+                        Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          handleDashboardOpen();
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                        role="menuitem"
+                      >
+                        <LayoutDashboard size={15} />
+                        Dashboard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          handleLogout();
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                        role="menuitem"
+                      >
+                        <LogOut size={15} />
+                        Sign Out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
