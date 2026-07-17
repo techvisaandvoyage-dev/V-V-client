@@ -18,6 +18,7 @@ import {
   CalendarDays,
   ChevronRight,
   Settings2,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
@@ -101,6 +102,7 @@ const ProfilePage = () => {
     verifyProfilePhoneOtp,
     uploadProfileImage,
     changeUserPassword,
+    deleteAccount,
     isLoading,
   } = useAuthStore();
   const { showToast } = useUIStore();
@@ -114,6 +116,8 @@ const ProfilePage = () => {
   const [countryCodeSearch, setCountryCodeSearch] = useState("");
   const [phoneCountryOptions, setPhoneCountryOptions] = useState(() => getPhoneCountryOptions());
   const [showSecurityForm, setShowSecurityForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [phoneOtpActive, setPhoneOtpActive] = useState(false);
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneOtpDigits, setPhoneOtpDigits] = useState(createEmptyOtp(6));
@@ -413,6 +417,19 @@ const ProfilePage = () => {
       setShowSecurityForm(false);
     } else {
       showToast(message || "Failed to update password", "error");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    const { success, message } = await deleteAccount();
+    setIsDeletingAccount(false);
+    if (success) {
+      showToast("Account deleted successfully.", "success");
+      navigate("/");
+    } else {
+      showToast(message || "Failed to delete account.", "error");
+      setShowDeleteModal(false);
     }
   };
 
@@ -892,10 +909,65 @@ const ProfilePage = () => {
             </SectionShell>
             )}
 
+            <SectionShell icon={AlertTriangle} title="Danger Zone" className="px-0 py-0 border-red-100 bg-red-50/30">
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  Permanently delete your account and all associated profile data.
+                </p>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="rounded-2xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 w-full sm:w-auto"
+                >
+                  Delete Account
+                </Button>
+              </div>
+            </SectionShell>
 
           </div>
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+          >
+            <div className="p-6 sm:p-8">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="mb-2 text-center text-xl font-bold text-slate-900">Delete Account?</h3>
+              <p className="text-center text-sm text-slate-600 mb-6">
+                Are you sure you want to delete your account? All your profile data will be permanently removed.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  variant="ghost"
+                  fullWidth
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeletingAccount}
+                  className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  fullWidth
+                  loading={isDeletingAccount}
+                  onClick={handleDeleteAccount}
+                  className="rounded-2xl bg-red-600 text-white hover:bg-red-700"
+                >
+                  Delete Account
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

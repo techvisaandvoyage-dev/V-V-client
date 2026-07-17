@@ -15,7 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore, api } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -187,6 +187,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
     isLoading,
     error,
     clearError,
+    updateProfile,
   } = useAuthStore();
   const { showToast } = useUIStore();
   const { authControls, loading: controlsLoading } = useAuthControls();
@@ -210,6 +211,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
   const [completionValues, setCompletionValues] = useState({ firstName: "", lastName: "", email: "" });
   const [completionErrors, setCompletionErrors] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
+  const [pendingSocialToken, setPendingSocialToken] = useState(null);
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
 
@@ -273,11 +275,7 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
       provider,
       email: resolvedEmail,
       phone: user?.phone || phone || "",
-      showEmail:
-        provider === "phoneOtp" ||
-        provider === "emailOtp" ||
-        provider === "password" ||
-        (provider === "facebook" && !resolvedEmail),
+      showEmail: true,
     });
     setCompletionValues({
       firstName,
@@ -288,8 +286,8 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
     setStep(3);
   };
 
-  const continueAfterRegisterAuth = ({ provider, user, fallbackName = "", email = "", phone = "" }) => {
-    if (needsProfileCompletion(user, provider)) {
+  const continueAfterRegisterAuth = ({ provider, user, isNewUser, fallbackName = "", email = "", phone = "" }) => {
+    if (isNewUser || needsProfileCompletion(user, provider)) {
       openProfileCompletion({ provider, user, fallbackName, email, phone });
       return;
     }
@@ -300,13 +298,15 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
     if (!authControls.googleEnabled) return;
     clearError();
     try {
-      const idToken = await signInWithGooglePopup();
-      const { success } = await loginWithFirebaseGoogle(idToken);
-      if (success) {
-        const authedUser = useAuthStore.getState().user;
-        showToast("Account ready. Logged in with Google.");
-        continueAfterRegisterAuth({ provider: "google", user: authedUser });
-      }
+      const { idToken, user: firebaseUser } = await signInWithGooglePopup();
+      setPendingSocialToken(idToken);
+      openProfileCompletion({
+        provider: "google",
+        user: firebaseUser,
+        fallbackName: firebaseUser?.displayName || "",
+        email: firebaseUser?.email || "",
+        phone: firebaseUser?.phoneNumber || "",
+      });
     } catch (err) {
       showToast(err.message || "Google signup failed", "error");
     }
@@ -316,13 +316,15 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
     if (!authControls.facebookEnabled) return;
     clearError();
     try {
-      const idToken = await signInWithFacebookPopup();
-      const { success } = await loginWithFirebaseFacebook(idToken);
-      if (success) {
-        const authedUser = useAuthStore.getState().user;
-        showToast("Account ready. Logged in with Facebook.");
-        continueAfterRegisterAuth({ provider: "facebook", user: authedUser });
-      }
+      const { idToken, user: firebaseUser } = await signInWithFacebookPopup();
+      setPendingSocialToken(idToken);
+      openProfileCompletion({
+        provider: "facebook",
+        user: firebaseUser,
+        fallbackName: firebaseUser?.displayName || "",
+        email: firebaseUser?.email || "",
+        phone: firebaseUser?.phoneNumber || "",
+      });
     } catch (err) {
       showToast(err.message || "Facebook signup failed", "error");
     }
@@ -491,6 +493,36 @@ const RegisterPage = ({ embedded = false, onClose, onSwitchToLogin, onAuthentica
 
     if (Object.keys(nextErrors).length) {
       setCompletionErrors(nextErrors);
+      return;
+    }
+
+    if (completionContext?.provider === "google" || completionContext?.provider === "facebook") {
+      if (!pendingSocialToken) {
+        setCompletionErrors({ form: "Social login session expired. Please try again." });
+        return;
+      }
+      try {
+        const res = completionContext.provider === "google" 
+          ? await loginWithFirebaseGoogle(pendingSocialToken, { createIfMissing: true })
+          : await loginWithFirebaseFacebook(pendingSocialToken, { createIfMissing: true });
+        
+        if (res.success) {
+          // Then update the profile
+          const updateRes = await updateProfile({
+            firstName,
+            lastName,
+            email: completionContext?.showEmail ? email : undefined,
+          });
+          if (updateRes.success) {
+            showToast("Account created successfully.");
+            finishRegisterAuth();
+          } else {
+            setCompletionErrors({ form: updateRes.message || "Could not save profile" });
+          }
+        }
+      } catch (err) {
+        setCompletionErrors({ form: err.response?.data?.message || err.message || "Could not save profile" });
+      }
       return;
     }
 

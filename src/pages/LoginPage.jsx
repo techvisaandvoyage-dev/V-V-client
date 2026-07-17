@@ -181,6 +181,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     isLoading,
     error,
     clearError,
+    updateProfile,
   } = useAuthStore();
   const { showToast } = useUIStore();
   const { authControls, loading: controlsLoading } = useAuthControls();
@@ -213,6 +214,7 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
   const [completionContext, setCompletionContext] = useState(null);
   const [completionValues, setCompletionValues] = useState({ firstName: "", lastName: "", email: "" });
   const [completionErrors, setCompletionErrors] = useState({});
+  const [pendingSocialToken, setPendingSocialToken] = useState(null);
 
   const { timeLeft, start: startTimer, canResend } = useResendTimer(30);
   const {
@@ -318,11 +320,20 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     if (!authControls.googleEnabled) return;
     clearError();
     try {
-      const idToken = await signInWithGooglePopup();
-      const { success } = await loginWithFirebaseGoogle(idToken);
-      if (success) {
-        showToast("Logged in with Google.");
-        finishLogin();
+      const { idToken, user: firebaseUser } = await signInWithGooglePopup();
+      const res = await loginWithFirebaseGoogle(idToken, { createIfMissing: false });
+      if (res.success) {
+        if (res.isNewUser || !res.user?.profileCompleted || !res.user?.firstName || !res.user?.lastName) {
+          setPendingSocialToken(idToken);
+          openProfileCompletion({
+            provider: "google",
+            fallbackName: res.user?.name || firebaseUser?.displayName || "",
+            email: res.user?.email || firebaseUser?.email || "",
+          });
+        } else {
+          showToast("Logged in with Google.");
+          finishLogin();
+        }
       }
     } catch (err) {
       showToast(err.message || "Google login failed", "error");
@@ -333,11 +344,20 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     if (!authControls.facebookEnabled) return;
     clearError();
     try {
-      const idToken = await signInWithFacebookPopup();
-      const { success } = await loginWithFirebaseFacebook(idToken);
-      if (success) {
-        showToast("Logged in with Facebook.");
-        finishLogin();
+      const { idToken, user: firebaseUser } = await signInWithFacebookPopup();
+      const res = await loginWithFirebaseFacebook(idToken, { createIfMissing: false });
+      if (res.success) {
+        if (res.isNewUser || !res.user?.profileCompleted || !res.user?.firstName || !res.user?.lastName) {
+          setPendingSocialToken(idToken);
+          openProfileCompletion({
+            provider: "facebook",
+            fallbackName: res.user?.name || firebaseUser?.displayName || "",
+            email: res.user?.email || firebaseUser?.email || "",
+          });
+        } else {
+          showToast("Logged in with Facebook.");
+          finishLogin();
+        }
       }
     } catch (err) {
       showToast(err.message || "Facebook login failed", "error");
@@ -422,19 +442,8 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
     if (otpStep === 2 && otpAuthMode === "signup") {
       otpResult = await register("", contact, "");
     } else {
-      otpResult = await sendLoginOtp(contact, { suppressError: embedded && otpStep === 1 });
-      if (
-        !otpResult.success &&
-        otpStep === 1 &&
-        /not registered|sign up first/i.test(String(otpResult.message || ""))
-      ) {
-        otpResult = await register("", contact, "");
-        if (otpResult.success) {
-          clearError();
-          setOtpAuthMode("signup");
-          showToast("Verification code sent. Complete signup to continue.", "success");
-        }
-      } else if (otpResult.success) {
+      otpResult = await sendLoginOtp(contact);
+      if (otpResult.success) {
         setOtpAuthMode("login");
       }
     }
@@ -517,6 +526,35 @@ const LoginPage = ({ embedded = false, onClose, onSwitchToRegister, onAuthentica
 
     if (Object.keys(nextErrors).length) {
       setCompletionErrors(nextErrors);
+      return;
+    }
+
+    if (completionContext?.provider === "google" || completionContext?.provider === "facebook") {
+      if (!pendingSocialToken) {
+        setCompletionErrors({ form: "Social login session expired. Please try again." });
+        return;
+      }
+      try {
+        const res = completionContext.provider === "google"
+          ? await loginWithFirebaseGoogle(pendingSocialToken, { createIfMissing: true })
+          : await loginWithFirebaseFacebook(pendingSocialToken, { createIfMissing: true });
+
+        if (res.success) {
+          const updateRes = await updateProfile({ 
+            firstName, 
+            lastName, 
+            email: completionContext?.showEmail ? email : undefined 
+          });
+          if (!updateRes.success) {
+            setCompletionErrors({ form: updateRes.message || "Could not complete profile" });
+            return;
+          }
+          showToast("Account created successfully. You're now logged in.");
+          finishLogin();
+        }
+      } catch (err) {
+        setCompletionErrors({ form: err.response?.data?.message || "Could not save profile" });
+      }
       return;
     }
 

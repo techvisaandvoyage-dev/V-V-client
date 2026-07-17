@@ -49,9 +49,7 @@ const Navbar = () => {
     closeMobileMenu();
   }, [location.pathname, closeMobileMenu]);
 
-  useEffect(() => {
-    if (isAuthenticated && authModalOpen) setAuthModalOpen(false);
-  }, [authModalOpen, isAuthenticated]);
+
 
   const handleLogout = () => {
     logout();

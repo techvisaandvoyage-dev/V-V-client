@@ -97,7 +97,10 @@ export const signInWithGooglePopup = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const credential = await signInWithPopup(auth, provider);
-    return credential.user.getIdToken();
+    return {
+      idToken: await credential.user.getIdToken(),
+      user: credential.user
+    };
   } catch (err) {
     throw new Error(mapFirebaseAuthError(err), { cause: err });
   }
@@ -111,7 +114,10 @@ export const signInWithFacebookPopup = async () => {
     provider.addScope("email");
     provider.addScope("public_profile");
     const credential = await signInWithPopup(auth, provider);
-    return credential.user.getIdToken();
+    return {
+      idToken: await credential.user.getIdToken(),
+      user: credential.user
+    };
   } catch (err) {
     throw new Error(mapFirebaseAuthError(err), { cause: err });
   }

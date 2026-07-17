@@ -330,11 +330,16 @@ export const useAuthStore = create(
        *
        * @param {"google"|"facebook"|"firebase"} sessionAuthMethod
        */
-      loginWithFirebaseIdToken: async (idToken, sessionAuthMethod = "firebase") => {
+      loginWithFirebaseIdToken: async (idToken, sessionAuthMethod = "firebase", options = {}) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.post("/users/firebase-auth", { idToken });
+          const { createIfMissing = true } = options;
+          const { data } = await api.post("/users/firebase-auth", { idToken, createIfMissing });
           if (data.success) {
+            if (data.user === null) {
+              set({ isLoading: false });
+              return { success: true, isNewUser: true, user: null };
+            }
             localStorage.setItem("token", data.token);
             const initial = mapApiUserToAuthState(data.user);
             if (initial) {
@@ -347,11 +352,11 @@ export const useAuthStore = create(
               get()
                 .refreshUserFromServer({ sessionAuthMethod })
                 .catch(() => {});
-              return { success: true, role: "user" };
+              return { success: true, role: "user", isNewUser: data.isNewUser, user: initial };
             }
             const refreshed = await get().refreshUserFromServer({ sessionAuthMethod });
             set({ isLoading: false });
-            return { success: !!refreshed, role: refreshed ? "user" : null };
+            return { success: !!refreshed, role: refreshed ? "user" : null, isNewUser: data.isNewUser, user: refreshed };
           }
           set({ isLoading: false });
           return { success: false, role: null };
@@ -368,12 +373,12 @@ export const useAuthStore = create(
         }
       },
 
-      loginWithFirebaseGoogle: async (idToken) => {
-        return get().loginWithFirebaseIdToken(idToken, "google");
+      loginWithFirebaseGoogle: async (idToken, options = {}) => {
+        return get().loginWithFirebaseIdToken(idToken, "google", options);
       },
 
-      loginWithFirebaseFacebook: async (idToken) => {
-        return get().loginWithFirebaseIdToken(idToken, "facebook");
+      loginWithFirebaseFacebook: async (idToken, options = {}) => {
+        return get().loginWithFirebaseIdToken(idToken, "facebook", options);
       },
 
       loginWithFirebaseEmailPassword: async (email, password) => {
@@ -477,7 +482,7 @@ export const useAuthStore = create(
        */
       logout: () => {
         localStorage.removeItem("token");
-        set({ user: null, isAuthenticated: false, error: null, sessionAuthMethod: null });
+        set({ user: null, isAuthenticated: false, error: null, sessionAuthMethod: null, isLoading: false });
       },
 
       /**
@@ -543,28 +548,9 @@ export const useAuthStore = create(
             otpLength: data.otpLength,
           };
         } catch (error) {
-          try {
-            const { data } = await api.post("/auth/send-otp", {
-              identifier: phone,
-              purpose: "profile-phone",
-              channel,
-            });
-            set({ isLoading: false });
-            return {
-              success: !!data.success,
-              message: data.message,
-              devOtp: data.devOtp != null ? String(data.devOtp) : undefined,
-              channel: data.channel,
-              otpLength: data.otpLength,
-            };
-          } catch (fallbackError) {
-            const message =
-              fallbackError.response?.data?.message ||
-              error.response?.data?.message ||
-              "Failed to send OTP";
-            set({ isLoading: false, error: message });
-            return { success: false, message };
-          }
+          const message = error.response?.data?.message || "Failed to send OTP";
+          set({ isLoading: false, error: message });
+          return { success: false, message };
         }
       },
 
@@ -583,29 +569,9 @@ export const useAuthStore = create(
           set({ isLoading: false });
           return { success: false, message: data.message || "Could not update mobile number" };
         } catch (error) {
-          try {
-            await api.post("/auth/verify-otp", {
-              identifier: phone,
-              otp,
-              purpose: "profile-phone",
-              profile: { phone },
-            });
-            const { data } = await api.put("/users/profile/update", { phone });
-            if (data.success && data.user) {
-              const mapped = mapProfileUserToAuthState(data.user);
-              set({ user: { ...get().user, ...mapped }, isLoading: false });
-              return { success: true };
-            }
-            set({ isLoading: false });
-            return { success: false, message: data.message || "Could not update mobile number" };
-          } catch (fallbackError) {
-            const message =
-              fallbackError.response?.data?.message ||
-              error.response?.data?.message ||
-              "OTP verification failed";
-            set({ isLoading: false, error: message });
-            return { success: false, message };
-          }
+          const message = error.response?.data?.message || "Could not update mobile number";
+          set({ isLoading: false, error: message });
+          return { success: false, message };
         }
       },
 
@@ -755,6 +721,24 @@ export const useAuthStore = create(
           const field = error.response?.data?.field;
           set({ error: message, isLoading: false });
           return { success: false, message, field };
+        }
+      },
+
+      deleteAccount: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.delete("/users/profile");
+          if (data.success) {
+            get().logout();
+            set({ isLoading: false });
+            return { success: true, message: data.message };
+          }
+          set({ isLoading: false });
+          return { success: false, message: data.message || "Failed to delete account" };
+        } catch (error) {
+          const message = error.response?.data?.message || "Failed to delete account";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
         }
       },
     }),
