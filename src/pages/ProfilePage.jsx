@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Settings2,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
@@ -103,6 +104,10 @@ const ProfilePage = () => {
     uploadProfileImage,
     changeUserPassword,
     deleteAccount,
+    sendDeleteOtp,
+    verifyDeleteOtp,
+    generateCaptcha,
+    verifyCaptcha,
     isLoading,
   } = useAuthStore();
   const { showToast } = useUIStore();
@@ -125,6 +130,95 @@ const ProfilePage = () => {
   const [phoneOtpChannel, setPhoneOtpChannel] = useState("");
   const [phoneDevOtp, setPhoneDevOtp] = useState("");
   const [phoneChangeError, setPhoneChangeError] = useState("");
+
+  const [deletePhone, setDeletePhone] = useState("");
+  const [deletePhoneError, setDeletePhoneError] = useState("");
+  const [deleteOtpDigits, setDeleteOtpDigits] = useState(createEmptyOtp(4));
+  const [deleteOtpSent, setDeleteOtpSent] = useState(false);
+  const [deleteToken, setDeleteToken] = useState("");
+  const [deleteOtpError, setDeleteOtpError] = useState("");
+  const [deleteOtpCountdown, setDeleteOtpCountdown] = useState(0);
+  const [captchaData, setCaptchaData] = useState({ id: "", image: "" });
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
+  const [isGeneratingCaptcha, setIsGeneratingCaptcha] = useState(false);
+  const [showFinalDeleteConfirm, setShowFinalDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    let interval;
+    if (deleteOtpCountdown > 0) {
+      interval = setInterval(() => setDeleteOtpCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [deleteOtpCountdown]);
+
+  const loadCaptcha = async () => {
+    setIsGeneratingCaptcha(true);
+    setCaptchaError("");
+    setCaptchaInput("");
+    const res = await generateCaptcha();
+    if (res.success) {
+      setCaptchaData({ id: res.captchaId, image: res.image });
+    } else {
+      setCaptchaError(res.message || "Failed to load CAPTCHA");
+    }
+    setIsGeneratingCaptcha(false);
+  };
+
+  useEffect(() => {
+    if (showDeleteModal) {
+      setDeletePhone("");
+      setDeletePhoneError("");
+      setDeleteOtpDigits(createEmptyOtp(4));
+      setDeleteOtpSent(false);
+      setDeleteToken("");
+      setDeleteOtpError("");
+      setDeleteOtpCountdown(0);
+      setShowFinalDeleteConfirm(false);
+      loadCaptcha();
+    }
+  }, [showDeleteModal]);
+
+  const handleSendDeleteOtp = async () => {
+    if (!deletePhone) {
+      setDeletePhoneError("Please enter your registered phone number");
+      return;
+    }
+    
+    const justDigits = String(deletePhone).replace(/\D/g, "");
+    if (justDigits.length < 10) {
+      setDeletePhoneError("Please enter a valid 10-digit mobile number");
+      return;
+    }
+    
+    const userDigits = String(user.phone || "").replace(/\D/g, "");
+    if (justDigits !== userDigits && userDigits.length === 10) {
+      setDeletePhoneError("This phone number is not linked to your account.");
+      return;
+    }
+
+    setDeletePhoneError("");
+    const res = await sendDeleteOtp(deletePhone);
+    if (res.success) {
+      setDeleteOtpSent(true);
+      setDeleteOtpCountdown(60);
+      showToast(res.message, "success");
+    } else {
+      setDeletePhoneError(res.message);
+    }
+  };
+
+  const handleVerifyDeleteOtp = async (otpString) => {
+    if (otpString.length !== 4) return;
+    setDeleteOtpError("");
+    const res = await verifyDeleteOtp(deletePhone, otpString);
+    if (res.success) {
+      setDeleteToken(res.deleteToken);
+      showToast("OTP Verified successfully", "success");
+    } else {
+      setDeleteOtpError(res.message);
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -420,16 +514,39 @@ const ProfilePage = () => {
     }
   };
 
+  const handleVerifyAndNext = async () => {
+    if (!deleteToken || !captchaInput) return;
+    
+    setIsDeletingAccount(true);
+    const res = await verifyCaptcha(captchaData.id, captchaInput);
+    setIsDeletingAccount(false);
+    
+    if (res.success) {
+      setShowFinalDeleteConfirm(true);
+    } else {
+      setCaptchaError(res.message);
+      setTimeout(() => {
+        loadCaptcha();
+      }, 1500);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setIsDeletingAccount(true);
-    const { success, message } = await deleteAccount();
+    const { success, message } = await deleteAccount({ 
+      deleteToken, 
+      captchaId: captchaData.id, 
+      captchaText: captchaInput 
+    });
     setIsDeletingAccount(false);
+    
     if (success) {
       showToast("Account deleted successfully.", "success");
       navigate("/");
     } else {
       showToast(message || "Failed to delete account.", "error");
       setShowDeleteModal(false);
+      setShowFinalDeleteConfirm(false);
     }
   };
 
@@ -909,7 +1026,7 @@ const ProfilePage = () => {
             </SectionShell>
             )}
 
-            <SectionShell icon={AlertTriangle} title="Danger Zone" className="px-0 py-0 border-red-100 bg-red-50/30">
+            <SectionShell icon={AlertTriangle} title="Account Deletion" className="px-0 py-0 border-red-100 bg-red-50/30">
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">
                   Permanently delete your account and all associated profile data.
@@ -934,36 +1051,157 @@ const ProfilePage = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl"
           >
             <div className="p-6 sm:p-8">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="mb-2 text-center text-xl font-bold text-slate-900">Delete Account?</h3>
-              <p className="text-center text-sm text-slate-600 mb-6">
-                Are you sure you want to delete your account? All your profile data will be permanently removed.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  variant="ghost"
-                  fullWidth
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={isDeletingAccount}
-                  className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  fullWidth
-                  loading={isDeletingAccount}
-                  onClick={handleDeleteAccount}
-                  className="rounded-2xl bg-red-600 text-white hover:bg-red-700"
-                >
-                  Delete Account
-                </Button>
-              </div>
+              {!showFinalDeleteConfirm ? (
+                <>
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <h3 className="mb-2 text-center text-xl font-bold text-slate-900">Verify Your Identity</h3>
+                  <p className="text-center text-sm text-slate-600 mb-6">
+                    For your security, please verify your identity before permanently deleting your account.
+                  </p>
+
+                  <div className="space-y-5 text-left">
+                    {/* 1. Registered Phone Number */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-semibold text-slate-900">1. Registered Phone Number</label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          value={deletePhone}
+                          onChange={(e) => {
+                            setDeletePhone(e.target.value);
+                            setDeletePhoneError("");
+                          }}
+                          placeholder="Enter your registered phone number"
+                          disabled={deleteOtpSent || Boolean(deleteToken)}
+                          className="flex-1 rounded-xl"
+                        />
+                        <Button 
+                          onClick={handleSendDeleteOtp}
+                          disabled={(deleteOtpSent && deleteOtpCountdown > 0) || Boolean(deleteToken) || isLoading}
+                          loading={isLoading && !isDeletingAccount && !deleteOtpSent}
+                          className="rounded-xl px-4 shrink-0"
+                        >
+                          {deleteOtpCountdown > 0 ? `Resend (${deleteOtpCountdown}s)` : (deleteOtpSent ? "Resend OTP" : "Send OTP")}
+                        </Button>
+                      </div>
+                      {deletePhoneError && <p className="text-sm text-red-500">{deletePhoneError}</p>}
+                      {deleteOtpSent && !deletePhoneError && <p className="text-sm text-emerald-600">OTP sent successfully.</p>}
+                    </div>
+
+                    {/* 2. OTP Verification */}
+                    {deleteOtpSent && (
+                      <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                        <label className="text-sm font-semibold text-slate-900 flex justify-between items-center">
+                          2. OTP Verification
+                          {deleteToken && <BadgeCheck size={18} className="text-emerald-500" />}
+                        </label>
+                        <OtpInput
+                          length={4}
+                          value={deleteOtpDigits}
+                          onChange={(newDigits) => {
+                            setDeleteOtpDigits(newDigits);
+                            const otpString = newDigits.join("");
+                            if (otpString.length === 4) {
+                              handleVerifyDeleteOtp(otpString);
+                            }
+                          }}
+                          disabled={Boolean(deleteToken)}
+                        />
+                        {deleteOtpError && <p className="text-sm text-red-500 text-center">{deleteOtpError}</p>}
+                      </div>
+                    )}
+
+                    {/* 3. CAPTCHA Verification */}
+                    <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                      <label className="text-sm font-semibold text-slate-900">3. CAPTCHA Verification</label>
+                      <div className="flex gap-3 items-center">
+                        <div className="flex-1 h-14 bg-slate-50 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                          {isGeneratingCaptcha ? (
+                            <Loader2 className="animate-spin text-slate-400" size={20} />
+                          ) : captchaData.image ? (
+                            <div dangerouslySetInnerHTML={{ __html: captchaData.image }} className="w-full h-full flex justify-center items-center [&>svg]:w-full [&>svg]:h-full" />
+                          ) : null}
+                        </div>
+                        <button 
+                          onClick={loadCaptcha}
+                          className="p-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors shrink-0"
+                          title="Refresh CAPTCHA"
+                          disabled={isGeneratingCaptcha}
+                        >
+                          <RefreshCw size={20} className={isGeneratingCaptcha ? "animate-spin" : ""} />
+                        </button>
+                      </div>
+                      <Input
+                        value={captchaInput}
+                        onChange={(e) => {
+                          setCaptchaInput(e.target.value);
+                          setCaptchaError("");
+                        }}
+                        placeholder="Enter CAPTCHA text"
+                        error={captchaError}
+                        className={`rounded-xl transition-all ${captchaError ? 'border-2 border-red-500 bg-red-50' : ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row mt-8">
+                    <Button
+                      variant="ghost"
+                      fullWidth
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={isDeletingAccount}
+                      className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      loading={isDeletingAccount}
+                      onClick={handleVerifyAndNext}
+                      disabled={!deleteToken || !captchaInput}
+                      className="rounded-2xl bg-[#235BFF] text-white hover:bg-[#1a4acc] disabled:opacity-50 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <h3 className="mb-2 text-center text-xl font-bold text-slate-900">Are you sure?</h3>
+                  <p className="text-center text-sm text-slate-600 mb-6">
+                    This action cannot be undone. All your profile data, applications, and history will be permanently deleted.
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row mt-8">
+                    <Button
+                      variant="ghost"
+                      fullWidth
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={isDeletingAccount}
+                      className="rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      loading={isDeletingAccount}
+                      onClick={handleDeleteAccount}
+                      className="rounded-2xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Delete Account
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         </div>

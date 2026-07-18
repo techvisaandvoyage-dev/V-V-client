@@ -82,6 +82,8 @@ const buildGreetingMessage = (currentUser) => ({
   id: "m_greet",
   sender: "support",
   text: `Hello ${currentUser?.name || "there"}! Welcome to Visa & Voyage Support. How can we help you today?`,
+  type: "chips",
+  options: ["Change Application", "Require Document Needed", "Refund Related", "Application Status"],
   time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
 });
 
@@ -295,12 +297,8 @@ export default function SupportChatWidget() {
     if (!messagesEndRef.current || !scrollContainerRef.current) return;
     
     const container = scrollContainerRef.current;
-    // Check if user is scrolled near bottom (within 150px)
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-    
-    if (isNearBottom || isTyping) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    // Always scroll to bottom to ensure new messages (especially large ones) are visible
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, isTyping, adminIsTyping]);
 
   useEffect(() => {
@@ -395,22 +393,35 @@ export default function SupportChatWidget() {
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
+  const handleOptionClick = (text) => {
+    // Re-use send message logic but without an event
+    const e = { preventDefault: () => {} };
+    const prevInput = inputText;
+    setInputText(text);
+    // Since setInputText is async, we pass text directly to a specialized handler or just duplicate the logic
+    handleSendText(text);
+  };
+
+  const handleSendText = async (textToSend) => {
+    if (!textToSend.trim()) return;
 
     const currentUser = useAuthStore.getState().user || guestUser;
     if (!currentUser?.email) return;
 
-    const textToSend = inputText;
-    setInputText("");
     setShowEmojiPicker(false);
+    setInputText("");
+
+    let displayText = textToSend;
+    if (textToSend.startsWith("APP_SELECT_")) {
+      const appId = textToSend.replace("APP_SELECT_", "");
+      displayText = `Selected Application: ${appId}`;
+    }
 
     // Optimistically update
     const userMsg = {
       id: "opt_" + Date.now(),
       sender: "user",
-      text: textToSend,
+      text: displayText,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -431,6 +442,30 @@ export default function SupportChatWidget() {
       }
     } catch (err) {
       console.error("Failed to send customer message:", err);
+    }
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    handleSendText(inputText);
+  };
+
+  const handleHumanRequest = async () => {
+    const currentUser = useAuthStore.getState().user || guestUser;
+    if (!currentUser?.email) return;
+
+    try {
+      const conversationId = activeConvo?.id || "new";
+      // Ensure conversation exists first
+      if (conversationId === "new") return;
+      
+      const { data } = await api.post(`/support/conversations/${conversationId}/human-request`);
+      if (data?.success && data?.conversation) {
+        setActiveConvo(data.conversation);
+        setMessages(withAutomationGreeting(data.conversation.messages, currentUser));
+      }
+    } catch (err) {
+      console.error("Failed to request human:", err);
     }
   };
 
@@ -828,16 +863,25 @@ export default function SupportChatWidget() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex w-full ${isUser ? "justify-end" : "justify-start"}`}
+                        className={`flex w-full flex-col ${isUser ? "items-end" : "items-start"}`}
                       >
                         <div
-                          className={`max-w-[78%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
+                          className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
                             isUser
                               ? "bg-[#E8F0FF] text-slate-900 rounded-[1.5rem] rounded-tr-md border border-[#D7E5FF]"
                               : "bg-white border border-slate-100 text-text-primary rounded-[1.5rem] rounded-tl-md shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
                           }`}
                         >
-                          <p>{msg.text}</p>
+                          <p className="whitespace-pre-wrap">{msg.text}</p>
+                          {msg.type === "human_escalation" && (
+                            <button
+                              type="button"
+                              onClick={handleHumanRequest}
+                              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1463F3] px-3 py-2 text-[11px] font-bold text-white shadow-md hover:bg-blue-600 transition-colors"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" /> Connect to Human
+                            </button>
+                          )}
                           <div
                             className={`mt-1 flex items-center justify-end gap-1 text-[9px] ${
                               isUser ? "text-slate-500" : "text-text-muted"
@@ -847,6 +891,46 @@ export default function SupportChatWidget() {
                             {isUser && <CheckCheck className="h-3.5 w-3.5 text-[#1463F3]" />}
                           </div>
                         </div>
+
+                        {msg.type === "chips" && msg.options && msg.options.length > 0 && (
+                          <div className="mt-2 flex max-w-[90%] flex-wrap gap-1.5 ml-2">
+                            {msg.options.map((option, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleOptionClick(option)}
+                                className="rounded-full border border-cyan/20 bg-white px-3 py-1.5 text-[10px] font-medium text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-colors hover:bg-cyan/5 hover:text-cyan"
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {msg.type === "application_cards" && msg.applicationsData && msg.applicationsData.length > 0 && (
+                          <div className="mt-3 flex flex-col gap-2.5 w-[90%] ml-2">
+                            {msg.applicationsData.map((app, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleOptionClick(`APP_SELECT_${app.applicationId}`)}
+                                className="flex w-full flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-all hover:border-cyan hover:shadow-md"
+                              >
+                                <div className="flex w-full items-center justify-between border-b border-slate-100 pb-1.5">
+                                  <span className="text-sm font-bold text-slate-900">{app.flagEmoji} {app.countryName}</span>
+                                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{app.applicationId}</span>
+                                </div>
+                                <div className="flex w-full items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-700">{app.visaType}</span>
+                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-600 uppercase tracking-wider">{app.status}</span>
+                                </div>
+                                {app.travelDate && (
+                                  <div className="text-[10px] font-medium text-slate-500 mt-0.5 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Travel: {new Date(app.travelDate).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

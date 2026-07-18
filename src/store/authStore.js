@@ -724,10 +724,62 @@ export const useAuthStore = create(
         }
       },
 
-      deleteAccount: async () => {
+      sendDeleteOtp: async (phone) => {
         set({ isLoading: true, error: null });
         try {
-          const { data } = await api.delete("/users/profile");
+          const { data } = await api.post("/users/profile/delete/send-otp", { phone });
+          set({ isLoading: false });
+          return { success: true, message: data.message };
+        } catch (error) {
+          const message = error.response?.data?.message || "Failed to send OTP";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      verifyDeleteOtp: async (phone, otp) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/profile/delete/verify-otp", { phone, otp });
+          set({ isLoading: false });
+          return { success: true, deleteToken: data.deleteToken };
+        } catch (error) {
+          const message = error.response?.data?.message || "Invalid OTP";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      generateCaptcha: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.get("/users/profile/delete/security-check");
+          set({ isLoading: false });
+          return { success: true, captchaId: data.captchaId, image: data.image };
+        } catch (error) {
+          const message = error.response?.data?.message || "Failed to generate CAPTCHA";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      verifyCaptcha: async (captchaId, captchaText) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.post("/users/profile/delete/verify-security-check", { captchaId, captchaText });
+          set({ isLoading: false });
+          return { success: true, message: data.message };
+        } catch (error) {
+          const message = error.response?.data?.message || "Invalid CAPTCHA";
+          set({ error: message, isLoading: false });
+          return { success: false, message };
+        }
+      },
+
+      deleteAccount: async (payload) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data } = await api.delete("/users/profile", { data: payload });
           if (data.success) {
             get().logout();
             set({ isLoading: false });
