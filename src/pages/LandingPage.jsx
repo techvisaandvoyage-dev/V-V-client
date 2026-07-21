@@ -555,6 +555,8 @@ const LandingPage = () => {
     };
   }, []);
 
+  const effectiveMobileSearchExpanded = mobileSearchExpanded || searchDestination.trim().length > 0;
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -658,14 +660,14 @@ const LandingPage = () => {
             className={`fixed inset-x-0 top-0 z-[1000] flex h-[72px] items-center transition-all duration-300 ${
               isSearchPinned ? "opacity-100" : "opacity-0 pointer-events-none"
             } ${
-              mobileSearchExpanded 
+              effectiveMobileSearchExpanded 
                 ? "bg-white px-2 sm:px-4 pointer-events-auto" 
                 : `pointer-events-none justify-end md:justify-center px-4 sm:px-6 lg:px-8 ${isAuthenticated ? "pr-[104px]" : "pr-[62px]"} md:pr-4`
             }`}
           >
-            <div className={`pointer-events-auto transition-all duration-300 ${mobileSearchExpanded ? "w-full flex items-center gap-2" : "w-auto md:w-full md:max-w-[34rem] lg:max-w-[38rem]"}`}>
+            <div className={`pointer-events-auto transition-all duration-300 ${effectiveMobileSearchExpanded ? "w-full flex items-center gap-2" : "w-auto md:w-full md:max-w-[34rem] lg:max-w-[38rem]"}`}>
               
-              {mobileSearchExpanded && (
+              {effectiveMobileSearchExpanded && (
                 <button
                   type="button"
                   onClick={() => {
@@ -681,7 +683,7 @@ const LandingPage = () => {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!mobileSearchExpanded && window.innerWidth < 768) {
+                  if (!effectiveMobileSearchExpanded && window.innerWidth < 768) {
                     setMobileSearchExpanded(true);
                     setTimeout(() => searchInputRef.current?.focus(), 100);
                     return;
@@ -690,12 +692,12 @@ const LandingPage = () => {
                 }}
                 autoComplete="off"
                 className={`relative flex items-center justify-center transition-all duration-300 ${
-                  mobileSearchExpanded
+                  effectiveMobileSearchExpanded
                     ? "flex-1 rounded-full border border-slate-200 bg-slate-50 h-11 px-2 pr-1 shadow-inner"
                     : "md:rounded-full md:border md:border-slate-200 md:bg-white md:h-11 md:w-full md:px-4 md:shadow-sm"
                 }`}
               >
-                <div className={`flex h-full w-full items-center ${mobileSearchExpanded ? "gap-1" : "md:gap-3"}`}>
+                <div className={`flex h-full w-full items-center ${effectiveMobileSearchExpanded ? "gap-1" : "md:gap-3"}`}>
                   <input
                     ref={isSearchPinned ? searchInputRef : null}
                     type="text"
@@ -709,30 +711,30 @@ const LandingPage = () => {
                       window.setTimeout(() => setIsSearchFocused(false), 120);
                     }}
                     className={`h-full min-w-0 flex-1 bg-transparent px-3 text-sm leading-none text-text-primary placeholder:text-[#858da3] focus:outline-none ${
-                      mobileSearchExpanded ? "block" : "hidden md:block"
+                      effectiveMobileSearchExpanded ? "block" : "hidden md:block"
                     }`}
                   />
                   <button
-                    type={!mobileSearchExpanded && window.innerWidth < 768 ? "button" : "submit"}
+                    type={!effectiveMobileSearchExpanded && window.innerWidth < 768 ? "button" : "submit"}
                     onClick={(e) => {
-                      if (!mobileSearchExpanded && window.innerWidth < 768) {
+                      if (!effectiveMobileSearchExpanded && window.innerWidth < 768) {
                         e.preventDefault();
                         setMobileSearchExpanded(true);
                         setTimeout(() => searchInputRef.current?.focus(), 100);
                       }
                     }}
                     className={`flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
-                      mobileSearchExpanded
+                      effectiveMobileSearchExpanded
                         ? "h-9 w-9 text-cyan hover:bg-cyan/10"
                         : "h-10 w-10 bg-cyan/15 border border-cyan/30 text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow md:border-0 md:h-8 md:w-8 md:bg-cyan md:text-white md:hover:scale-[1.03] md:hover:bg-cyan-dim md:shadow-sm"
                     }`}
                   >
-                    <Search className={mobileSearchExpanded ? "h-4 w-4" : "h-5 w-5 md:h-4 md:w-4"} />
+                    <Search className={effectiveMobileSearchExpanded ? "h-4 w-4" : "h-5 w-5 md:h-4 md:w-4"} />
                   </button>
                 </div>
 
                 {isSearchPinned && searchTerm && isSearchFocused && (
-                  <div className={`absolute left-0 right-0 top-[calc(100%+14px)] z-30 text-left ${mobileSearchExpanded ? "block" : "hidden md:block"}`}>
+                  <div className={`z-30 text-left ${effectiveMobileSearchExpanded ? "fixed inset-x-2 top-[72px] block md:absolute md:inset-x-0 md:top-[calc(100%+14px)]" : "hidden md:absolute md:inset-x-0 md:top-[calc(100%+14px)] md:block"}`}>
                     <div
                       ref={searchFormRef}
                       className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"

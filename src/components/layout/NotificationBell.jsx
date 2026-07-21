@@ -49,9 +49,11 @@ const NotificationBell = ({ className = "" }) => {
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect) return;
 
+      const isMobile = window.innerWidth < 768;
+
       setDropdownPosition({
         top: rect.bottom + 12,
-        right: Math.max(16, window.innerWidth - rect.right),
+        right: isMobile ? 16 : Math.max(16, window.innerWidth - rect.right),
       });
     };
 
