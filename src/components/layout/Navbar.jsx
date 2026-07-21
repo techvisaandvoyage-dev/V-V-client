@@ -233,6 +233,7 @@ const Navbar = () => {
 
             {/* ── Mobile notification & hamburger ── */}
             <div className="flex md:hidden items-center gap-1.5">
+              <NotificationBell />
               {!isLanding && (
                 <button
                   onClick={() => navigate("/")}
@@ -242,7 +243,6 @@ const Navbar = () => {
                   <Search size={18} />
                 </button>
               )}
-              <NotificationBell />
               <button
                 id="mobile-menu-btn"
                 onClick={toggleMobileMenu}
