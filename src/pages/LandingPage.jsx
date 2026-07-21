@@ -27,7 +27,7 @@ const AVAILABLE_ICONS = {
 import Navbar from "../components/layout/Navbar";
 import LandingCountriesGrid from "../components/landing/LandingCountriesGrid";
 import { normalizeCountryFromApi, useCountries } from "../hooks/useCountries";
-import { api } from "../store/authStore";
+import { api, useAuthStore } from "../store/authStore";
 import { getCountryFlagEmoji, getCountrySearchHint, matchesCountrySearch } from "../utils/countrySearch";
 import { getCountryRouteId } from "../utils/countryRouting";
 
@@ -121,6 +121,7 @@ const LandingPage = () => {
   const geocodeReqSeq = useRef(0);
   const homeExitGuardRef = useRef(false);
   const { countries: allCountries, trendingCountries, display: countryDisplay, documentCatalog } = useCountries();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // Global requirements for merging logic on cards
   const [globalRequirements, setGlobalRequirements] = useState([]);
@@ -659,7 +660,7 @@ const LandingPage = () => {
             } ${
               mobileSearchExpanded 
                 ? "bg-white px-2 sm:px-4 pointer-events-auto" 
-                : "pointer-events-none justify-end md:justify-center px-4 sm:px-6 lg:px-8 pr-[104px] md:pr-4"
+                : `pointer-events-none justify-end md:justify-center px-4 sm:px-6 lg:px-8 ${isAuthenticated ? "pr-[104px]" : "pr-[62px]"} md:pr-4`
             }`}
           >
             <div className={`pointer-events-auto transition-all duration-300 ${mobileSearchExpanded ? "w-full flex items-center gap-2" : "w-auto md:w-full md:max-w-[34rem] lg:max-w-[38rem]"}`}>
