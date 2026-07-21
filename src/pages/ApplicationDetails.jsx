@@ -1819,7 +1819,7 @@ const ApplicationDetails = () => {
               <Plane size={18} className="text-cyan" />
               <h3 className="text-lg font-semibold text-text-primary">Application Summary</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
               <div className="rounded-xl bg-white p-4">
                 <p className="text-xs text-text-muted mb-1">Destination</p>
                 <p className="text-sm font-semibold text-text-primary">{booking.countryName}</p>
@@ -2293,8 +2293,8 @@ const ApplicationDetails = () => {
 
           {visibleRequiredDocFields.filter((field) => field.key !== "passport").length > 0 && display?.showDestinationRequiredDocs !== false && (
             <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-              <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-                <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+              <div className="flex flex-col sm:flex-row items-start gap-4 px-5 py-6 sm:px-7">
+                <span className="self-center sm:self-start flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
                   <ShieldCheck size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
@@ -2340,8 +2340,8 @@ const ApplicationDetails = () => {
 
           {visibleOtherDocFields.length > 0 && display?.showDestinationOptionalDocs !== false && (
             <div className="mt-6 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-              <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-                <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+              <div className="flex flex-col sm:flex-row items-start gap-4 px-5 py-6 sm:px-7">
+                <span className="self-center sm:self-start flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
                   <FileText size={20} strokeWidth={2} />
                 </span>
                 <div className="min-w-0">

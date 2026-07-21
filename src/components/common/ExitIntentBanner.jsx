@@ -193,7 +193,7 @@ const ExitIntentBanner = () => {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[120] flex justify-center px-4 pt-4 sm:px-6">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[9999] flex justify-center px-4 pt-4 sm:px-6">
       <div
         className={`w-full max-w-xl transform transition-all duration-300 ease-out ${
           visible

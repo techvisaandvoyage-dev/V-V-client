@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { User, LayoutDashboard, LogOut, Menu, X, BookOpen } from "lucide-react";
+import { User, LayoutDashboard, LogOut, Menu, X, BookOpen, Search } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { getAdminAppUrl } from "../../utils/adminAppUrl";
@@ -143,6 +143,15 @@ const Navbar = () => {
                 <BookOpen size={15} />
                 Blog
               </Link>
+              {!isLanding && (
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-10 h-10 rounded-full bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan hover:bg-cyan/20 transition-all duration-200"
+                  aria-label="Search"
+                >
+                  <Search size={18} />
+                </button>
+              )}
               <NotificationBell className="ml-2" />
               <div className="relative" ref={dropdownRef}>
                 <button
@@ -222,67 +231,112 @@ const Navbar = () => {
               </div>
             </div>
 
-            {/* ── Mobile hamburger ── */}
-            <button
-              id="mobile-menu-btn"
-              onClick={toggleMobileMenu}
-              className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white transition-colors"
-              aria-label="Toggle mobile menu"
-            >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
+            {/* ── Mobile notification & hamburger ── */}
+            <div className="flex md:hidden items-center gap-1.5">
+              {!isLanding && (
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-10 h-10 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow transition-all duration-200"
+                  aria-label="Search destinations"
+                >
+                  <Search size={18} />
+                </button>
+              )}
+              <NotificationBell />
+              <button
+                id="mobile-menu-btn"
+                onClick={toggleMobileMenu}
+                className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white transition-colors"
+                aria-label="Toggle mobile menu"
+              >
+                {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ── Mobile menu drawer ── */}
         {mobileMenuOpen && (
             <div className="md:hidden border-t border-border bg-white overflow-hidden animate-mobile-menu-in">
-              <div className="px-4 py-4 space-y-1">
+              {isAuthenticated && (
+                <div className="px-4 py-3 border-b border-border bg-slate-50/50 text-center">
+                  <p className="text-sm font-semibold text-text-primary truncate">
+                    {user?.name || "User"}
+                  </p>
+                  {user?.email && (
+                    <p className="text-xs text-text-secondary truncate mt-1">
+                      {user?.email}
+                    </p>
+                  )}
+                  {user?.phone && (
+                    <p className="text-xs text-text-secondary truncate mt-0.5">
+                      {user?.phone}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <div className="py-2">
                 <Link
                   to="/blog"
                   replace={isTransientPage}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-secondary hover:bg-white rounded-lg transition-colors"
+                  onClick={closeMobileMenu}
+                  className="flex w-full justify-center items-center gap-2 px-4 py-2.5 text-center text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
                 >
                   <BookOpen size={15} />
                   Blog
                 </Link>
-                {/* Auth actions */}
-                <div className="pt-2 border-t border-border flex flex-col gap-2">
-                  {isAuthenticated ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          if (user?.role === "admin") {
-                            window.location.href = getAdminAppUrl("/");
-                          } else {
-                            navigate("/dashboard", { replace: isTransientPage });
-                          }
-                        }}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan hover:bg-cyan/10 rounded-lg transition-colors"
-                      >
-                        <LayoutDashboard size={15} />
-                        Dashboard
-                      </button>
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      >
-                        <LogOut size={15} />
-                        Sign Out
-                      </button>
-                    </>
-                  ) : (
+
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        closeMobileMenu();
+                        navigate("/dashboard/profile", { replace: isTransientPage });
+                      }}
+                      className="flex w-full justify-center items-center gap-2 px-4 py-2.5 text-center text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                    >
+                      <User size={15} />
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        closeMobileMenu();
+                        if (user?.role === "admin") {
+                          window.location.href = getAdminAppUrl("/");
+                        } else {
+                          navigate("/dashboard", { replace: isTransientPage });
+                        }
+                      }}
+                      className="flex w-full justify-center items-center gap-2 px-4 py-2.5 text-center text-sm font-medium text-text-secondary transition-colors hover:bg-cyan/10 hover:text-cyan"
+                    >
+                      <LayoutDashboard size={15} />
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => {
+                        closeMobileMenu();
+                        handleLogout();
+                      }}
+                      className="flex w-full justify-center items-center gap-2 px-4 py-2.5 text-center text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
+                    >
+                      <LogOut size={15} />
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <div className="px-4 pt-2 border-t border-border mt-2">
                     <button
                       onClick={() => {
                         closeMobileMenu();
                         setAuthModalOpen(true);
                       }}
-                      className="mx-4 my-2 px-4 py-2.5 bg-cyan text-background text-sm font-bold rounded-xl hover:bg-cyan/90 transition-all text-center shadow-lg shadow-cyan/20"
+                      className="w-full px-4 py-2.5 bg-cyan text-background text-sm font-bold rounded-xl hover:bg-cyan/90 transition-all text-center shadow-lg shadow-cyan/20"
                     >
                       Sign In
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

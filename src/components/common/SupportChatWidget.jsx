@@ -498,7 +498,7 @@ export default function SupportChatWidget() {
   if (!chatConfig.enabled) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] font-sans select-none antialiased">
+    <div className="support-chat-widget fixed bottom-6 right-6 z-[9999] font-sans select-none antialiased transition-all duration-300">
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes chatFadeIn {
           from { opacity: 0; transform: translateY(12px) scale(0.96); }
@@ -507,6 +507,9 @@ export default function SupportChatWidget() {
         @keyframes chatFloat {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-4px); }
+        }
+        body.has-sticky-cta .support-chat-widget {
+          bottom: 104px !important;
         }
         .animate-fade-in {
           animation: chatFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;

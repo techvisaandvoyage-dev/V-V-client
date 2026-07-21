@@ -668,40 +668,42 @@ const UserDashboard = () => {
             </div>
 
             <div>
-              <div className="flex flex-wrap items-center gap-3 mb-5">
-                <h2 className="text-lg font-semibold text-text-primary flex-1">My Applications</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <h2 className="text-lg font-semibold text-text-primary">My Applications</h2>
 
-                <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2">
-                  <Search size={14} className="text-text-muted" />
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    placeholder="Search country..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent text-sm text-text-primary placeholder-text-muted focus:outline-none w-32"
-                    aria-label="Search applications"
-                    id="dashboard-search"
-                  />
-                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2 flex-1 sm:flex-none">
+                    <Search size={14} className="text-text-muted shrink-0" />
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Search country..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent text-sm text-text-primary placeholder-text-muted focus:outline-none w-full sm:w-32 min-w-0"
+                      aria-label="Search applications"
+                      id="dashboard-search"
+                    />
+                  </div>
 
-                <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2">
-                  <Filter size={14} className="text-text-muted" />
-                  <select
-                    autoComplete="off"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-transparent text-sm text-text-secondary focus:outline-none cursor-pointer"
-                    aria-label="Filter by status"
-                    id="status-filter"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="doc_pending">Doc Pending</option>
-                    {uploadSettings.enableGDriveUpload && <option value="drive_link_pending">Upload Drive Link</option>}
-                    <option value="review">Under Review</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                  <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2 flex-1 sm:flex-none">
+                    <Filter size={14} className="text-text-muted shrink-0" />
+                    <select
+                      autoComplete="off"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="bg-transparent text-sm text-text-secondary focus:outline-none cursor-pointer w-full min-w-0"
+                      aria-label="Filter by status"
+                      id="status-filter"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="doc_pending">Doc Pending</option>
+                      {uploadSettings.enableGDriveUpload && <option value="drive_link_pending">Upload Drive Link</option>}
+                      <option value="review">Under Review</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -777,46 +779,49 @@ const UserDashboard = () => {
                               <h3 className="font-semibold text-text-primary truncate">
                                 {booking.countryName || "Unknown Country"}
                               </h3>
-                              {resolvedStatus !== "doc_pending" && resolvedStatus !== "pending_payment" && (
+                              {(resolvedStatus !== "doc_pending" || booking.paymentStatus === "completed") && resolvedStatus !== "pending_payment" && (
                                 <StatusBadge status={resolvedStatus} />
                               )}
                               {booking.paymentStatus !== "completed" && (
                                 <StatusBadge status={booking.paymentStatus === "failed" ? "cancelled" : "pending_payment"} />
                               )}
                             </div>
-                            <p className="text-[11px] font-mono text-text-muted mb-1">
-                              Application ID: {booking.applicationId || booking._id || booking.id}
-                            </p>
-                            <p className="text-xs text-text-muted">{booking.visaType || "Visa Application"}</p>
-                            
-                            <div>
-                              <div className="flex items-center gap-3 mt-1.5">
-                                <span className="flex items-center gap-1 text-xs text-text-muted">
-                                  <Calendar size={11} />
-                                  Applied: {fmtDate(booking.createdAt)}
-                                </span>
-                                <span className="hidden sm:flex items-center gap-1 text-xs text-text-muted">
-                                  ✈️ Travel: {fmtDate(booking.travelDate)}
-                                </span>
-                              </div>
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-2">
+                              <p className="text-[11px] font-mono text-text-muted flex items-center min-w-0">
+                                <span className="truncate">App ID: {booking.applicationId || booking._id || booking.id}</span>
+                              </p>
+                              <p className="text-xs text-text-muted flex items-center min-w-0">
+                                <span className="truncate">{booking.visaType || "Visa Application"}</span>
+                              </p>
+                              
+                              <span className="flex items-center gap-1 text-xs text-text-muted min-w-0">
+                                <Calendar size={11} className="shrink-0" />
+                                <span className="truncate">Applied: {fmtDate(booking.createdAt)}</span>
+                              </span>
+                              
+                              <span className="hidden sm:flex items-center gap-1 text-xs text-text-muted min-w-0">
+                                <span className="shrink-0">✈️</span>
+                                <span className="truncate">Travel: {fmtDate(booking.travelDate)}</span>
+                              </span>
+
                               {booking.visaFilePath && (
-                                <div className="mt-1.5">
-                                  <span className="text-xs text-emerald-400">
-                                    Visa file received
-                                  </span>
-                                </div>
+                                <span className="flex items-center gap-1 text-xs text-emerald-400 min-w-0">
+                                  <span className="truncate">Visa file received</span>
+                                </span>
                               )}
+
                               {!uploadSettings.enableFileUpload && (
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <>
                                   {derivedProgress.allPassportsUploaded ? (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                      <CheckCircle size={11} /> Passport uploaded
+                                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-400 min-w-0">
+                                      <CheckCircle size={11} className="shrink-0" /> <span className="truncate">Passport</span>
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
-                                      <Upload size={11} /> No passport
+                                    <span className="flex items-center gap-1 text-xs font-medium text-text-muted min-w-0">
+                                      <Upload size={11} className="shrink-0" /> <span className="truncate">No passport</span>
                                     </span>
                                   )}
+                                  
                                   {(() => {
                                     if (!uploadSettings.enableGDriveUpload) return null;
                                     const rootDrive = String(booking?.gdriveLink || "").trim();
@@ -824,40 +829,39 @@ const UserDashboard = () => {
                                     const hasDrive = Boolean(rootDrive) || travellers.some((entry) => String(entry?.gdriveLink || "").trim());
                                     if (hasDrive) {
                                       return (
-                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                          <ExternalLink size={11} /> Drive link added
+                                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-400 min-w-0">
+                                          <ExternalLink size={11} className="shrink-0" /> <span className="truncate">Drive link added</span>
                                         </span>
                                       );
                                     }
                                     return (
-                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-text-muted">
-                                        <ExternalLink size={11} /> Drive link not added
+                                      <span className="flex items-center gap-1 text-xs font-medium text-text-muted min-w-0">
+                                        <ExternalLink size={11} className="shrink-0" /> <span className="truncate">No drive link</span>
                                       </span>
                                     );
                                   })()}
-                                </div>
+                                </>
                               )}
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {uploadSettings.enableFileUpload && (
-                                  (() => {
-                                    if (derivedProgress.allDocumentsUploaded) {
-                                      return (
-                                        <span className="hidden sm:inline-flex items-center gap-1 text-2xs font-medium text-emerald-400">
-                                          <CheckCircle size={12} />
-                                          Documents
-                                        </span>
-                                      );
-                                    } else {
-                                      return (
-                                        <span className="hidden sm:inline-flex items-center gap-1 text-2xs font-medium text-zinc-400">
-                                          <Upload size={12} />
-                                          Documents
-                                        </span>
-                                      );
-                                    }
-                                  })()
-                                )}
-                              </div>
+
+                              {uploadSettings.enableFileUpload && (
+                                (() => {
+                                  if (derivedProgress.allDocumentsUploaded) {
+                                    return (
+                                      <span className="hidden sm:flex items-center gap-1 text-2xs font-medium text-emerald-400 min-w-0">
+                                        <CheckCircle size={12} className="shrink-0" />
+                                        <span className="truncate">Documents</span>
+                                      </span>
+                                    );
+                                  } else {
+                                    return (
+                                      <span className="hidden sm:flex items-center gap-1 text-2xs font-medium text-zinc-400 min-w-0">
+                                        <Upload size={12} className="shrink-0" />
+                                        <span className="truncate">Documents</span>
+                                      </span>
+                                    );
+                                  }
+                                })()
+                              )}
                             </div>
                           </div>
 

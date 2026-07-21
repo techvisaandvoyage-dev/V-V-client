@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { CheckCircle, Info, Link2 } from "lucide-react";
 
 const DriveShareGuidePopover = ({ showSkipHint = true }) => (
-  <span className="pointer-events-none absolute right-0 bottom-full z-30 mb-2 hidden w-80 rounded-2xl border border-border bg-surface p-4 text-[11px] font-normal leading-relaxed text-text-secondary shadow-xl group-hover:block">
+  <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0 bottom-full z-30 mb-2 hidden w-[260px] sm:w-80 rounded-2xl border border-border bg-surface p-4 text-[11px] font-normal leading-relaxed text-text-secondary shadow-xl group-hover:block">
     <p className="font-semibold text-text-primary text-sm mb-2">How to share your folder</p>
     <ol className="list-decimal list-inside space-y-2">
       <li>
@@ -98,8 +98,8 @@ export default function SharedGoogleDriveLinkSection({
     <div
       className={`rounded-2xl border border-border bg-surface p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)] ${className}`}
     >
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+      <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+        <span className="self-center sm:self-start flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
           <Link2 size={18} />
         </span>
         <div className="min-w-0 flex-1">

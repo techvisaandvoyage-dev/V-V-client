@@ -17,7 +17,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search, MapPin, CheckCircle, Clock, Globe, Users, CreditCard, Plane, HeartHandshake, Smile,
-  ShieldCheck, FileText, Lock, Zap,
+  ShieldCheck, FileText, Lock, Zap, X,
 } from "lucide-react";
 
 const AVAILABLE_ICONS = {
@@ -130,6 +130,7 @@ const LandingPage = () => {
   const [popularCountriesLoading, setPopularCountriesLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNTRY_CARD_COUNT);
   const [isSearchPinned, setIsSearchPinned] = useState(false);
+  const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
   const [showDeferredFooter, setShowDeferredFooter] = useState(false);
 
 
@@ -529,7 +530,9 @@ const LandingPage = () => {
       rafId = requestAnimationFrame(() => {
         rafId = null;
         if (!triggerTop) measureSearchPosition();
-        setIsSearchPinned(window.scrollY >= triggerTop);
+        const isPinned = window.scrollY >= triggerTop;
+        setIsSearchPinned(isPinned);
+        if (!isPinned) setMobileSearchExpanded(false);
       });
     };
 
@@ -559,28 +562,18 @@ const LandingPage = () => {
         <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div
             ref={searchAnchorRef}
-            className={isSearchPinned ? "h-16" : ""}
+            className="relative mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
           >
-            <div
-                className={
-                  isSearchPinned
-                    ? "pointer-events-none fixed inset-x-0 top-0 z-[100] flex h-[72px] items-center px-4 sm:px-6 lg:px-8"
-                    : "relative z-[100] mx-auto w-full max-w-[48rem] bg-white py-2 sm:py-3 animate-home-enter"
-                }
-              >
-                <div className={isSearchPinned ? "pointer-events-auto mx-auto w-full max-w-[34rem] md:max-w-[36rem] lg:max-w-[38rem]" : ""}>
               <form
                 onSubmit={handleSearch}
                 autoComplete="off"
-                className={`relative rounded-full border border-slate-200 bg-white px-4 sm:px-5 transition-all duration-200 ${
-                  isSearchPinned ? "h-11 sm:h-12" : "h-16"
-                }`}
+                className="relative rounded-full border border-slate-200 bg-white h-16 px-4 sm:px-5 w-full transition-shadow hover:shadow-md"
                 role="search"
                 aria-label="Search visa destinations"
               >
                 <div className="flex h-full items-center gap-3">
                   <input
-                    ref={searchInputRef}
+                    ref={!isSearchPinned ? searchInputRef : null}
                     type="text"
                     autoComplete="off"
                     placeholder="Search country"
@@ -599,16 +592,14 @@ const LandingPage = () => {
                   />
                   <button
                     type="submit"
-                    className={`flex flex-shrink-0 items-center justify-center rounded-full bg-cyan text-white shadow-[0_12px_28px_rgba(2,132,199,0.26)] transition-all hover:scale-[1.03] hover:bg-cyan-dim ${
-                      isSearchPinned ? "h-8 w-8 sm:h-9 sm:w-9" : "h-11 w-11 sm:h-12 sm:w-12"
-                    }`}
+                    className="flex h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-full bg-cyan text-white shadow-[0_12px_28px_rgba(2,132,199,0.26)] transition-all hover:scale-[1.03] hover:bg-cyan-dim"
                     aria-label="Search destinations"
                   >
-                    <Search className={isSearchPinned ? "h-4 w-4" : "h-5 w-5"} />
+                    <Search className="h-5 w-5" />
                   </button>
                 </div>
 
-              {searchTerm && isSearchFocused && (
+              {!isSearchPinned && searchTerm && isSearchFocused && (
                 <div className="absolute left-0 right-0 top-[calc(100%+14px)] z-30 text-left">
                   <div
                     ref={searchFormRef}
@@ -659,8 +650,138 @@ const LandingPage = () => {
                 </div>
               )}
             </form>
-            </div>
           </div>
+
+          {/* Pinned Navbar Search */}
+          <div
+            className={`fixed inset-x-0 top-0 z-[1000] flex h-[72px] items-center transition-all duration-300 ${
+              isSearchPinned ? "opacity-100" : "opacity-0 pointer-events-none"
+            } ${
+              mobileSearchExpanded 
+                ? "bg-white px-2 sm:px-4 pointer-events-auto" 
+                : "pointer-events-none justify-end md:justify-center px-4 sm:px-6 lg:px-8 pr-[104px] md:pr-4"
+            }`}
+          >
+            <div className={`pointer-events-auto transition-all duration-300 ${mobileSearchExpanded ? "w-full flex items-center gap-2" : "w-auto md:w-full md:max-w-[34rem] lg:max-w-[38rem]"}`}>
+              
+              {mobileSearchExpanded && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileSearchExpanded(false);
+                    setSearchDestination("");
+                  }}
+                  className="md:hidden flex-shrink-0 text-text-secondary p-2 ml-1 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              )}
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!mobileSearchExpanded && window.innerWidth < 768) {
+                    setMobileSearchExpanded(true);
+                    setTimeout(() => searchInputRef.current?.focus(), 100);
+                    return;
+                  }
+                  handleSearch(e);
+                }}
+                autoComplete="off"
+                className={`relative flex items-center justify-center transition-all duration-300 ${
+                  mobileSearchExpanded
+                    ? "flex-1 rounded-full border border-slate-200 bg-slate-50 h-11 px-2 pr-1 shadow-inner"
+                    : "md:rounded-full md:border md:border-slate-200 md:bg-white md:h-11 md:w-full md:px-4 md:shadow-sm"
+                }`}
+              >
+                <div className={`flex h-full w-full items-center ${mobileSearchExpanded ? "gap-1" : "md:gap-3"}`}>
+                  <input
+                    ref={isSearchPinned ? searchInputRef : null}
+                    type="text"
+                    placeholder="Search country"
+                    value={searchDestination}
+                    onChange={(e) => setSearchDestination(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={(e) => {
+                      const nextFocused = e.relatedTarget;
+                      if (searchFormRef.current?.contains(nextFocused)) return;
+                      window.setTimeout(() => setIsSearchFocused(false), 120);
+                    }}
+                    className={`h-full min-w-0 flex-1 bg-transparent px-3 text-sm leading-none text-text-primary placeholder:text-[#858da3] focus:outline-none ${
+                      mobileSearchExpanded ? "block" : "hidden md:block"
+                    }`}
+                  />
+                  <button
+                    type={!mobileSearchExpanded && window.innerWidth < 768 ? "button" : "submit"}
+                    onClick={(e) => {
+                      if (!mobileSearchExpanded && window.innerWidth < 768) {
+                        e.preventDefault();
+                        setMobileSearchExpanded(true);
+                        setTimeout(() => searchInputRef.current?.focus(), 100);
+                      }
+                    }}
+                    className={`flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
+                      mobileSearchExpanded
+                        ? "h-9 w-9 text-cyan hover:bg-cyan/10"
+                        : "h-10 w-10 bg-cyan/15 border border-cyan/30 text-cyan hover:bg-cyan/20 hover:shadow-cyan-glow md:border-0 md:h-8 md:w-8 md:bg-cyan md:text-white md:hover:scale-[1.03] md:hover:bg-cyan-dim md:shadow-sm"
+                    }`}
+                  >
+                    <Search className={mobileSearchExpanded ? "h-4 w-4" : "h-5 w-5 md:h-4 md:w-4"} />
+                  </button>
+                </div>
+
+                {isSearchPinned && searchTerm && isSearchFocused && (
+                  <div className={`absolute left-0 right-0 top-[calc(100%+14px)] z-30 text-left ${mobileSearchExpanded ? "block" : "hidden md:block"}`}>
+                    <div
+                      ref={searchFormRef}
+                      className="max-h-[min(70vh,520px)] overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+                    >
+                      {suggestionRows.length > 0 ? (
+                        <div className="overflow-y-auto overscroll-contain">
+                          {suggestionRows.map((row) => (
+                            <button
+                              type="button"
+                              key={row.key}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSuggestionRowClick(row)}
+                              className="w-full flex items-start justify-between gap-3 px-4 py-3 text-sm text-text-primary hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                {row.kind === "country" ? (
+                                  <>
+                                    <span className="font-medium truncate">{row.country.name}</span>
+                                    {row.hint ? (
+                                      <span className="text-xs text-text-muted">{row.hint}</span>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="flex items-center gap-2 font-medium text-text-primary min-w-0">
+                                      <MapPin size={14} className="text-cyan flex-shrink-0 mt-0.5" />
+                                      <span className="truncate">{row.primaryLabel}</span>
+                                    </span>
+                                    <span className="text-xs text-text-muted pl-6 truncate">
+                                      {row.detailLabel}
+                                    </span>
+                                  </>
+                                )}
+                              </span>
+                              <span className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex-shrink-0">
+                                {getCountryFlagEmoji(row.country.name, row.country.flagEmoji)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-text-muted">
+                          No matching destinations found.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
           </div>
 
           <div

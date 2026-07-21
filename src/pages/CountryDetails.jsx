@@ -34,6 +34,7 @@ import {
   Headphones,
   Info,
   Link2,
+  Users,
 } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
@@ -639,6 +640,15 @@ const CountryDetails = () => {
   const [activeSubNav, setActiveSubNav] = useState("how-it-works");
   const pendingContactAction = useRef(null);
   const [showStickyStartCta, setShowStickyStartCta] = useState(false);
+
+  useEffect(() => {
+    if (showStickyStartCta) {
+      document.body.classList.add("has-sticky-cta");
+    } else {
+      document.body.classList.remove("has-sticky-cta");
+    }
+    return () => document.body.classList.remove("has-sticky-cta");
+  }, [showStickyStartCta]);
   /**
    * When a guest hits an action that requires authentication ("Upload docs
    * first" / "Upload docs later"), we attach a `?postLoginAction=<key>` to the
@@ -1117,31 +1127,14 @@ const CountryDetails = () => {
       return;
     }
 
-    const node = startApplicationCardRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") {
-      setShowStickyStartCta(false);
-      return;
-    }
+    const handleScroll = () => {
+      setShowStickyStartCta(window.scrollY > 400);
+    };
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          startApplicationCardSeenRef.current = true;
-          setShowStickyStartCta(false);
-          return;
-        }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
 
-        setShowStickyStartCta(
-          startApplicationCardSeenRef.current && entry.boundingClientRect.top < 0
-        );
-      },
-      {
-        threshold: 0.2,
-      }
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [showTravelDetails]);
 
   /** Return date must stay on/after departure; both must be today or later. */
@@ -1537,13 +1530,13 @@ const CountryDetails = () => {
     <div className="space-y-6">
       {countryDisplay?.showDestinationRequiredDocs !== false && (
       <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-        <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-          <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+        <div className="flex flex-col sm:flex-row items-start gap-4 px-5 py-6 sm:px-7">
+          <span className="self-center sm:self-start flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
             <ShieldCheck size={20} strokeWidth={2} />
           </span>
           <div className="min-w-0">
             <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.requiredHeading}</h3>
-            <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+            <p className="mt-2 text-sm text-slate-500 sm:text-[15px]">
               {documentSectionCopy.requiredDescription}
             </p>
           </div>
@@ -1587,13 +1580,13 @@ const CountryDetails = () => {
 
       {countryDisplay?.showDestinationOptionalDocs !== false && travelDetailsOtherDocumentFields.length > 0 ? (
         <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.08),transparent_42%),linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.24)]">
-          <div className="flex items-start gap-4 px-5 py-6 sm:px-7">
-            <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
+          <div className="flex flex-col sm:flex-row items-start gap-4 px-5 py-6 sm:px-7">
+            <span className="self-center sm:self-start flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[24px] bg-sky-50 text-cyan shadow-inner shadow-sky-100/60">
               <FileText size={20} strokeWidth={2} />
             </span>
             <div className="min-w-0">
               <h3 className="text-[26px] font-semibold tracking-tight text-slate-950 sm:text-[28px]">{documentSectionCopy.optionalHeading}</h3>
-              <p className="mt-1 text-sm text-slate-500 sm:text-[15px]">
+              <p className="mt-2 text-sm text-slate-500 sm:text-[15px]">
                 {documentSectionCopy.optionalDescription}
             </p>
             </div>
@@ -3138,7 +3131,7 @@ const CountryDetails = () => {
       <Navbar />
 
       {!showTravelDetails && (
-        <motion.div id="info" initial="initial" animate="animate" variants={fadeUp} className="w-full">
+        <motion.div id="info" initial="initial" animate="animate" variants={fadeUp} className="w-full pt-6 lg:pt-8">
           <div className="relative mx-auto w-full max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl border border-border sm:max-w-[calc(100vw-3rem)] lg:max-w-[calc(100vw-4rem)]">
             <ImageWithShimmer
               src={country.imageUrl}
@@ -3166,7 +3159,7 @@ const CountryDetails = () => {
                     <p className="text-xs text-white/65 uppercase tracking-[0.18em] mb-2">Validity</p>
                     <p className="text-sm font-semibold text-white">{country.validity || "—"}</p>
                   </div>
-                  <div>
+                  <div className="col-span-2 sm:col-span-1">
                     <p className="text-xs text-white/65 uppercase tracking-[0.18em] mb-2">Processing</p>
                     <p className="text-base font-semibold text-white">
                       {country.processingDays
@@ -3262,7 +3255,7 @@ const CountryDetails = () => {
         )}
 
         <div className="mx-auto w-full max-w-[1400px]">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start lg:gap-1 xl:gap-2">
+          <div className={`grid grid-cols-1 lg:grid-cols-12 lg:items-start ${showTravelDetails ? "gap-12 lg:gap-8 xl:gap-12" : "gap-5 lg:gap-1 xl:gap-2"}`}>
             {!showTravelDetails && (
               <motion.section
                 initial={{ opacity: 0, y: 12 }}
@@ -3281,7 +3274,7 @@ const CountryDetails = () => {
             <div
               className={
                 showTravelDetails
-                  ? "lg:col-span-8 space-y-8"
+                  ? "lg:col-span-8 space-y-8 lg:pl-4 xl:pl-6"
                   : "hidden"
               }
             >
@@ -3629,8 +3622,8 @@ const CountryDetails = () => {
                 <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.45)]">
                   {uploadSettings.enableGDriveUpload && (
                     <>
-                      <div className="flex items-start gap-4">
-                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-[#4285F4] shadow-inner">
+                      <div className="flex flex-col sm:flex-row items-start gap-4">
+                        <span className="self-center sm:self-start flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-[#4285F4] shadow-inner">
                           <Link2 size={22} />
                         </span>
                     <div className="min-w-0 flex-1">
@@ -3654,7 +3647,7 @@ const CountryDetails = () => {
                         </span>
                       </div>
                       <p className="mt-1 text-sm leading-6 text-slate-500">
-                        Upload all documents to Google Drive and share the folder link here. This link will be applicable for all travelers.
+                        Upload all required and optional documents to Google Drive and share the folder link here. This link will be applicable for all travelers.
                       </p>
                     </div>
                   </div>
@@ -3672,7 +3665,7 @@ const CountryDetails = () => {
                         >
                           <Info size={15} />
                         </button>
-                        <div className="pointer-events-none absolute left-0 bottom-full z-30 mb-2 hidden w-80 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-normal leading-relaxed text-slate-600 shadow-xl group-hover:block transition-all duration-200">
+                        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-0 bottom-full z-30 mb-2 hidden w-[260px] sm:w-80 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-normal leading-relaxed text-slate-600 shadow-xl group-hover:block transition-all duration-200">
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-50 text-blue-600 font-semibold text-[10px]">GD</span>
@@ -3778,53 +3771,62 @@ const CountryDetails = () => {
                           <p className="mt-1 text-xl font-bold leading-none">{travellerCount}</p>
                         </div>
                       </div>
-                      <div className="relative mt-5">
+                      <div className="relative mt-5 text-center">
                         <p className="text-[0.7rem] uppercase tracking-[0.34em] text-white/72">Amount to be paid now</p>
                         <p className="mt-2 text-4xl font-extrabold tracking-tight sm:text-[2.8rem]">₹{finalTotal.toLocaleString("en-IN")}</p>
                       </div>
                     </div>
 
                     <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3.5">
+                      <div className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3.5 space-y-3">
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
                             <Receipt className="h-4 w-4" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div>
-                              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-500">Visa Type</p>
-                              <p className="mt-1 text-[0.95rem] font-semibold text-slate-900">{visaOption || "Tourist Visa"}</p>
-                            </div>
-                            <div className="mt-3 border-t border-slate-200 pt-3">
-                              <div className="flex items-center gap-2 text-slate-500">
-                                <CalendarDays className="h-4 w-4 text-sky-600" />
-                                <span className="text-[0.7rem] font-semibold uppercase tracking-[0.24em]">Travel Dates</span>
-                              </div>
-                              <p className="mt-1.5 text-[0.88rem] font-semibold text-slate-900">{formatTravelRange()}</p>
+                            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-500">Visa Type</p>
+                            <p className="mt-1 text-[0.95rem] font-semibold text-slate-900">{visaOption || "Tourist Visa"}</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-slate-200 pt-3">
+                          <div className="flex items-start gap-3">
+                            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
+                              <CalendarDays className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-500">Travel Dates</p>
+                              <p className="mt-1 text-[0.95rem] font-semibold text-slate-900">{formatTravelRange()}</p>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-500">Traveler Names</p>
-                            <p className="mt-1 text-sm text-slate-600">Added in your application form</p>
-                          </div>
-                          <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
-                            {travellerCount} total
+                      <div className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3.5 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
+                            <Users className="h-4 w-4" />
                           </span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {travelers.map((traveler, idx) => (
-                            <span
-                              key={`travel-summary-name-${idx}`}
-                              className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-medium text-slate-700"
-                            >
-                              {traveler.name?.trim() || `Traveler ${idx + 1}`}
-                            </span>
-                          ))}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-500">Traveler Names</p>
+                                <p className="mt-1 text-[0.95rem] font-semibold text-slate-900">Added in form</p>
+                              </div>
+                              <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                                {travellerCount} total
+                              </span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {travelers.map((traveler, idx) => (
+                                <span
+                                  key={`travel-summary-name-${idx}`}
+                                  className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-xs font-medium text-slate-700"
+                                >
+                                  {traveler.name?.trim() || `Traveler ${idx + 1}`}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
 

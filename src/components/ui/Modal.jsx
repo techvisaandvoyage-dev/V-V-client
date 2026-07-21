@@ -111,7 +111,7 @@ const Modal = ({
 
             {/* ── Footer (optional) ── */}
             {footer && (
-              <div className="px-6 py-4 border-t border-border bg-surface-2">
+              <div className="px-6 py-4 border-t border-border bg-surface-2 rounded-b-2xl">
                 {footer}
               </div>
             )}

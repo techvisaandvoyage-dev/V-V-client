@@ -4,7 +4,7 @@
 // ============================================================
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send } from "lucide-react";
+import { Mail, Shield, Lock, Globe, Link as LinkIcon, MessageCircle, Send, ChevronDown } from "lucide-react";
 import { api, SERVER_URL } from "../../store/authStore";
 import { useSiteLogo } from "../../hooks/useSiteLogo";
 
@@ -125,6 +125,12 @@ const Footer = () => {
   const [footerContent, setFooterContent] = useState(FOOTER_CONTENT_FALLBACK);
   const [footerSections, setFooterSections] = useState(FOOTER_CONTENT_FALLBACK.sections);
   const [activeCountryCount, setActiveCountryCount] = useState(0);
+  const [openSections, setOpenSections] = useState({});
+
+  const toggleSection = (key) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -218,7 +224,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-white" id="footer">
+    <footer className="bg-white transition-[padding] duration-300 [.has-sticky-cta_&]:pb-24 sm:[.has-sticky-cta_&]:pb-0" id="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
         <div className="flex flex-col lg:flex-row justify-between gap-8 lg:gap-12 mb-12">
           <div className="w-full lg:w-[35%] lg:max-w-sm lg:pr-12 shrink-0">
@@ -281,27 +287,47 @@ const Footer = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap lg:flex-nowrap justify-start lg:justify-end gap-8 lg:gap-12 xl:gap-16 w-full lg:w-auto flex-1">
+          <div className="flex flex-col lg:flex-row flex-wrap lg:flex-nowrap justify-start lg:justify-end w-full lg:w-auto flex-1 gap-2 lg:gap-12 xl:gap-16">
             {columns.map((col) => (
-              <div key={col.key} className="w-[calc(50%-1rem)] sm:w-auto sm:min-w-[140px]">
-                <h3 className="text-base font-semibold text-text-primary mb-4">{col.title}</h3>
-                <ul className="space-y-3">
-                  {col.links.map((link) => (
-                    <li key={link.slug}>
-                      <Link
-                        to={`/page/${link.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base text-text-secondary hover:text-cyan transition-colors duration-200 block"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                  {col.links.length === 0 && (
-                    <li className="text-base text-text-muted">No pages yet</li>
-                  )}
-                </ul>
+              <div key={col.key} className="w-full lg:w-auto sm:min-w-[140px] border-b border-slate-100 lg:border-none pb-2 lg:pb-0">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(col.key)}
+                  className="flex items-center justify-between lg:block w-full text-left text-base font-semibold text-text-primary py-3 lg:py-0 lg:mb-4 lg:pointer-events-none"
+                >
+                  <span>{col.title}</span>
+                  <ChevronDown
+                    size={20}
+                    className={`lg:hidden text-text-muted transition-transform duration-300 ${
+                      openSections[col.key] ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                <div
+                  className={`grid transition-[grid-template-rows,opacity] duration-300 lg:!grid-rows-[1fr] lg:!opacity-100 ${
+                    openSections[col.key] ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <ul className="space-y-3 flex flex-col items-start text-left pb-4 lg:pb-0 pt-1 lg:pt-0">
+                      {col.links.map((link) => (
+                        <li key={link.slug}>
+                          <Link
+                            to={`/page/${link.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-base text-text-secondary hover:text-cyan transition-colors duration-200 block"
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      ))}
+                      {col.links.length === 0 && (
+                        <li className="text-base text-text-muted">No pages yet</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

@@ -82,6 +82,7 @@ const OverviewRow = ({ icon: Icon, label, value, valueTone = "green" }) => (
 
 const SectionShell = ({ icon: Icon, title, children, className = "" }) => (
   <Card
+    padding="none"
     className={`overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl ${className}`}
   >
     <div className="flex items-center gap-3 border-b border-slate-100 px-7 py-6">
@@ -589,7 +590,7 @@ const ProfilePage = () => {
 
           <div className="relative z-10 flex flex-col gap-8 px-8 py-8 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-              <div className="relative">
+              <div className="relative mx-auto sm:mx-0">
                 <button
                   type="button"
                   onClick={handleImageClick}
@@ -605,14 +606,6 @@ const ProfilePage = () => {
                   <span className="absolute inset-0 bg-slate-900/0 transition-colors group-hover:bg-slate-900/20" />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleImageClick}
-                  className="absolute bottom-3 right-1 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-white text-[#235BFF] shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-transform hover:scale-105"
-                >
-                  <Camera size={22} />
-                </button>
-
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -622,22 +615,22 @@ const ProfilePage = () => {
                 />
               </div>
 
-              <div className="space-y-4 text-left">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-4xl font-bold tracking-tight text-slate-950">{user.name}</h1>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#235BFF] text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)]">
+              <div className="space-y-4 text-center sm:text-left">
+                <h1 className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-4xl font-bold tracking-tight text-slate-950">
+                  <span className="break-words text-center sm:text-left">{user.name}</span>
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#235BFF] text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)]">
                     <BadgeCheck size={18} />
                   </span>
-                </div>
+                </h1>
 
                 <StatusPill tone="green">Profile Active</StatusPill>
 
                 <div className="space-y-3 text-[1.02rem] text-slate-600">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center sm:justify-start gap-3">
                     <Mail size={18} className="text-slate-500" />
                     <span>{user.email || "No email added"}</span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center sm:justify-start gap-3">
                     <Phone size={18} className="text-slate-500" />
                     <span>{displayPhone}</span>
                   </div>
@@ -645,7 +638,7 @@ const ProfilePage = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 lg:self-start">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 lg:self-start">
               {!isEditing ? (
                 <Button
                   variant="primary"
@@ -925,7 +918,7 @@ const ProfilePage = () => {
           </SectionShell>
 
           <div className="space-y-7">
-            <SectionShell icon={BadgeCheck} title="Account Overview" className="px-0 py-0">
+            <SectionShell icon={BadgeCheck} title="Account Overview">
               <div className="divide-y divide-slate-100">
                 <OverviewRow icon={CalendarDays} label="Member Since" value={memberSince} valueTone="zinc" />
                 <OverviewRow icon={Mail} label="Email Address" value={user.email ? "Added" : "Add email"} valueTone={user.email ? "green" : "amber"} />
@@ -935,7 +928,7 @@ const ProfilePage = () => {
             </SectionShell>
 
             {authControls.passwordEnabled && (
-            <SectionShell icon={Shield} title="Security" className="px-0 py-0">
+            <SectionShell icon={Shield} title="Security">
               <div className="space-y-5">
                 <div className="space-y-2">
                   <p className="text-sm text-slate-600">
@@ -1026,7 +1019,7 @@ const ProfilePage = () => {
             </SectionShell>
             )}
 
-            <SectionShell icon={AlertTriangle} title="Account Deletion" className="px-0 py-0 border-red-100 bg-red-50/30">
+            <SectionShell icon={AlertTriangle} title="Account Deletion" className="border-red-100 bg-red-50/30">
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">
                   Permanently delete your account and all associated profile data.
