@@ -925,7 +925,7 @@ const LandingPage = () => {
 
           {/* ── Standard Filter Bar (always visible in hero, sleek design) ── */}
           {siteConfig?.landingPage?.hideFilter !== true && (
-            <div ref={filterAnchorRef} className="relative z-30 mx-auto mt-6 sm:mt-8 w-full max-w-6xl flex flex-col lg:flex-row lg:items-center rounded-3xl lg:rounded-[48px] bg-white p-2 lg:p-2 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 filter-dropdown-container animate-home-enter [animation-delay:40ms]">
+            <div ref={filterAnchorRef} className="relative z-30 mx-auto mt-6 sm:mt-8 w-full max-w-6xl flex flex-col lg:flex-row lg:items-center rounded-3xl lg:rounded-[48px] bg-white p-2 lg:p-2 filter-dropdown-container animate-home-enter [animation-delay:40ms]">
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-1 lg:items-center w-full">
                 
