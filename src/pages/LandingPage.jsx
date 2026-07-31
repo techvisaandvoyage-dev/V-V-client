@@ -917,7 +917,9 @@ const LandingPage = () => {
                   )}
                 </div>
                 {(selectedVisaType !== "All Visa Types" || selectedValidity !== "Any Validity" || selectedLengthOfStay !== "Any Length of Stay" || selectedEntryType !== "Any Entry Type") && (
-                  <button onClick={clearFilters} className="text-sm font-medium text-[#0b1f45] transition-colors hover:text-cyan ml-2">Clear</button>
+                  <button onClick={clearFilters} className="flex items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-rose-50 hover:text-rose-600 ml-2">
+                    <X size={14} /> Clear
+                  </button>
                 )}
               </div>
             </div>
