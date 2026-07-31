@@ -21,6 +21,7 @@ import FilePreviewModal from "../components/ui/FilePreviewModal";
 import { getFileUrl } from "../utils/fileUrl";
 import CountryFlagBadge from "../components/ui/CountryFlagBadge";
 import Footer from "../components/layout/Footer";
+import Navbar from "../components/layout/Navbar";
 
 /**
  * Map every built-in doc key → its lucide icon component. Used to render the
@@ -408,7 +409,8 @@ const UserDashboard = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background relative">
-      <div className="fixed bottom-6 left-6 z-50">
+      <Navbar />
+      <div className="fixed bottom-6 left-6 z-50 hidden md:block">
         <button
           onClick={() => {
             logout();
@@ -786,7 +788,7 @@ const UserDashboard = () => {
                                 <StatusBadge status={booking.paymentStatus === "failed" ? "cancelled" : "pending_payment"} />
                               )}
                             </div>
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-3">
                               <p className="text-[11px] font-mono text-text-muted flex items-center min-w-0">
                                 <span className="truncate">App ID: {booking.applicationId || booking._id || booking.id}</span>
                               </p>

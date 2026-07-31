@@ -416,13 +416,14 @@ const LandingPage = () => {
   }, [searchTerm, allCountries, geocodePlaces]);
 
   const filteredCountries = useMemo(() => {
+    let baseList = [];
     const term = searchDestination.trim();
     if (!term) {
       if (popularCountryCards.length > 0) {
         const freshById = new Map(
           [...allCountries, ...trendingCountries].map((country) => [getCountryRouteId(country), country])
         );
-        return popularCountryCards.map((country) => {
+        baseList = popularCountryCards.map((country) => {
           const fresh = freshById.get(getCountryRouteId(country));
           if (!fresh) return country;
           return {
@@ -431,27 +432,32 @@ const LandingPage = () => {
             imageUrl: fresh.imageUrl || country.imageUrl || "",
           };
         });
+      } else if (popularCountriesLoading) {
+        baseList = [];
+      } else {
+        baseList = allCountries.length > 0 ? allCountries : trendingCountries;
       }
-      if (popularCountriesLoading) return [];
-      return allCountries.length > 0 ? allCountries : trendingCountries;
+    } else {
+      const local = allCountries.filter((country) => matchesCountrySearch(country, term));
+      const byId = new Map(local.map((c) => [getCountryRouteId(c), c]));
+      for (const p of geocodePlaces) {
+        const country = allCountries.find(
+          (c) => c.id === p.countrySlug || c.name === p.countryName
+        );
+        const routeId = getCountryRouteId(country);
+        if (country && !byId.has(routeId)) byId.set(routeId, country);
+      }
+      baseList = Array.from(byId.values());
     }
-    const local = allCountries.filter((country) => matchesCountrySearch(country, term));
-    const byId = new Map(local.map((c) => [getCountryRouteId(c), c]));
-    for (const p of geocodePlaces) {
-      const country = allCountries.find(
-        (c) => c.id === p.countrySlug || c.name === p.countryName
-      );
-      const routeId = getCountryRouteId(country);
-      if (country && !byId.has(routeId)) byId.set(routeId, country);
-    }
-    let result = Array.from(byId.values());
+
     // Apply dropdown filters
-    if (selectedVisaType !== "All Visa Types") result = result.filter((c) => c.visaType === selectedVisaType);
-    if (selectedValidity !== "Any Validity") result = result.filter((c) => c.validity === selectedValidity);
-    if (selectedLengthOfStay !== "Any Length of Stay") result = result.filter((c) => c.lengthOfStay === selectedLengthOfStay);
-    if (selectedEntryType !== "Any Entry Type") result = result.filter((c) => c.entryType === selectedEntryType);
-    return result;
-  }, [searchDestination, popularCountryCards, trendingCountries, allCountries, geocodePlaces, selectedVisaType, selectedValidity, selectedLengthOfStay, selectedEntryType]);
+    if (selectedVisaType !== "All Visa Types") baseList = baseList.filter((c) => c.visaType === selectedVisaType);
+    if (selectedValidity !== "Any Validity") baseList = baseList.filter((c) => c.validity === selectedValidity);
+    if (selectedLengthOfStay !== "Any Length of Stay") baseList = baseList.filter((c) => c.lengthOfStay === selectedLengthOfStay);
+    if (selectedEntryType !== "Any Entry Type") baseList = baseList.filter((c) => c.entryType === selectedEntryType);
+    
+    return baseList;
+  }, [searchDestination, popularCountryCards, trendingCountries, allCountries, geocodePlaces, selectedVisaType, selectedValidity, selectedLengthOfStay, selectedEntryType, popularCountriesLoading]);
 
   const shouldShowPopularCountriesLoading =
     !searchDestination.trim() &&
@@ -756,7 +762,7 @@ const LandingPage = () => {
                 autoComplete="off"
                 className={`relative flex items-center justify-center transition-all duration-300 ${
                   effectiveMobileSearchExpanded
-                    ? "flex-1 rounded-full border border-slate-200 bg-slate-50 h-11 px-2 pr-1 shadow-inner"
+                    ? "flex-1 rounded-full border border-slate-200 bg-white h-11 px-2 pr-1 shadow-inner"
                     : "md:rounded-full md:border md:border-slate-200 md:bg-white md:h-11 md:w-full md:px-4 md:shadow-sm"
                 }`}
               >
@@ -810,7 +816,7 @@ const LandingPage = () => {
                               key={row.key}
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => handleSuggestionRowClick(row)}
-                              className="w-full flex items-start justify-between gap-3 px-4 py-3 text-sm text-text-primary hover:bg-slate-50 transition-colors text-left"
+                              className="w-full flex items-start justify-between gap-3 px-4 py-3 text-sm text-text-primary hover:bg-white transition-colors text-left"
                             >
                               <span className="flex flex-col gap-0.5 min-w-0 flex-1">
                                 {row.kind === "country" ? (
@@ -860,52 +866,52 @@ const LandingPage = () => {
               <div className="hidden lg:flex items-center gap-3 filter-dropdown-container pointer-events-auto">
                 {/* Visa Type */}
                 <div className="relative">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedVisaType' ? null : 'pinnedVisaType')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm font-medium text-text-primary shadow-sm backdrop-blur-md transition-colors hover:border-cyan hover:text-cyan">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedVisaType' ? null : 'pinnedVisaType')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm  transition-colors hover:border-cyan hover:text-cyan">
                     {selectedVisaType} <ChevronDown size={14} className={`transition-transform ${openDropdown === 'pinnedVisaType' ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === 'pinnedVisaType' && (
                     <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
                       {visaTypes.map((type) => (
-                        <button key={type} onClick={() => { setSelectedVisaType(type); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedVisaType === type ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>{type}</button>
+                        <button key={type} onClick={() => { setSelectedVisaType(type); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedVisaType === type ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-white hover:text-text-primary"}`}>{type}</button>
                       ))}
                     </div>
                   )}
                 </div>
                 {/* Validity */}
                 <div className="relative">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedValidity' ? null : 'pinnedValidity')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm font-medium text-text-primary shadow-sm backdrop-blur-md transition-colors hover:border-cyan hover:text-cyan">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedValidity' ? null : 'pinnedValidity')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm  transition-colors hover:border-cyan hover:text-cyan">
                     {selectedValidity} <ChevronDown size={14} className={`transition-transform ${openDropdown === 'pinnedValidity' ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === 'pinnedValidity' && (
                     <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
                       {validities.map((val) => (
-                        <button key={val} onClick={() => { setSelectedValidity(val); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedValidity === val ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>{val}</button>
+                        <button key={val} onClick={() => { setSelectedValidity(val); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedValidity === val ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-white hover:text-text-primary"}`}>{val}</button>
                       ))}
                     </div>
                   )}
                 </div>
                 {/* Length of Stay */}
                 <div className="relative">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedLength' ? null : 'pinnedLength')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm font-medium text-text-primary shadow-sm backdrop-blur-md transition-colors hover:border-cyan hover:text-cyan">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedLength' ? null : 'pinnedLength')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm  transition-colors hover:border-cyan hover:text-cyan">
                     {selectedLengthOfStay} <ChevronDown size={14} className={`transition-transform ${openDropdown === 'pinnedLength' ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === 'pinnedLength' && (
                     <div className="absolute left-0 top-full mt-2 w-56 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
                       {lengthsOfStay.map((len) => (
-                        <button key={len} onClick={() => { setSelectedLengthOfStay(len); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedLengthOfStay === len ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>{len}</button>
+                        <button key={len} onClick={() => { setSelectedLengthOfStay(len); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedLengthOfStay === len ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-white hover:text-text-primary"}`}>{len}</button>
                       ))}
                     </div>
                   )}
                 </div>
                 {/* Entry Type */}
                 <div className="relative">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedEntry' ? null : 'pinnedEntry')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm font-medium text-text-primary shadow-sm backdrop-blur-md transition-colors hover:border-cyan hover:text-cyan">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'pinnedEntry' ? null : 'pinnedEntry')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-text-primary shadow-sm  transition-colors hover:border-cyan hover:text-cyan">
                     {selectedEntryType} <ChevronDown size={14} className={`transition-transform ${openDropdown === 'pinnedEntry' ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === 'pinnedEntry' && (
                     <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
                       {entryTypes.map((type) => (
-                        <button key={type} onClick={() => { setSelectedEntryType(type); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedEntryType === type ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-slate-50 hover:text-text-primary"}`}>{type}</button>
+                        <button key={type} onClick={() => { setSelectedEntryType(type); setOpenDropdown(null); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedEntryType === type ? "bg-cyan/10 text-cyan font-semibold" : "text-text-secondary hover:bg-white hover:text-text-primary"}`}>{type}</button>
                       ))}
                     </div>
                   )}
@@ -919,13 +925,13 @@ const LandingPage = () => {
 
           {/* ── Standard Filter Bar (always visible in hero, sleek design) ── */}
           {siteConfig?.landingPage?.hideFilter !== true && (
-            <div ref={filterAnchorRef} className="mx-auto mt-6 sm:mt-8 w-full max-w-6xl flex flex-col lg:flex-row lg:items-center rounded-3xl lg:rounded-[48px] bg-white p-2 lg:p-2 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 filter-dropdown-container animate-home-enter [animation-delay:40ms]">
+            <div ref={filterAnchorRef} className="relative z-30 mx-auto mt-6 sm:mt-8 w-full max-w-6xl flex flex-col lg:flex-row lg:items-center rounded-3xl lg:rounded-[48px] bg-white p-2 lg:p-2 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 filter-dropdown-container animate-home-enter [animation-delay:40ms]">
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-1 lg:items-center w-full">
                 
                 {/* Visa Type */}
                 <div className="relative w-full lg:flex-1">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroVisaType' ? null : 'heroVisaType')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-slate-50 transition-colors lg:rounded-[36px] rounded-2xl group text-left">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroVisaType' ? null : 'heroVisaType')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-white transition-colors lg:rounded-[36px] rounded-2xl group text-left">
                     <div className="flex items-center gap-3 lg:gap-4 min-w-0">
                       <div className="flex-shrink-0 w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-[#eff4ff] text-[#0052cc] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <FileText size={20} className="lg:w-5 lg:h-5" strokeWidth={1.5} />
@@ -940,7 +946,7 @@ const LandingPage = () => {
                   {openDropdown === 'heroVisaType' && (
                     <div className="absolute left-0 top-full z-10 mt-2 w-[calc(100vw-3rem)] sm:w-64 lg:w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
                       {visaTypes.map((type) => (
-                        <button key={type} onClick={() => { setSelectedVisaType(type); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedVisaType === type ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>{type}</button>
+                        <button key={type} onClick={() => { setSelectedVisaType(type); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedVisaType === type ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>{type}</button>
                       ))}
                     </div>
                   )}
@@ -950,7 +956,7 @@ const LandingPage = () => {
 
                 {/* Validity */}
                 <div className="relative w-full lg:flex-1">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroValidity' ? null : 'heroValidity')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-slate-50 transition-colors lg:rounded-[36px] rounded-2xl group text-left">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroValidity' ? null : 'heroValidity')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-white transition-colors lg:rounded-[36px] rounded-2xl group text-left">
                     <div className="flex items-center gap-3 lg:gap-4 min-w-0">
                       <div className="flex-shrink-0 w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-[#eff4ff] text-[#0052cc] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <CalendarDays size={20} className="lg:w-5 lg:h-5" strokeWidth={1.5} />
@@ -965,7 +971,7 @@ const LandingPage = () => {
                   {openDropdown === 'heroValidity' && (
                     <div className="absolute left-0 top-full z-10 mt-2 w-[calc(100vw-3rem)] sm:w-64 lg:w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
                       {validities.map((val) => (
-                        <button key={val} onClick={() => { setSelectedValidity(val); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedValidity === val ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>{val}</button>
+                        <button key={val} onClick={() => { setSelectedValidity(val); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedValidity === val ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>{val}</button>
                       ))}
                     </div>
                   )}
@@ -975,7 +981,7 @@ const LandingPage = () => {
 
                 {/* Length of Stay */}
                 <div className="relative w-full lg:flex-1">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroLength' ? null : 'heroLength')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-slate-50 transition-colors lg:rounded-[36px] rounded-2xl group text-left">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroLength' ? null : 'heroLength')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-white transition-colors lg:rounded-[36px] rounded-2xl group text-left">
                     <div className="flex items-center gap-3 lg:gap-4 min-w-0">
                       <div className="flex-shrink-0 w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-[#eff4ff] text-[#0052cc] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <Clock size={20} className="lg:w-5 lg:h-5" strokeWidth={1.5} />
@@ -990,7 +996,7 @@ const LandingPage = () => {
                   {openDropdown === 'heroLength' && (
                     <div className="absolute right-0 lg:left-0 top-full z-10 mt-2 w-[calc(100vw-3rem)] sm:w-64 lg:w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
                       {lengthsOfStay.map((len) => (
-                        <button key={len} onClick={() => { setSelectedLengthOfStay(len); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedLengthOfStay === len ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>{len}</button>
+                        <button key={len} onClick={() => { setSelectedLengthOfStay(len); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedLengthOfStay === len ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>{len}</button>
                       ))}
                     </div>
                   )}
@@ -1000,7 +1006,7 @@ const LandingPage = () => {
 
                 {/* Entry Type */}
                 <div className="relative w-full lg:flex-1">
-                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroEntry' ? null : 'heroEntry')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-slate-50 transition-colors lg:rounded-[36px] rounded-2xl group text-left">
+                  <button type="button" onClick={() => setOpenDropdown(openDropdown === 'heroEntry' ? null : 'heroEntry')} className="flex items-center justify-between w-full p-2 sm:p-3 lg:px-5 lg:py-2 hover:bg-white transition-colors lg:rounded-[36px] rounded-2xl group text-left">
                     <div className="flex items-center gap-3 lg:gap-4 min-w-0">
                       <div className="flex-shrink-0 w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-[#eff4ff] text-[#0052cc] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <Plane size={20} className="lg:w-5 lg:h-5" strokeWidth={1.5} />
@@ -1015,7 +1021,7 @@ const LandingPage = () => {
                   {openDropdown === 'heroEntry' && (
                     <div className="absolute right-0 lg:left-0 top-full z-10 mt-2 w-[calc(100vw-3rem)] sm:w-64 lg:w-[120%] rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
                       {entryTypes.map((type) => (
-                        <button key={type} onClick={() => { setSelectedEntryType(type); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedEntryType === type ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>{type}</button>
+                        <button key={type} onClick={() => { setSelectedEntryType(type); setOpenDropdown(null); }} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-colors ${selectedEntryType === type ? "bg-[#eff4ff] text-[#0052cc] font-semibold" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}>{type}</button>
                       ))}
                     </div>
                   )}
@@ -1024,7 +1030,7 @@ const LandingPage = () => {
                 {/* Clear All */}
                 {(selectedVisaType !== "All Visa Types" || selectedValidity !== "Any Validity" || selectedLengthOfStay !== "Any Length of Stay" || selectedEntryType !== "Any Entry Type") && (
                   <div className="col-span-1 sm:col-span-2 lg:col-span-1 flex justify-center lg:justify-end lg:pr-4 mt-2 lg:mt-0">
-                    <button onClick={clearFilters} className="flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-rose-500 transition-colors whitespace-nowrap lg:p-2 lg:bg-slate-50 lg:hover:bg-rose-50 lg:rounded-full">
+                    <button onClick={clearFilters} className="flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-rose-500 transition-colors whitespace-nowrap lg:p-2 lg:bg-white lg:hover:bg-rose-50 lg:rounded-full">
                       <span className="lg:hidden">Clear all filters</span>
                       <X size={16} className="hidden lg:block" />
                     </button>

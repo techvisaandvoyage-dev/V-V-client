@@ -314,8 +314,6 @@ const Footer = () => {
                         <li key={link.slug}>
                           <Link
                             to={`/page/${link.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="text-base text-text-secondary hover:text-cyan transition-colors duration-200 block"
                           >
                             {link.label}

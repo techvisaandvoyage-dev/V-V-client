@@ -52,11 +52,6 @@ const formatDate = (iso) => {
   return formatOrdinalDate(d);
 };
 
-const SORT_OPTIONS = [
-  { id: "latest", label: "Latest" },
-  { id: "trending", label: "Trending" },
-  { id: "likes", label: "Most Liked" },
-];
 
 /**
  * One card in the grid — matches the reference layout (image with date badge,
@@ -298,7 +293,7 @@ const BlogListingPage = () => {
       </section>
 
       {/* ── Category bar ────────────────────────────────────── */}
-      <div className="bg-surface border-b border-border sticky top-16 z-30">
+      <div className="bg-surface border-b border-border sticky top-16 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {navItems.map((item) => {
             const isActive = activeCategory === item.slug || activeCategory === item._id;
@@ -324,21 +319,6 @@ const BlogListingPage = () => {
             );
           })}
 
-          <div className="ml-auto hidden md:flex items-center gap-1 py-2">
-            {SORT_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => setParam("sort", opt.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
-                  sortKey === opt.id
-                    ? "bg-cyan/10 text-cyan border border-cyan-border"
-                    : "text-text-muted hover:text-text-primary"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 

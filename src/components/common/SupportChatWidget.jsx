@@ -597,7 +597,7 @@ export default function SupportChatWidget() {
                   </div>
 
                   {/* Continue with WhatsApp (Shown below chat) */}
-                  {chatConfig.enabled && (
+                  {chatConfig.enabled && !chatConfig.hideWhatsAppSection && (
                     <div className="rounded-[1.6rem] border border-[#86E7AE] bg-[linear-gradient(180deg,#F8FFF9_0%,#F0FFF4_100%)] p-4 text-left shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
                       <div className="flex items-center gap-4">
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_10px_24px_rgba(37,211,102,0.24)]">

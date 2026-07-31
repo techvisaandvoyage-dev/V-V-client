@@ -173,7 +173,7 @@ const Navbar = () => {
                     }`}
                     role="menu"
                   >
-                    <div className="px-4 py-3 border-b border-border bg-slate-50/50">
+                    <div className="px-4 py-3 border-b border-border bg-white">
                       <p className="text-sm font-semibold text-text-primary truncate">
                         {user?.name || "User"}
                       </p>
@@ -259,7 +259,7 @@ const Navbar = () => {
         {mobileMenuOpen && (
             <div className="md:hidden border-t border-border bg-white overflow-hidden animate-mobile-menu-in">
               {isAuthenticated && (
-                <div className="px-4 py-3 border-b border-border bg-slate-50/50 text-center">
+                <div className="px-4 py-3 border-b border-border bg-white text-center">
                   <p className="text-sm font-semibold text-text-primary truncate">
                     {user?.name || "User"}
                   </p>
